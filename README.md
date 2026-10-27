@@ -35,6 +35,6 @@ Sugo converts PDFs, screenshots, images, Office files, e-books, emails and web p
 
 ## License
 
-AGPL-3.0 (see [ADR-010](docs/adr/ADR-010-license.md)).
+AGPL-3.0-or-later (see [ADR-010](docs/adr/ADR-010-license.md)).
 
 🇮🇹 [Leggi in italiano](README.it.md)

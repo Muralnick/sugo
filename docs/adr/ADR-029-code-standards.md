@@ -2,7 +2,8 @@
 
 **Status:** Accepted  
 **Date:** 2026-10-27  
-**Deciders:** project author
+**Deciders:** project author  
+**Amended by:** ADR-036 (network access boundaries)
 
 ## Context
 

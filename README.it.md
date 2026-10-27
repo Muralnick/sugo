@@ -23,6 +23,6 @@ Sugo converte PDF, screenshot, immagini, file Office, e-book, email e pagine web
 
 ## Licenza
 
-AGPL-3.0.
+AGPL-3.0-or-later (vedi [ADR-010](docs/adr/ADR-010-license.md)).
 
 🇬🇧 [Read in English](README.md)

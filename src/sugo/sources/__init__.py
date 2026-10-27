@@ -1,1 +1,1 @@
-"""Sources: fetch remote content; the only package allowed to use the network."""
+"""Sources: fetch remote content through the network gateway (sugo._internal.net)."""

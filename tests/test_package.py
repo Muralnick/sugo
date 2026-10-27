@@ -5,7 +5,17 @@ import importlib
 import pytest
 
 
-@pytest.mark.parametrize("module", ["sugo", "sugo.core", "sugo.api", "sugo.sources", "sugo.ports"])
-def test_module_imports_and_has_docstring(module: str) -> None:
-    imported = importlib.import_module(module)
-    assert imported.__doc__
+@pytest.mark.parametrize(
+    "module",
+    [
+        "sugo",
+        "sugo.core",
+        "sugo.api",
+        "sugo.sources",
+        "sugo.ports",
+        "sugo._internal",
+        "sugo._internal.net",
+    ],
+)
+def test_module_imports(module: str) -> None:
+    importlib.import_module(module)

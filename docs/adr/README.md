@@ -11,7 +11,7 @@
 | [007](ADR-007-engine-levels.md) | Three engine levels: lite, normal, quality | Accepted |
 | [008](ADR-008-quality-vlm.md) | VLM choice for the quality level | Accepted |
 | [009](ADR-009-platforms-python.md) | Platforms and Python version | Accepted |
-| [010](ADR-010-license.md) | Licence: AGPL-3.0 | Accepted |
+| [010](ADR-010-license.md) | Licence: AGPL-3.0-or-later | Accepted |
 | [011](ADR-011-configuration.md) | Layered TOML configuration with policies | Accepted |
 | [012](ADR-012-extensions.md) | Extension system via entry points | Accepted |
 | [013](ADR-013-models-offline.md) | Model management and offline mode | Accepted |
@@ -37,3 +37,4 @@
 | [033](ADR-033-release-supply-chain.md) | Distribution, CI and release supply chain | Accepted |
 | [034](ADR-034-project-name.md) | Project name: Sugo | Accepted |
 | [035](ADR-035-dev-toolchain.md) | Development toolchain and build backend | Accepted |
+| [036](ADR-036-network-boundaries.md) | Network access boundaries | Accepted |

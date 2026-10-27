@@ -24,7 +24,7 @@ Sugo is a local, offline-first Python application that converts documents, scree
 ## Hard rules
 
 - Python 3.12, managed with `uv`. Pinned dependencies with hashes in `uv.lock`.
-- Never use `eval`, `exec`, `pickle`, `subprocess` with `shell=True`, or network access outside `src/sugo/sources/`.
+- Never use `eval`, `exec`, `pickle`, `subprocess` with `shell=True`, or network access outside the boundaries of ADR-036: outbound internet only through `src/sugo/_internal/net/` (called only by `sources`, `models`, `setup`); local networking only in `ports` and `core/engine`.
 - Never use `print`; use the structured logger or the ports.
 - Never log document content or file names at default log level.
 - Plugins and cleaners **propose** changes to the intermediate representation; only the core applies them. Removal = mark `removed` with `removed_by` and `reason`, never delete.

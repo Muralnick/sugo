@@ -13,7 +13,7 @@ Rules are enforced by tools wherever possible: a written rule that no tool check
 | Errors | No bare `except`, no swallowed exceptions; use the error model (`code`, `message`, `hint`, `details`) | ruff, review |
 | Output | No `print`; structured logging or ports only | ruff (`T20`) |
 | Forbidden | `eval`, `exec`, `pickle`, `marshal`, `subprocess(..., shell=True)`, `yaml.load` without safe loader, stdlib XML parsers | ruff, Bandit, Semgrep |
-| Network | Only `src/sugo/sources/` may import network libraries | `import-linter` |
+| Network | Outbound internet only through `sugo._internal.net`, called only by `sources`, `models` and `setup`; local networking only in `ports` and `core.engine` (ADR-036) | `import-linter`, ruff |
 | Architecture | Core never imports ports; packs and plugins use only `sugo.api` | `import-linter` |
 | Dependencies | Minimal, pinned with hashes, licence on the allow-list, at least 14 days old, justified in an ADR | CI licence check, Renovate config |
 | Tests | Every change ships with tests; core coverage ≥ 90% | CI |

@@ -3,7 +3,7 @@ name = "sugo"
 version = "0.0.0"
 description = "Documents, reduced: local conversion of documents and screenshots into compact Markdown for LLMs and RAG."
 readme = "README.md"
-license = "AGPL-3.0-only"
+license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.12,<3.13"
 dependencies = []
@@ -83,10 +83,11 @@ select = [
 "xml.dom.expatbuilder".msg = "Parse XML only with defusedxml (CLAUDE.md)."
 "xml.sax".msg = "Parse XML only with defusedxml (CLAUDE.md)."
 "xml.parsers.expat".msg = "Parse XML only with defusedxml (CLAUDE.md)."
-# import-linter can only forbid whole top-level packages, and urllib.parse is
-# harmless, so urllib.request is banned here; sugo.sources marks each allowed
-# import with an explicit `# noqa: TID251`.
-"urllib.request".msg = "Network access only in sugo.sources (PRINCIPLES.md #1)."
+# import-linter can only forbid whole top-level packages, and urllib.parse and
+# http.HTTPStatus are harmless, so the client submodules are banned here
+# (ADR-036). Only sugo._internal.net may import them, each with `# noqa: TID251`.
+"urllib.request".msg = "Outbound access only through sugo._internal.net (ADR-036)."
+"http.client".msg = "Outbound access only through sugo._internal.net (ADR-036)."
 
 # --- mypy -----------------------------------------------------------------
 
@@ -138,19 +139,20 @@ type = "forbidden"
 source_modules = ["sugo.core"]
 forbidden_modules = ["sugo.ports"]
 
+# Network boundaries (ADR-036). Each contract ignores the imports made by the
+# modules it allows, which also cuts indirect chains through them; unmatched
+# ignores are expected until those packages exist.
+
 [[tool.importlinter.contracts]]
-name = "Network access only in sugo.sources"
+name = "Internet client libraries only in the network gateway"
 type = "forbidden"
 source_modules = ["sugo"]
 forbidden_modules = [
     # Standard library
     "ftplib",
-    "http",
     "imaplib",
     "poplib",
     "smtplib",
-    "socket",
-    "socketserver",
     "ssl",
     "xmlrpc",
     # Third-party clients
@@ -160,6 +162,45 @@ forbidden_modules = [
     "urllib3",
     "websockets",
 ]
-# sugo.sources is the single gateway to the network (ADR-016).
-ignore_imports = ["sugo.sources -> *", "sugo.sources.** -> *"]
+ignore_imports = ["sugo._internal.net -> *", "sugo._internal.net.** -> *"]
+unmatched_ignore_imports_alerting = "none"
+
+[[tool.importlinter.contracts]]
+name = "Local networking only in ports, engine and gateway"
+type = "forbidden"
+source_modules = ["sugo"]
+forbidden_modules = ["http", "socket", "socketserver"]
+ignore_imports = [
+    "sugo.ports -> *",
+    "sugo.ports.** -> *",
+    "sugo.core.engine -> *",
+    "sugo.core.engine.** -> *",
+    "sugo._internal.net -> *",
+    "sugo._internal.net.** -> *",
+]
+unmatched_ignore_imports_alerting = "none"
+
+[[tool.importlinter.contracts]]
+name = "Network gateway used only by sources, models and setup"
+type = "forbidden"
+# "sugo.*" rather than "sugo": import-linter skips a source module that
+# contains the forbidden one. Known gap, left to review: the top-level
+# sugo/__init__.py and other sugo._internal modules are not checked.
+source_modules = ["sugo.*"]
+forbidden_modules = ["sugo._internal.net"]
+# A "*" target matches one name segment only, so the gateway is named in full.
+ignore_imports = [
+    "sugo.sources -> sugo._internal.net",
+    "sugo.sources -> sugo._internal.net.**",
+    "sugo.sources.** -> sugo._internal.net",
+    "sugo.sources.** -> sugo._internal.net.**",
+    "sugo.models -> sugo._internal.net",
+    "sugo.models -> sugo._internal.net.**",
+    "sugo.models.** -> sugo._internal.net",
+    "sugo.models.** -> sugo._internal.net.**",
+    "sugo.setup -> sugo._internal.net",
+    "sugo.setup -> sugo._internal.net.**",
+    "sugo.setup.** -> sugo._internal.net",
+    "sugo.setup.** -> sugo._internal.net.**",
+]
 unmatched_ignore_imports_alerting = "none"

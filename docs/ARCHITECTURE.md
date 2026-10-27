@@ -99,7 +99,7 @@ Normalised coordinates let the same positional rules work on phone screenshots, 
 
 | Module | Contract | Notes |
 |---|---|---|
-| Source | `fetch(ref) → content + metadata` | Only component allowed to use the network (ADR-016) |
+| Source | `fetch(ref) → content + metadata` | Reaches the internet only through the network gateway (ADR-016, ADR-036) |
 | Container | `list() → entries`, `open(entry) → content` | Folders, archives, emails, PDFs with attachments (ADR-020) |
 | Extractor | `supports(input) → score`, `extract(input) → stream of Page` | Router picks the best score |
 | Analyzer | `observe(page)`, `finalize() → stats` | For cleaners needing document-wide context |
@@ -525,7 +525,7 @@ First run measures RAM, cores, GPU, VRAM and runs an FP16 self-test; a resolver 
 
 Model registry entries: task, scripts, levels, format, RAM/VRAM, licence, **pinned revision**, SHA-256, sources (Hugging Face, ModelScope fallback). Downloads on demand with consent, resumable, atomic after verification; single cache with Docling, RapidOCR and Hugging Face caches redirected to it. Offline bundles: `sugo models bundle` / `sugo models install`. Safe formats only (ONNX, safetensors, GGUF), no `trust_remote_code`. MCP never triggers downloads. New model versions become default only after benchmark gates. `sugo models list|prune|licenses|update`.
 
-Offline mode: library offline switches plus a Python-level network guard with logging; for certifiable guarantees, documentation explains OS-level methods (container without network, firewall).
+Offline mode: library offline switches plus a Python-level network guard with logging, enforced in the network gateway `sugo._internal.net` (ADR-036); for certifiable guarantees, documentation explains OS-level methods (container without network, firewall).
 
 Indicative disk footprint (to be measured): lite tens of MB; normal a few hundred MB; quality about 2 GB more.
 
@@ -592,7 +592,7 @@ sugo/
 │   ├── config/  setup/  i18n/
 │   ├── ports/               cli/, shell/, mcp/, web/, service/
 │   ├── data/                profiles, recipes, providers, cards
-│   └── _internal/
+│   └── _internal/           private helpers; net/ is the only gateway to the internet (ADR-036)
 ├── packs/                   official packs, separate distributions (uv workspace)
 │   ├── sugo-pack-anonymize/
 │   ├── sugo-pack-italy/
