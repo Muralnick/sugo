@@ -36,3 +36,4 @@
 | [032](ADR-032-repository-layout.md) | Monorepo with packs as separate distributions | Accepted |
 | [033](ADR-033-release-supply-chain.md) | Distribution, CI and release supply chain | Accepted |
 | [034](ADR-034-project-name.md) | Project name: Sugo | Accepted |
+| [035](ADR-035-dev-toolchain.md) | Development toolchain and build backend | Accepted |

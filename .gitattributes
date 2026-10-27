@@ -1,0 +1,21 @@
+# Store and check out every text file with LF endings on every OS, so diffs,
+# hashes and golden outputs are identical on Linux, Windows and macOS.
+* text=auto eol=lf
+
+# Binary formats: never convert line endings or show text diffs.
+*.png      binary
+*.jpg      binary
+*.jpeg     binary
+*.webp     binary
+*.gif      binary
+*.heic     binary
+*.ico      binary
+*.pdf      binary
+*.zip      binary
+*.gz       binary
+*.onnx     binary
+*.gguf     binary
+*.safetensors binary
+*.db       binary
+*.sqlite   binary
+*.mo       binary

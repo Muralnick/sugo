@@ -1,0 +1,165 @@
+[project]
+name = "sugo"
+version = "0.0.0"
+description = "Documents, reduced: local conversion of documents and screenshots into compact Markdown for LLMs and RAG."
+readme = "README.md"
+license = "AGPL-3.0-only"
+license-files = ["LICENSE"]
+requires-python = ">=3.12,<3.13"
+dependencies = []
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+    # Blocks accidental uploads until the v0.1 release (roadmap step 9).
+    "Private :: Do Not Upload",
+]
+
+[dependency-groups]
+# Development tools only; see ADR-035. Exact versions and hashes live in uv.lock.
+dev = [
+    "import-linter>=2.15",
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
+    "ruff>=0.17.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.0,<0.14"]
+build-backend = "uv_build"
+
+# --- uv -------------------------------------------------------------------
+
+[tool.uv]
+# Relative durations in exclude-newer need uv 0.13 (ADR-035).
+required-version = ">=0.13.0"
+# Enforces the 14-day minimum age for every dependency (CLAUDE.md, ADR-035).
+exclude-newer = "14 days"
+
+[tool.uv.workspace]
+# Official packs, each a separate distribution (ADR-032).
+members = ["packs/*"]
+
+# --- ruff -----------------------------------------------------------------
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",       # pycodestyle errors, incl. E722 bare except
+    "W",       # pycodestyle warnings
+    "F",       # pyflakes
+    "I",       # import sorting
+    "N",       # naming
+    "B",       # bugbear
+    "UP",      # modern syntax for the target version
+    "S",       # security: eval, exec, pickle, shell=True, yaml.load, XML
+    "T20",     # no print
+    "BLE",     # no blind except
+    "TID",     # banned imports (see banned-api below)
+    "PT",      # pytest style
+    "SIM",     # simplifications
+    "RUF",     # ruff-specific
+    "PLR2004", # no magic numbers: limits live in sugo/core/constants.py
+    "D100",    # every module starts with a docstring
+    "D104",    # every package starts with a docstring
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert and compare against literal expected values by design.
+"tests/**" = ["S101", "PLR2004"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"pickle".msg = "Unsafe deserialization is forbidden (CODE_STYLE.md)."
+"marshal".msg = "Unsafe deserialization is forbidden (CODE_STYLE.md)."
+"shelve".msg = "Built on pickle; forbidden (CODE_STYLE.md)."
+"xml.etree.ElementTree".msg = "Parse XML only with defusedxml (CLAUDE.md)."
+"xml.etree.cElementTree".msg = "Parse XML only with defusedxml (CLAUDE.md)."
+"xml.dom.minidom".msg = "Parse XML only with defusedxml (CLAUDE.md)."
+"xml.dom.pulldom".msg = "Parse XML only with defusedxml (CLAUDE.md)."
+"xml.dom.expatbuilder".msg = "Parse XML only with defusedxml (CLAUDE.md)."
+"xml.sax".msg = "Parse XML only with defusedxml (CLAUDE.md)."
+"xml.parsers.expat".msg = "Parse XML only with defusedxml (CLAUDE.md)."
+# import-linter can only forbid whole top-level packages, and urllib.parse is
+# harmless, so urllib.request is banned here; sugo.sources marks each allowed
+# import with an explicit `# noqa: TID251`.
+"urllib.request".msg = "Network access only in sugo.sources (PRINCIPLES.md #1)."
+
+# --- mypy -----------------------------------------------------------------
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src", "tests"]
+mypy_path = "src"
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+check_untyped_defs = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+# Strict typing where correctness matters most (CODE_STYLE.md, ADR-029).
+# Add "sugo.security.*" when that package is created (warn_unused_configs).
+module = ["sugo.core.*", "sugo.api.*"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_untyped_decorators = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+warn_return_any = true
+no_implicit_reexport = true
+extra_checks = true
+
+# --- pytest ---------------------------------------------------------------
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
+xfail_strict = true
+filterwarnings = ["error"]
+markers = [
+    "invariant: enforces a principle in PRINCIPLES.md; never weaken or skip",
+]
+
+# --- import-linter --------------------------------------------------------
+
+[tool.importlinter]
+root_package = "sugo"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Core never imports ports"
+type = "forbidden"
+source_modules = ["sugo.core"]
+forbidden_modules = ["sugo.ports"]
+
+[[tool.importlinter.contracts]]
+name = "Network access only in sugo.sources"
+type = "forbidden"
+source_modules = ["sugo"]
+forbidden_modules = [
+    # Standard library
+    "ftplib",
+    "http",
+    "imaplib",
+    "poplib",
+    "smtplib",
+    "socket",
+    "socketserver",
+    "ssl",
+    "xmlrpc",
+    # Third-party clients
+    "aiohttp",
+    "httpx",
+    "requests",
+    "urllib3",
+    "websockets",
+]
+# sugo.sources is the single gateway to the network (ADR-016).
+ignore_imports = ["sugo.sources -> *", "sugo.sources.** -> *"]
+unmatched_ignore_imports_alerting = "none"
