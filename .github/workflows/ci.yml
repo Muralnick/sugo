@@ -15,7 +15,8 @@ concurrency:
 
 jobs:
   checks:
-    name: Lint, types, boundaries, tests (Linux)
+    # Required by the main branch ruleset; renaming it blocks every pull request.
+    name: checks
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:

@@ -58,3 +58,12 @@ uv run lint-imports          # architectural boundaries
 ## Commit conventions
 
 Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`). Mention AI assistance with a `Co-authored-by` trailer, consistent with `AI_WORKFLOW.md`.
+
+## Git workflow
+
+`main` is protected: every change reaches it through a pull request whose CI check (`checks`) passes.
+
+1. Never commit directly to `main`. Start each piece of work on a new branch from an up-to-date `main`, named `<type>/<short-description>` with a Conventional Commits type (e.g. `feat/ir-models`, `fix/ocr-timeout`, `docs/pr-workflow`).
+2. Run the commands above locally before pushing.
+3. Push the branch with `git push -u origin <branch>` and open the pull request with `gh pr create`. The description summarises the change, lists the checks run, follows the checklist in `CONTRIBUTING.md` and declares AI assistance.
+4. The maintainer reviews and merges. Do not merge a pull request unless the maintainer asks you to.

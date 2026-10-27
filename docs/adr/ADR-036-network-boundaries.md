@@ -3,7 +3,8 @@
 **Status:** Accepted  
 **Date:** 2026-10-27  
 **Deciders:** project author  
-**Amends:** principle 1 in `PRINCIPLES.md`, ADR-016, ADR-029
+**Amends:** principle 1 in `PRINCIPLES.md`, ADR-016, ADR-029  
+**Discussion:** [Muralnick/sugo#1](https://github.com/Muralnick/sugo/issues/1)
 
 ## Context
 
