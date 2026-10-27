@@ -1,8 +1,11 @@
-# Checks run on every push and pull request (ADR-033, "every push" tier).
+# Checks run on every change (ADR-033, "every push" tier): on pull requests
+# for work branches, and on push to main after a merge. Running on push for
+# every branch would check each pull request twice.
 name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 # Least privilege: the workflow only reads the repository.
