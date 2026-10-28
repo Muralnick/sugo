@@ -24,4 +24,10 @@ def extract_page(data: bytes, engine: OcrEngine) -> Page:
         if classification.kind is ImageKind.BLANK
         else engine.read(preprocess(image, classification))
     )
-    return build_page(lines, width=image.width, height=image.height, origin_engine=ENGINE_NAME)
+    return build_page(
+        lines,
+        width=image.width,
+        height=image.height,
+        origin_engine=ENGINE_NAME,
+        screenshot=classification.kind is ImageKind.SCREENSHOT,
+    )

@@ -90,3 +90,33 @@ LAYOUT_COLUMN_GAP: Final = 1.5
 # Two boxes are on the same text row when their vertical overlap exceeds this
 # share of the shorter box's height.
 LAYOUT_SAME_ROW_OVERLAP: Final = 0.5
+
+# --- Screenshot detectors (roadmap step 3a) ----------------------------------
+# Conservative on purpose: leaving noise costs a few tokens, removing content
+# breaks principle 3. Initial values, to be calibrated (step 8).
+
+# Share of the screenshot height at the top and bottom where status bars,
+# navigation bars and icon rows live. A phone status bar is about 5% of the
+# height (140 of 2532 px on an iPhone), a desktop menu bar about 2-3%.
+UI_CHROME_EDGE_BAND: Final = 0.06
+
+# Longest text treated as an icon misread by OCR (e.g. "Q", "<", "@") when it
+# sits alone in an edge band.
+UI_CHROME_ICON_MAX_CHARS: Final = 2
+
+# A chat bubble is left-aligned when its text starts within this share of the
+# width from the left edge and ends before the same margin from the right edge;
+# right-aligned symmetrically. Centred or full-width text is neither.
+CHAT_SIDE_MARGIN: Final = 0.15
+
+# A screenshot is a chat when it has at least this many aligned bubbles, on
+# both sides, making up at least this share of its text blocks.
+CHAT_MIN_MESSAGES: Final = 3
+CHAT_MIN_ALIGNED_SHARE: Final = 0.6
+
+# A text block is code when at least this share of its rows shows code syntax
+# (keywords, brackets, operators at the end or start of the row).
+CODE_MIN_SIGNAL_SHARE: Final = 0.5
+# ...and at least this many rows: a one-row heading ending with ":" must never
+# become code.
+CODE_MIN_SIGNAL_ROWS: Final = 2
