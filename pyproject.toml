@@ -121,7 +121,7 @@ strict_equality = true
 [[tool.mypy.overrides]]
 # Strict typing where correctness matters most (CODE_STYLE.md, ADR-029).
 # Add "sugo.security.*" when that package is created (warn_unused_configs).
-module = ["sugo.core.*", "sugo.api.*", "sugo.metrics.*", "sugo.extractors.*"]
+module = ["sugo.core.*", "sugo.api.*", "sugo.metrics.*", "sugo.extractors.*", "sugo.cleaners.*"]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 disallow_untyped_calls = true
@@ -155,6 +155,13 @@ name = "Core never imports ports"
 type = "forbidden"
 source_modules = ["sugo.core"]
 forbidden_modules = ["sugo.ports"]
+
+# Cleaners see only the IR and propose decisions; the core applies them (ADR-041).
+[[tool.importlinter.contracts]]
+name = "Cleaners work on the IR only"
+type = "forbidden"
+source_modules = ["sugo.cleaners"]
+forbidden_modules = ["sugo.extractors", "sugo.ports"]
 
 # Network boundaries (ADR-036). Each contract ignores the imports made by the
 # modules it allows, which also cuts indirect chains through them; unmatched
