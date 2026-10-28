@@ -55,3 +55,22 @@ DARK_MODE_MEDIAN_LUMINANCE: Final = 128
 # to be calibrated (step 8).
 SMALL_IMAGE_LONG_SIDE: Final = 600
 SMALL_IMAGE_UPSCALE: Final = 2
+
+# --- OCR (roadmap step 2b, ADR-039) -----------------------------------------
+
+# SHA-256 of the PP-OCRv6 small models bundled in rapidocr 3.10.0, identical to
+# the hashes in RapidOCR's own model registry (default_models.yaml). A mismatch
+# means the installed file was altered.
+PPOCRV6_DET_SMALL_SHA256: Final = "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f"
+PPOCRV6_REC_SMALL_SHA256: Final = "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884"
+
+# The text detector shrinks images so their long side is at most this many
+# pixels. RapidOCR's default instead enlarges every image to a 736 px short
+# side, which made detection several times slower in the ADR-039 spike.
+OCR_DETECTION_MAX_SIDE: Final = 960
+
+# Recognition confidence (0-1) below which a line is treated as unreadable: it
+# is kept as an illegible line without text, never guessed (principle 4). Same
+# value as RapidOCR's own default filter, which Sugo disables because it drops
+# lines silently. Initial value, to be calibrated (step 8).
+OCR_MIN_CONFIDENCE: Final = 0.5

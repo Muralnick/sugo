@@ -123,7 +123,7 @@ extractors/image/
 ├── loader.py       safe decoding: magic bytes, size and pixel limits before decoding
 ├── classifier.py   screenshot · document photo · no text (skip early)
 ├── preprocess.py   dark mode inversion, upscaling small fonts, deskew and perspective
-├── ocr_engine.py   multi-script OCR with confidence threshold
+├── ocr_engine.py   multi-script OCR with confidence threshold; hash-checked models, low-confidence lines kept as illegible
 ├── layout.py       reading-order reconstruction (lines, columns, blocks)
 └── detectors.py    chat, code, tables, UI chrome
 ```
@@ -634,8 +634,8 @@ Versioning: SemVer; 0.x may change contracts with notice; 1.0 when contracts are
 | Item | Status |
 |---|---|
 | PP-OCRv6 availability in RapidOCR packages (else convert to ONNX) | Verified: `rapidocr` 3.10.0 bundles PP-OCRv6 *small* (ADR-039) |
-| Deskew and perspective correction of document photos | Deferred to step 2b (needs OpenCV) |
-| OCR speed on the reference machine: dense phone screenshot ~7.7 s warm vs < 2 s target | To investigate (ADR-039) |
+| Deskew and perspective correction of document photos | Deferred: separate pull request after the layout module (2c) |
+| OCR speed on the reference machine: dense phone screenshot ~7.4 s warm with the bundled small models vs < 2 s target; tiny models ~2.1 s but no Japanese (`benchmarks/ocr_speed.py`, ADR-039) | Decision pending |
 | PaddleOCR-VL on macOS | To verify |
 | Exact options to redirect Docling, RapidOCR and Hugging Face caches | To verify |
 | llama.cpp + Vulkan backend for AMD/Intel GPUs on Windows | To evaluate |
