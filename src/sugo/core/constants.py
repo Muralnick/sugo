@@ -120,3 +120,18 @@ CODE_MIN_SIGNAL_SHARE: Final = 0.5
 # ...and at least this many rows: a one-row heading ending with ":" must never
 # become code.
 CODE_MIN_SIGNAL_ROWS: Final = 2
+
+# --- Markdown serializer (roadmap step 4, ADR-042) --------------------------
+
+# CommonMark code fences are at least three backticks, and must be longer than
+# any backtick run inside the code, or the code would close its own fence.
+MARKDOWN_MIN_FENCE: Final = 3
+
+# Continuation lines of list items and chat messages are indented by this many
+# spaces, so a line such as "right: I agree" inside a left bubble cannot be
+# read as a new message. Two spaces keep a list item's continuation inside it.
+MARKDOWN_CONTINUATION_INDENT: Final = 2
+
+# A line indented by up to three spaces can still open Markdown structure
+# (heading, list, quote); four or more make an indented code block instead.
+MARKDOWN_MAX_STRUCTURE_INDENT: Final = 3
