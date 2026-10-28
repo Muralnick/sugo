@@ -24,4 +24,4 @@ Rules are enforced by tools wherever possible: a written rule that no tool check
 
 MIT, BSD-2-Clause, BSD-3-Clause, Apache-2.0, ISC, PSF-2.0, MPL-2.0, LGPL (dynamic use), AGPL-3.0, GPL-3.0-compatible. Anything else requires an ADR.
 
-Approved exceptions: CNRI-Python, only as part of `regex` (dependency of tiktoken, ADR-038).
+Approved exceptions: CNRI-Python, only as part of `regex` (dependency of tiktoken, ADR-038); MIT-CMU for Pillow, and Zlib, 0BSD and CC0-1.0 for parts of numpy (ADR-039).

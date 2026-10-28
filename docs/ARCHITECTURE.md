@@ -120,6 +120,7 @@ Models are immutable, strictly validated pydantic models (ADR-037): a change is 
 
 ```
 extractors/image/
+├── loader.py       safe decoding: magic bytes, size and pixel limits before decoding
 ├── classifier.py   screenshot · document photo · no text (skip early)
 ├── preprocess.py   dark mode inversion, upscaling small fonts, deskew and perspective
 ├── ocr_engine.py   multi-script OCR with confidence threshold
@@ -632,7 +633,9 @@ Versioning: SemVer; 0.x may change contracts with notice; 1.0 when contracts are
 
 | Item | Status |
 |---|---|
-| PP-OCRv6 availability in RapidOCR packages (else convert to ONNX) | To verify |
+| PP-OCRv6 availability in RapidOCR packages (else convert to ONNX) | Verified: `rapidocr` 3.10.0 bundles PP-OCRv6 *small* (ADR-039) |
+| Deskew and perspective correction of document photos | Deferred to step 2b (needs OpenCV) |
+| OCR speed on the reference machine: dense phone screenshot ~7.7 s warm vs < 2 s target | To investigate (ADR-039) |
 | PaddleOCR-VL on macOS | To verify |
 | Exact options to redirect Docling, RapidOCR and Hugging Face caches | To verify |
 | llama.cpp + Vulkan backend for AMD/Intel GPUs on Windows | To evaluate |
