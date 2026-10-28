@@ -1,0 +1,214 @@
+# Image-token formulas for OpenAI vision models (ADR-003). Data, not code: update
+# this file when the provider changes its pricing, without a Sugo release.
+#
+# Tier names are "<model family>-<detail level>". Patch-based tiers follow the
+# "Model sizing behavior" table and the multiplier table; tile-based tiers follow
+# "Tile-based image tokenization". Deprecated models (marked * in the
+# documentation) are not listed, since they are not in the sizing table.
+schema_version = 1
+provider = "openai"
+# The API default detail level is "auto".
+default_tier = "gpt-6-astra-auto"
+
+[source]
+description = "OpenAI documentation: Images and vision, sections 'Model sizing behavior' and 'Calculating costs'"
+url = "https://developers.openai.com/api/docs/guides/images-vision"
+checked = 2026-10-28
+status = "verified"
+
+# --- gpt-6-astra (multiplier 1.2) ------------------------------------------
+
+[tiers.gpt-6-astra-low]
+kind = "budgeted_patches"
+applies_to = ["gpt-6-astra, detail low"]
+patch_size = 32
+max_dimension = 512
+max_patches = 30000
+multiplier = 1.2
+
+[tiers.gpt-6-astra-high]
+kind = "budgeted_patches"
+applies_to = ["gpt-6-astra, detail high"]
+patch_size = 32
+max_dimension = 65535
+patch_budget = 2500
+max_patches = 30000
+multiplier = 1.2
+
+[tiers.gpt-6-astra-original]
+kind = "budgeted_patches"
+applies_to = ["gpt-6-astra, detail original or auto"]
+patch_size = 32
+max_dimension = 65535
+max_patches = 30000
+multiplier = 1.2
+
+# --- gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna (multiplier 1.2) --------------
+
+[tiers."gpt-5.6-low"]
+kind = "budgeted_patches"
+applies_to = ["gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, detail low"]
+patch_size = 32
+max_dimension = 512
+max_patches = 30000
+multiplier = 1.2
+
+[tiers."gpt-5.6-high"]
+kind = "budgeted_patches"
+applies_to = ["gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, detail high"]
+patch_size = 32
+max_dimension = 2048
+patch_budget = 2500
+max_patches = 30000
+multiplier = 1.2
+
+[tiers."gpt-5.6-original"]
+kind = "budgeted_patches"
+applies_to = ["gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, detail original or auto"]
+patch_size = 32
+max_dimension = 65535
+max_patches = 30000
+multiplier = 1.2
+
+# --- gpt-5.5 (multiplier 1.2) -----------------------------------------------
+
+[tiers."gpt-5.5-low"]
+kind = "budgeted_patches"
+applies_to = ["gpt-5.5, detail low"]
+patch_size = 32
+max_dimension = 512
+max_patches = 30000
+multiplier = 1.2
+
+[tiers."gpt-5.5-high"]
+kind = "budgeted_patches"
+applies_to = ["gpt-5.5, detail high"]
+patch_size = 32
+max_dimension = 2048
+patch_budget = 2500
+max_patches = 30000
+multiplier = 1.2
+
+[tiers."gpt-5.5-original"]
+kind = "budgeted_patches"
+applies_to = ["gpt-5.5, detail original or auto"]
+patch_size = 32
+max_dimension = 6000
+patch_budget = 10000
+max_patches = 30000
+multiplier = 1.2
+
+# --- gpt-5.4, gpt-5.4-mini, gpt-5.4-nano (multiplier 1.2) -------------------
+
+[tiers."gpt-5.4-low"]
+kind = "budgeted_patches"
+applies_to = ["gpt-5.4, gpt-5.4-mini, gpt-5.4-nano, detail low"]
+patch_size = 32
+max_dimension = 2048
+patch_budget = 6144
+max_patches = 30000
+multiplier = 1.2
+
+[tiers."gpt-5.4-high"]
+kind = "budgeted_patches"
+applies_to = ["gpt-5.4, gpt-5.4-mini, gpt-5.4-nano, detail high or auto"]
+patch_size = 32
+max_dimension = 2048
+patch_budget = 2500
+max_patches = 30000
+multiplier = 1.2
+
+[tiers."gpt-5.4-original"]
+kind = "budgeted_patches"
+applies_to = ["gpt-5.4, gpt-5.4-mini, gpt-5.4-nano, detail original"]
+patch_size = 32
+max_dimension = 6000
+patch_budget = 10000
+max_patches = 30000
+multiplier = 1.2
+
+# --- gpt-5.2 and gpt-4.1-mini: same sizing for low, high and auto -----------
+
+[tiers."gpt-5.2"]
+kind = "budgeted_patches"
+applies_to = ["gpt-5.2, detail low, high or auto"]
+patch_size = 32
+max_dimension = 2048
+patch_budget = 6144
+max_patches = 30000
+multiplier = 1.2
+
+[tiers."gpt-4.1-mini"]
+kind = "budgeted_patches"
+applies_to = ["gpt-4.1-mini (2025-04-14 snapshot), detail low, high or auto"]
+patch_size = 32
+max_dimension = 2048
+patch_budget = 6144
+max_patches = 30000
+multiplier = 1.62
+
+# --- Tile-based models ------------------------------------------------------
+# Detail high or auto: fit within 2048 x 2048, shortest side down to 768, then
+# base tokens plus tile tokens per 512 x 512 square. Detail low: base tokens only.
+
+[tiers."gpt-5.1-high"]
+kind = "tiles"
+applies_to = ["gpt-5.1, detail high or auto"]
+fit_within = 2048
+shortest_side = 768
+tile_size = 512
+tokens_per_tile = 140
+base_tokens = 70
+
+[tiers."gpt-5.1-low"]
+kind = "fixed"
+applies_to = ["gpt-5.1, detail low"]
+tokens = 70
+
+[tiers.gpt-4o-high]
+kind = "tiles"
+applies_to = ["gpt-4o, detail high or auto", "gpt-4.1, detail high or auto"]
+fit_within = 2048
+shortest_side = 768
+tile_size = 512
+tokens_per_tile = 170
+base_tokens = 85
+
+[tiers.gpt-4o-low]
+kind = "fixed"
+applies_to = ["gpt-4o, detail low", "gpt-4.1, detail low"]
+tokens = 85
+
+[tiers.gpt-4o-mini-high]
+kind = "tiles"
+applies_to = ["gpt-4o-mini, detail high or auto"]
+fit_within = 2048
+shortest_side = 768
+tile_size = 512
+tokens_per_tile = 5667
+base_tokens = 2833
+
+[tiers.gpt-4o-mini-low]
+kind = "fixed"
+applies_to = ["gpt-4o-mini, detail low"]
+tokens = 2833
+
+# Detail levels that behave like another tier, so callers can use the name
+# from the documentation.
+[aliases]
+gpt-6-astra-auto = "gpt-6-astra-original"
+"gpt-5.6-auto" = "gpt-5.6-original"
+"gpt-5.5-auto" = "gpt-5.5-original"
+"gpt-5.4-auto" = "gpt-5.4-high"
+"gpt-5.2-low" = "gpt-5.2"
+"gpt-5.2-high" = "gpt-5.2"
+"gpt-5.2-auto" = "gpt-5.2"
+"gpt-4.1-mini-low" = "gpt-4.1-mini"
+"gpt-4.1-mini-high" = "gpt-4.1-mini"
+"gpt-4.1-mini-auto" = "gpt-4.1-mini"
+"gpt-5.1-auto" = "gpt-5.1-high"
+gpt-4o-auto = "gpt-4o-high"
+"gpt-4.1-high" = "gpt-4o-high"
+"gpt-4.1-auto" = "gpt-4o-high"
+"gpt-4.1-low" = "gpt-4o-low"
+gpt-4o-mini-auto = "gpt-4o-mini-high"

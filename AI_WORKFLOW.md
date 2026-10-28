@@ -29,3 +29,6 @@ Mistakes caught during design are part of the record:
 - "Economical RAM upgrade" advice ignored 2025–2026 memory prices; withdrawn.
 - One file per page for the page store was replaced by SQLite after considering crash safety and Windows antivirus overhead (ADR-006).
 - The command name `tsp` conflicted with Debian's task-spooler; the project was renamed Sugo (ADR-034).
+- The first implementation of the Claude formula capped the patch count instead of shrinking the image, overestimating a 1920×1080 image by 8 tokens, and defaulted to the standard tier although current models use the high-resolution one. Both were corrected against the official table, which is now part of the tests.
+- The OpenAI formula first shipped was the tile formula of older models; recent models use patches with a budget and a multiplier. Corrected from the official documentation supplied by the author. The Claude resize rule was then ported from Anthropic's reference implementation, which the tests run verbatim as an oracle; it differs by one pixel from one row of the documentation's own table (2000×1500 → 1270×952 in the code, 1269×952 in the table), with identical token counts.
+- A test value for the token count of "ciao" was written from memory and was wrong; it was replaced by a cross-check against tiktoken's own definition.

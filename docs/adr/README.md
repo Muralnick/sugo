@@ -39,3 +39,4 @@
 | [035](ADR-035-dev-toolchain.md) | Development toolchain and build backend | Accepted |
 | [036](ADR-036-network-boundaries.md) | Network access boundaries | Accepted |
 | [037](ADR-037-pydantic-models.md) | pydantic for the IR and typed data models | Accepted |
+| [038](ADR-038-tiktoken-offline.md) | tiktoken with a bundled, hash-verified vocabulary | Accepted |

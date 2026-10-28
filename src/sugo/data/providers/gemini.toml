@@ -1,0 +1,20 @@
+# Image-token formula for Google Gemini (ADR-003). Data, not code: update this
+# file when the provider changes its pricing, without a Sugo release.
+schema_version = 1
+provider = "gemini"
+default_tier = "standard"
+
+[source]
+description = "Gemini API documentation: Understand and count tokens, section 'Count multimodal tokens'"
+url = "https://ai.google.dev/gemini-api/docs/tokens"
+checked = 2026-10-28
+status = "verified"
+
+# 258 tokens when both sides are at most 384 px; otherwise 258 per 768 x 768 tile.
+[tiers.standard]
+kind = "tiles"
+applies_to = ["Gemini models"]
+small_max_side = 384
+small_tokens = 258
+tile_size = 768
+tokens_per_tile = 258

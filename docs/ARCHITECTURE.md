@@ -156,13 +156,13 @@ Hyphen resolution order: (1) the document's own lexicon (the joined word appears
 
 ## 7. Metrics and hybrid image mode
 
-Two baselines (ADR-003): raw vs clean text (`tiktoken`, `o200k_base` default), and **image cost vs extracted Markdown** per provider. Provider formulas are **data files** with source, date and verification status:
+Two baselines (ADR-003): raw vs clean text (`tiktoken`, `o200k_base` default, vocabulary bundled and hash-verified so counting never touches the network, ADR-038), and **image cost vs extracted Markdown** per provider. Provider formulas are **data files** with source, date and verification status:
 
 | Provider | Formula (as documented, October 2026) | Status |
 |---|---|---|
-| Claude | ⌈w/28⌉ × ⌈h/28⌉; standard tier: long edge ≤ 1568 px, ≤ 1568 tokens; high-res tier: ≤ 2576 px, ≤ 4784 tokens | Verified |
-| Gemini | 258 tokens if both sides ≤ 384 px; otherwise 258 per 768×768 tile | Verified |
-| OpenAI | Tile-based formula for older models; newer models differ | To verify |
+| Claude | ⌈w/28⌉ × ⌈h/28⌉ after scaling to the largest size within both limits (port of the official reference implementation); high-resolution tier (Claude 4.7 and later): long edge ≤ 2576 px, ≤ 4784 tokens; standard tier (other models): ≤ 1568 px, ≤ 1568 tokens | Verified (October 2026) |
+| Gemini | 258 tokens if both sides ≤ 384 px; otherwise 258 per 768×768 tile | Verified (October 2026) |
+| OpenAI | Patch-based models (gpt-6-astra, gpt-5.6, gpt-5.5, gpt-5.4, gpt-5.2, gpt-4.1-mini): 32×32 patches, maximum dimension and patch budget per model and detail level, then a multiplier; images above 30 000 patches are rejected. Tile-based models (gpt-5.1, gpt-4.1, gpt-4o, gpt-4o-mini): base tokens plus tokens per 512×512 tile, base only at detail `low` | Verified (October 2026); deprecated models not listed |
 
 Savings against images are not guaranteed (a small sparse screenshot sent to Gemini may cost as much as its text). The **hybrid mode** (ADR-017) picks per image: text only, provider-optimised image (crop noise, resize to tile/patch boundaries), or both. Percentages, not absolute counts, are the headline metric, since tokenizers differ across LLMs.
 
@@ -633,7 +633,6 @@ Versioning: SemVer; 0.x may change contracts with notice; 1.0 when contracts are
 | Item | Status |
 |---|---|
 | PP-OCRv6 availability in RapidOCR packages (else convert to ONNX) | To verify |
-| OpenAI image-token formula for recent models | To verify |
 | PaddleOCR-VL on macOS | To verify |
 | Exact options to redirect Docling, RapidOCR and Hugging Face caches | To verify |
 | llama.cpp + Vulkan backend for AMD/Intel GPUs on Windows | To evaluate |
