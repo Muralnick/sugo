@@ -38,8 +38,9 @@ class InvalidDecisionError(ValueError):
 def apply_decisions(page: Page, decisions: Sequence[Decision], *, cleaner: str) -> Page:
     """Return a copy of the page with the decisions of one cleaner applied.
 
-    The cleaner's name is recorded as ``removed_by`` by the core, not taken
-    from the decision, so a cleaner cannot act under another one's name.
+    The cleaner's name is recorded as ``removed_by`` from the caller, never
+    from the decisions. It is only as trustworthy as the caller: once the
+    extension API exists, the core will take it from the extension registry.
 
     Args:
         page: The page the cleaner examined.
@@ -53,6 +54,11 @@ def apply_decisions(page: Page, decisions: Sequence[Decision], *, cleaner: str) 
     """
     if not cleaner:
         raise ValueError("cleaner name must not be empty")
+    # Read once: a generator would be empty on the second pass, and its
+    # decisions would be validated but silently not applied.
+    decisions = tuple(decisions)
+    if not decisions:
+        return page
     blocks = {block.id: block for block in page.blocks}
     counts = Counter(decision.block_id for decision in decisions)
     # Block ids may be document text in the future, so errors name the problem

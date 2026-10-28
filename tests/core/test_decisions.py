@@ -48,6 +48,11 @@ class TestApplyDecisions:
     def test_no_decisions_returns_an_equal_page(self) -> None:
         assert apply_decisions(page("a", "b"), [], cleaner="c") == page("a", "b")
 
+    def test_decisions_from_a_generator_are_all_applied(self) -> None:
+        decisions = (Decision(block_id=i, reason="r") for i in ("a", "b"))
+        out = apply_decisions(page("a", "b"), decisions, cleaner="c")  # type: ignore[arg-type]
+        assert all(b.removed for b in out.blocks)
+
     def test_unknown_block_is_refused(self) -> None:
         with pytest.raises(InvalidDecisionError, match="not on the page") as error:
             apply_decisions(page("a"), [Decision(block_id="zz", reason="r")], cleaner="c")

@@ -60,11 +60,13 @@ def test_chat_screenshot_loses_only_the_status_bar(engine: OcrEngine) -> None:
     draw = ImageDraw.Draw(image)
     font = ImageFont.load_default(size=30)
     draw.text((30, 20), "9:41", fill="black", font=font)
+    draw.text((560, 20), "5G", fill="black", font=font)
     draw.text((640, 20), "87%", fill="black", font=font)
     bubbles = [
         ("left", "Hello, are we meeting tomorrow?"),
         ("right", "Yes, at six 10:42"),
         ("left", "Great, I will bring the papers"),
+        ("right", "Thanks!"),
     ]
     for n, (side, text) in enumerate(bubbles):
         y = 200 + n * 160
@@ -80,9 +82,10 @@ def test_chat_screenshot_loses_only_the_status_bar(engine: OcrEngine) -> None:
 
     removed = [(b.text, b.reason) for b in cleaned.blocks if b.removed]
     kept = [b.text for b in cleaned.blocks if not b.removed]
-    assert removed == [("9:41", REASON), ("87%", REASON)]
+    assert removed == [("9:41", REASON), ("5G", REASON), ("87%", REASON)]
     # The message timestamp is content and stays (ADR-040).
     assert kept == [text for _, text in bubbles]
     before = count_tokens("\n\n".join(b.text for b in extracted.blocks))
     after = count_tokens("\n\n".join(kept))
-    assert after < before
+    # Measured 35 -> 26 tokens (ADR-041); the gate leaves room for OCR drift.
+    assert after <= 0.8 * before
