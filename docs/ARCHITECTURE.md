@@ -124,7 +124,8 @@ extractors/image/
 ├── classifier.py   screenshot · document photo · no text (skip early)
 ├── preprocess.py   dark mode inversion, upscaling small fonts, deskew and perspective
 ├── ocr_engine.py   multi-script OCR with confidence threshold; hash-checked models, low-confidence lines kept as illegible
-├── layout.py       reading-order reconstruction (lines, columns, blocks)
+├── layout.py       reading-order reconstruction (lines, columns, blocks): recursive XY-cut, lines joined with newlines, illegible lines as separate flagged blocks
+├── extract.py      decode → classify → preprocess → OCR → layout, one IR page per image
 └── detectors.py    chat, code, tables, UI chrome
 ```
 

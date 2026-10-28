@@ -74,3 +74,19 @@ OCR_DETECTION_MAX_SIDE: Final = 960
 # value as RapidOCR's own default filter, which Sugo disables because it drops
 # lines silently. Initial value, to be calibrated (step 8).
 OCR_MIN_CONFIDENCE: Final = 0.5
+
+# --- Layout (roadmap step 2c) -----------------------------------------------
+# Gaps are measured in median text-line heights, so the same rules work at any
+# resolution and font size. Initial values, to be calibrated (step 8).
+
+# A vertical gap larger than this separates two paragraphs: line spacing inside
+# a paragraph is typically 0.2-0.6 line heights, a paragraph break 1 or more.
+LAYOUT_PARAGRAPH_GAP: Final = 0.8
+
+# A horizontal gap larger than this separates two columns: a column gutter is
+# a few characters wide (about 1.5-3 line heights), a word space far less.
+LAYOUT_COLUMN_GAP: Final = 1.5
+
+# Two boxes are on the same text row when their vertical overlap exceeds this
+# share of the shorter box's height.
+LAYOUT_SAME_ROW_OVERLAP: Final = 0.5
