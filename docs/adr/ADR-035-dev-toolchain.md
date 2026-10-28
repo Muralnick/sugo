@@ -17,13 +17,14 @@ Step 0 of the roadmap needs a build backend and the development tools that enfor
 | `mypy` | Static type checking | MIT | 2.4.0 |
 | `import-linter` | Architectural boundaries | BSD-2-Clause | 2.15 |
 | `pytest` | Test runner | MIT | 9.1.1 |
+| `hypothesis` | Property-based tests (added in roadmap step 1) | MPL-2.0 | 6.169.1 |
 
 - Development tools live in the `dev` dependency group (PEP 735), never in the runtime dependencies of `sugo`.
 - `[tool.uv] exclude-newer = "14 days"` makes the resolver ignore any artifact uploaded in the last 14 days, so the minimum-age rule is enforced by the tool, not by memory.
 - `uv.lock` pins exact versions with hashes; CI installs with `uv sync --locked`.
 - CI uses a pinned uv version, and GitHub Actions are pinned by commit SHA (ADR-033).
 
-Deferred to later steps, each with its own entry here when added: Hypothesis, pytest-cov and the coverage gate, Bandit, Semgrep, pip-audit, the licence check.
+Deferred to later steps, each with its own entry here when added: pytest-cov and the coverage gate, Bandit, Semgrep, pip-audit, the licence check.
 
 ## Alternatives considered
 

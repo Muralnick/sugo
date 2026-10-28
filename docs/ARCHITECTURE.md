@@ -91,7 +91,7 @@ Block
 └── removed, removed_by, reason
 ```
 
-Normalised coordinates let the same positional rules work on phone screenshots, 4K monitors and A4 pages. **Soft deletion** makes every removal explainable, enables per-cleaner metrics and the preview, and enforces principle 3.
+Models are immutable, strictly validated pydantic models (ADR-037): a change is a new validated copy, so no stage can bypass the invariants. Normalised coordinates let the same positional rules work on phone screenshots, 4K monitors and A4 pages. **Soft deletion** makes every removal explainable, enables per-cleaner metrics and the preview, and enforces principle 3.
 
 ---
 
