@@ -62,6 +62,14 @@ class PageOrigin(StrEnum):
     VLM = "vlm"
 
 
+class ChatSide(StrEnum):
+    """Side of a chat bubble. Neutral on purpose: which side is the phone's
+    owner depends on the app, so Sugo records what it sees, not who it guesses."""
+
+    LEFT = "left"
+    RIGHT = "right"
+
+
 class BlockFlag(StrEnum):
     """Warnings attached to a block for later stages and for the user (ADR-026)."""
 
@@ -148,7 +156,8 @@ class Block(_Model):
     - a removed block always records who removed it and why (principle 3);
     - an illegible block carries no text: unreadable content is marked, never
       filled with a guess (principle 4);
-    - heading levels and table grids appear only on blocks of the matching type.
+    - heading levels, table grids and chat speakers appear only on blocks of
+      the matching type.
     """
 
     id: NonEmptyStr
@@ -162,6 +171,7 @@ class Block(_Model):
     heading_level: Annotated[int, Field(ge=1, le=MAX_HEADING_LEVEL)] | None = None
     reading_order: Annotated[int, Field(ge=0)] | None = None
     table: Table | None = None
+    speaker: ChatSide | None = None
     origin_engine: NonEmptyStr
     flags: tuple[BlockFlag, ...] = ()
     time_range: TimeRange | None = None
@@ -187,6 +197,8 @@ class Block(_Model):
             raise ValueError("heading_level is only allowed on heading blocks")
         if self.table is not None and self.type is not BlockType.TABLE:
             raise ValueError("table is only allowed on table blocks")
+        if self.speaker is not None and self.type is not BlockType.CHAT_MESSAGE:
+            raise ValueError("speaker is only allowed on chat_message blocks")
         return self
 
     def mark_removed(self, removed_by: str, reason: str) -> Self:

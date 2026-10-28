@@ -10,6 +10,7 @@ from sugo.core.models import (
     Block,
     BlockFlag,
     BlockType,
+    ChatSide,
     Document,
     DocumentSource,
     Page,
@@ -133,6 +134,14 @@ class TestBlock:
     def test_rejects_table_on_non_table_block(self) -> None:
         with pytest.raises(ValidationError, match="table"):
             make_block(table=Table(n_rows=1, n_cols=1, cells=()))
+
+    def test_accepts_speaker_on_chat_message(self) -> None:
+        block = make_block(type=BlockType.CHAT_MESSAGE, speaker=ChatSide.RIGHT)
+        assert block.speaker is ChatSide.RIGHT
+
+    def test_rejects_speaker_on_paragraph(self) -> None:
+        with pytest.raises(ValidationError, match="speaker"):
+            make_block(speaker=ChatSide.LEFT)
 
     @pytest.mark.parametrize("script", ["latin", "han-kana", "hangul"])
     def test_accepts_script_identifiers(self, script: str) -> None:

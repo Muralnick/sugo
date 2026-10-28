@@ -86,6 +86,7 @@ Block
 ├── style: font size, bold, monospace (when available)
 ├── heading_level, reading_order
 ├── table: cell grid with spans and header rows (type = table)
+├── speaker: left | right (type = chat_message; neutral side, ADR-040)
 ├── origin_engine, flags (illegible, suspicious_instruction, low_agreement, …)
 ├── time_range: reserved for audio/video
 └── removed, removed_by, reason
@@ -126,7 +127,7 @@ extractors/image/
 ├── ocr_engine.py   multi-script OCR with confidence threshold; hash-checked models, low-confidence lines kept as illegible
 ├── layout.py       reading-order reconstruction (lines, columns, blocks): recursive XY-cut, lines joined with newlines, illegible lines as separate flagged blocks
 ├── extract.py      decode → classify → preprocess → OCR → layout, one IR page per image
-└── detectors.py    chat, code, tables, UI chrome
+└── detectors.py    chat (speaker side), code (indentation rebuilt), UI chrome; tables later (ADR-040)
 ```
 
 Handled cases: dark mode; UI noise (status bars, clocks, tabs, menus); chats (speaker from alignment); code (indentation rebuilt from x coordinates); icon/emoji garbage; scrolling screenshots with overlapping lines; duplicates (perceptual hash); HEIC phone photos.

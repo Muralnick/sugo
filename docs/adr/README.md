@@ -41,3 +41,4 @@
 | [037](ADR-037-pydantic-models.md) | pydantic for the IR and typed data models | Accepted |
 | [038](ADR-038-tiktoken-offline.md) | tiktoken with a bundled, hash-verified vocabulary | Accepted |
 | [039](ADR-039-lite-image-stack.md) | Image stack for the lite level | Accepted |
+| [040](ADR-040-screenshot-detectors.md) | Screenshot detectors and chat speaker side | Accepted |
