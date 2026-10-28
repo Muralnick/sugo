@@ -47,7 +47,7 @@ Method: assets → attackers → trust boundaries → threats per surface → mi
 | Threat | Mitigation |
 |---|---|
 | Exploits in native parsers (MuPDF, Pillow, ONNX Runtime) | Isolated workers, limits, timeouts, sandbox, updated libraries |
-| Decompression bombs (zip, huge images, PDF streams) | Limits on real decompressed bytes; Pillow pixel limit |
+| Decompression bombs (zip, huge images, PDF streams) | Limits on real decompressed bytes; image file size and pixel count checked from the header before decoding, Pillow bomb warning made fatal (ADR-039) |
 | Zip slip, symlinks, special files | Hashed names; special entries rejected |
 | **XXE** in Office, FatturaPA, PEC (all XML) | `defusedxml`, external entities disabled |
 | Polyglot files | Content-based type detection |

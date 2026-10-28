@@ -18,9 +18,18 @@ classifiers = [
     "Private :: Do Not Upload",
 ]
 
+[project.optional-dependencies]
+# Engine levels are installed as extras (ADR-007). Image stack: ADR-039.
+lite = [
+    "numpy>=2.5.4,<3",
+    "pillow>=12.3.0,<13",
+]
+
 [dependency-groups]
 # Development tools only; see ADR-035. Exact versions and hashes live in uv.lock.
 dev = [
+    # Tests exercise every level, so the dev environment installs its extras.
+    "sugo[lite]",
     "hypothesis>=6.169.1",
     "import-linter>=2.15",
     "mypy>=2.4.0",
@@ -110,7 +119,7 @@ strict_equality = true
 [[tool.mypy.overrides]]
 # Strict typing where correctness matters most (CODE_STYLE.md, ADR-029).
 # Add "sugo.security.*" when that package is created (warn_unused_configs).
-module = ["sugo.core.*", "sugo.api.*", "sugo.metrics.*"]
+module = ["sugo.core.*", "sugo.api.*", "sugo.metrics.*", "sugo.extractors.*"]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 disallow_untyped_calls = true
