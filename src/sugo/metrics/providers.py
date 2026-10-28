@@ -75,9 +75,11 @@ def _patches(width: int, height: int, patch_size: int) -> int:
 class PatchFormula(_Model):
     """Patch-based billing (Claude): one token per patch, within two limits.
 
-    An image larger than the long-edge limit or the token limit is scaled to
-    the largest size that fits both, keeping its aspect ratio; the cost is the
-    patch count of that size.
+    An image beyond the edge limit or the token limit is scaled to the largest
+    aspect-preserving size within both. This is a port of the provider's
+    published reference implementation ("How Claude resizes and pads images"),
+    including its two subtleties: the edge limit applies to the size padded to
+    whole patches, and the short edge rounds half to even.
     """
 
     kind: Literal["patches"]
@@ -86,29 +88,40 @@ class PatchFormula(_Model):
     max_long_edge: PositiveValue
     max_tokens: PositiveValue
 
-    def _fits(self, long_side: int, short_side: int) -> bool:
+    def _fits(self, width: int, height: int) -> bool:
+        size = self.patch_size
         return (
-            long_side <= self.max_long_edge
-            and _patches(long_side, short_side, self.patch_size) <= self.max_tokens
+            math.ceil(width / size) * size <= self.max_long_edge
+            and math.ceil(height / size) * size <= self.max_long_edge
+            and _patches(width, height, size) <= self.max_tokens
         )
+
+    def resized_size(self, width: int, height: int) -> tuple[int, int]:
+        """Return the size the provider resizes the image to, before padding."""
+        if self._fits(width, height):
+            return width, height
+        if height > width:
+            resized_h, resized_w = self.resized_size(height, width)
+            return resized_w, resized_h
+        aspect_ratio = width / height
+
+        def short_edge(long_edge: int) -> int:
+            # Python's round() rounds half to even, like the reference.
+            return max(round(long_edge / aspect_ratio), 1)
+
+        # Binary search on the long edge: low always fits, high never does.
+        low, high = 1, width
+        while low + 1 < high:
+            middle = (low + high) // 2
+            if self._fits(middle, short_edge(middle)):
+                low = middle
+            else:
+                high = middle
+        return low, short_edge(low)
 
     def estimate(self, width: int, height: int) -> int:
         """Return the image tokens for an image of the given pixel size."""
-        long_side, short_side = max(width, height), min(width, height)
-
-        def short_for(long_edge: int) -> int:
-            return max(1, short_side * long_edge // long_side)
-
-        # The patch count never decreases as the long edge grows, so a binary
-        # search finds the largest long edge that fits both limits.
-        low, high = 1, min(long_side, self.max_long_edge)
-        while low < high:
-            middle = (low + high + 1) // 2
-            if self._fits(middle, short_for(middle)):
-                low = middle
-            else:
-                high = middle - 1
-        return _patches(low, short_for(low), self.patch_size)
+        return _patches(*self.resized_size(width, height), self.patch_size)
 
 
 class BudgetedPatchFormula(_Model):
@@ -134,7 +147,9 @@ class BudgetedPatchFormula(_Model):
             ImageRejectedError: If the provider would reject the image.
         """
         if max(width, height) > self.max_dimension:
-            width, height = _scale_down(width, height, self.max_dimension / max(width, height))
+            # "Rounding to integer pixels" in the provider's words.
+            factor = self.max_dimension / max(width, height)
+            width, height = max(1, round(width * factor)), max(1, round(height * factor))
         size = self.patch_size
         count = _patches(width, height, size)
         if self.patch_budget is not None and count > self.patch_budget:
@@ -193,8 +208,21 @@ class TileFormula(_Model):
         return self.base_tokens + tiles * self.tokens_per_tile
 
 
+class FixedFormula(_Model):
+    """A flat cost whatever the image size (e.g. OpenAI tile models at detail low)."""
+
+    kind: Literal["fixed"]
+    applies_to: ModelNames = ()
+    tokens: TokenCount
+
+    def estimate(self, width: int, height: int) -> int:
+        """Return the flat image cost; the size does not matter."""
+        return self.tokens
+
+
 ImageFormula = Annotated[
-    PatchFormula | BudgetedPatchFormula | TileFormula, Field(discriminator="kind")
+    PatchFormula | BudgetedPatchFormula | TileFormula | FixedFormula,
+    Field(discriminator="kind"),
 ]
 
 
@@ -206,12 +234,23 @@ class ProviderFormulas(_Model):
     default_tier: Annotated[str, Field(min_length=1)]
     source: FormulaSource
     tiers: Annotated[dict[str, ImageFormula], Field(min_length=1)]
+    # Other names for a tier, e.g. a detail level that behaves like another one.
+    aliases: dict[str, str] = {}
 
     @model_validator(mode="after")
-    def _check_default_tier(self) -> Self:
-        if self.default_tier not in self.tiers:
+    def _check_names(self) -> Self:
+        for alias, target in self.aliases.items():
+            if alias in self.tiers:
+                raise ValueError(f"alias {alias!r} hides a tier of the same name")
+            if target not in self.tiers:
+                raise ValueError(f"alias {alias!r} points to unknown tier {target!r}")
+        if self._resolve(self.default_tier) is None:
             raise ValueError(f"default_tier {self.default_tier!r} is not among the tiers")
         return self
+
+    def _resolve(self, name: str) -> str | None:
+        target = self.aliases.get(name, name)
+        return target if target in self.tiers else None
 
     def estimate(self, width: int, height: int, tier: str | None = None) -> int:
         """Return the image tokens for an image, using ``tier`` or the default one.
@@ -223,9 +262,10 @@ class ProviderFormulas(_Model):
         if width < 1 or height < 1:
             raise ValueError("image width and height must be positive")
         name = self.default_tier if tier is None else tier
-        if name not in self.tiers:
+        resolved = self._resolve(name)
+        if resolved is None:
             raise ValueError(f"unknown tier {name!r} for provider {self.provider!r}")
-        return self.tiers[name].estimate(width, height)
+        return self.tiers[resolved].estimate(width, height)
 
 
 def parse_provider(text: str) -> ProviderFormulas:

@@ -160,9 +160,9 @@ Two baselines (ADR-003): raw vs clean text (`tiktoken`, `o200k_base` default, vo
 
 | Provider | Formula (as documented, October 2026) | Status |
 |---|---|---|
-| Claude | ⌈w/28⌉ × ⌈h/28⌉ after scaling to the largest size within both limits; high-resolution tier (Claude 4.7 and later): long edge ≤ 2576 px, ≤ 4784 tokens; standard tier (other models): ≤ 1568 px, ≤ 1568 tokens | Verified (October 2026) |
+| Claude | ⌈w/28⌉ × ⌈h/28⌉ after scaling to the largest size within both limits (port of the official reference implementation); high-resolution tier (Claude 4.7 and later): long edge ≤ 2576 px, ≤ 4784 tokens; standard tier (other models): ≤ 1568 px, ≤ 1568 tokens | Verified (October 2026) |
 | Gemini | 258 tokens if both sides ≤ 384 px; otherwise 258 per 768×768 tile | Verified (October 2026) |
-| OpenAI | Recent models: 32×32 patches, per-model maximum dimension and patch budget, then a multiplier (e.g. gpt-6-astra high: 2500 patches, ×1.2). gpt-4o, gpt-4.1, gpt-4o-mini, gpt-5.1: base tokens plus tokens per 512×512 tile | Verified (October 2026) for the models listed in `data/providers/openai.toml`; other patch-based models need the per-model sizing table |
+| OpenAI | Patch-based models (gpt-6-astra, gpt-5.6, gpt-5.5, gpt-5.4, gpt-5.2, gpt-4.1-mini): 32×32 patches, maximum dimension and patch budget per model and detail level, then a multiplier; images above 30 000 patches are rejected. Tile-based models (gpt-5.1, gpt-4.1, gpt-4o, gpt-4o-mini): base tokens plus tokens per 512×512 tile, base only at detail `low` | Verified (October 2026); deprecated models not listed |
 
 Savings against images are not guaranteed (a small sparse screenshot sent to Gemini may cost as much as its text). The **hybrid mode** (ADR-017) picks per image: text only, provider-optimised image (crop noise, resize to tile/patch boundaries), or both. Percentages, not absolute counts, are the headline metric, since tokenizers differ across LLMs.
 
@@ -633,7 +633,6 @@ Versioning: SemVer; 0.x may change contracts with notice; 1.0 when contracts are
 | Item | Status |
 |---|---|
 | PP-OCRv6 availability in RapidOCR packages (else convert to ONNX) | To verify |
-| OpenAI sizing table (maximum dimension and patch budget) for patch-based models other than gpt-6-astra | To provide |
 | PaddleOCR-VL on macOS | To verify |
 | Exact options to redirect Docling, RapidOCR and Hugging Face caches | To verify |
 | llama.cpp + Vulkan backend for AMD/Intel GPUs on Windows | To evaluate |

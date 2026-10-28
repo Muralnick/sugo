@@ -85,6 +85,26 @@ class TestClaude:
         assert claude.estimate(height, width, "standard") == standard
         assert claude.estimate(height, width, "high_resolution") == high
 
+    @pytest.mark.parametrize(
+        ("tier", "width", "height", "expected"),
+        [
+            # Examples stated in the official documentation pages.
+            ("standard", 1920, 1080, (1456, 819)),
+            ("standard", 1075, 1520, (924, 1307)),  # A4 at 130 DPI: token limit, not edge
+            ("high_resolution", 1075, 1520, (1075, 1520)),
+            ("high_resolution", 3840, 2160, (2576, 1449)),
+            # The table prints 1269 x 952; the official reference code gives
+            # 1270 x 952 (same 1564 tokens). Sugo follows the reference code.
+            ("standard", 2000, 1500, (1270, 952)),
+        ],
+    )
+    def test_resized_size_matches_documentation(
+        self, tier: str, width: int, height: int, expected: tuple[int, int]
+    ) -> None:
+        formula = load_provider("claude").tiers[tier]
+        assert isinstance(formula, PatchFormula)
+        assert formula.resized_size(width, height) == expected
+
     def test_default_tier_is_high_resolution_for_current_models(self) -> None:
         assert load_provider("claude").estimate(1920, 1080) == 2691
 
@@ -109,7 +129,46 @@ class TestOpenAI:
         [(1024, 1024, 1229), (2048, 2048, 3000), (4096, 512, 2458)],
     )
     def test_patch_budget_examples(self, width: int, height: int, expected: int) -> None:
-        assert load_provider("openai").estimate(width, height) == expected
+        assert load_provider("openai").estimate(width, height, "gpt-6-astra-high") == expected
+
+    def test_default_is_the_api_default_detail_auto(self) -> None:
+        # gpt-6-astra auto = original: no budget, 1170 x 2532 -> 37 x 80 patches.
+        openai = load_provider("openai")
+        assert openai.default_tier == "gpt-6-astra-auto"
+        assert openai.estimate(1170, 2532) == math.ceil(37 * 80 * 1.2)
+
+    @pytest.mark.parametrize(
+        ("tier", "width", "height", "expected"),
+        [
+            # low fits within 512 px: 1024 x 1024 -> 512 x 512 -> 16 x 16 patches.
+            ("gpt-6-astra-low", 1024, 1024, math.ceil(256 * 1.2)),
+            # high on gpt-5.6 fits within 2048 px first, then the 2500 budget.
+            ("gpt-5.6-high", 4096, 4096, 3000),
+            # gpt-5.5 original: 6000 px and 10 000 patches.
+            ("gpt-5.5-original", 3000, 3000, math.ceil(94 * 94 * 1.2)),
+            # gpt-5.4 low has a larger budget than high, so it can cost more.
+            ("gpt-5.4-low", 2048, 2048, math.ceil(4096 * 1.2)),
+            ("gpt-5.4-high", 2048, 2048, 3000),
+            ("gpt-5.4-auto", 2048, 2048, 3000),  # auto behaves like high
+            # gpt-4.1-mini: 6144-patch budget and multiplier 1.62.
+            ("gpt-4.1-mini-auto", 1024, 1024, math.ceil(1024 * 1.62)),
+        ],
+    )
+    def test_sizing_table_tiers(self, tier: str, width: int, height: int, expected: int) -> None:
+        assert load_provider("openai").estimate(width, height, tier) == expected
+
+    @pytest.mark.parametrize(
+        ("tier", "expected"), [("gpt-4o-low", 85), ("gpt-4.1-low", 85), ("gpt-4o-mini-low", 2833)]
+    )
+    def test_detail_low_costs_base_tokens_only(self, tier: str, expected: int) -> None:
+        openai = load_provider("openai")
+        assert openai.estimate(64, 64, tier) == expected
+        assert openai.estimate(4000, 3000, tier) == expected
+
+    def test_original_detail_rejects_images_above_30000_patches(self) -> None:
+        # 6000 x 6000 needs 188 x 188 = 35 344 patches; original never resizes to fit.
+        with pytest.raises(ImageRejectedError):
+            load_provider("openai").estimate(6000, 6000, "gpt-6-astra-original")
 
     @pytest.mark.parametrize(
         ("tier", "expected"),
@@ -159,22 +218,62 @@ def test_patch_estimate_stays_within_cap(width: int, height: int) -> None:
     assert 1 <= formula.estimate(width, height) <= 1568
 
 
-def _reference_patch_tokens(width: int, height: int) -> int:
-    # Slow, obvious version of the documented rule: try every long edge from the
-    # largest allowed downwards and keep the first one within both limits.
-    long_side, short_side = max(width, height), min(width, height)
-    for long_edge in range(min(long_side, 1568), 0, -1):
-        short_edge = max(1, short_side * long_edge // long_side)
-        tokens = math.ceil(long_edge / 28) * math.ceil(short_edge / 28)
-        if tokens <= 1568:
-            return tokens
-    raise AssertionError("unreachable: a 1 px image always fits")
+def _official_resized_size(
+    width: int, height: int, max_edge: int = 1568, max_tokens: int = 1568
+) -> tuple[int, int]:
+    # Copied verbatim from Anthropic's "How Claude resizes and pads images"
+    # reference implementation (checked 2026-10-28); only type hints differ.
+    def fits(w: int, h: int) -> bool:
+        return (
+            math.ceil(w / 28) * 28 <= max_edge
+            and math.ceil(h / 28) * 28 <= max_edge
+            and math.ceil(w / 28) * math.ceil(h / 28) <= max_tokens
+        )
+
+    if fits(width, height):
+        return (width, height)
+    if height > width:
+        resized_h, resized_w = _official_resized_size(height, width, max_edge, max_tokens)
+        return (resized_w, resized_h)
+    aspect_ratio = width / height
+    lo, hi = 1, width
+    while lo + 1 < hi:
+        mid = (lo + hi) // 2
+        if fits(mid, max(round(mid / aspect_ratio), 1)):
+            lo = mid
+        else:
+            hi = mid
+    return (lo, max(round(lo / aspect_ratio), 1))
 
 
 @given(width=sides, height=sides)
-def test_patch_estimate_matches_reference(width: int, height: int) -> None:
-    formula = PatchFormula(kind="patches", patch_size=28, max_long_edge=1568, max_tokens=1568)
-    assert formula.estimate(width, height) == _reference_patch_tokens(width, height)
+@pytest.mark.parametrize("tier", ["standard", "high_resolution"])
+def test_claude_matches_official_reference(tier: str, width: int, height: int) -> None:
+    formula = load_provider("claude").tiers[tier]
+    assert isinstance(formula, PatchFormula)
+    expected = _official_resized_size(width, height, formula.max_long_edge, formula.max_tokens)
+    assert formula.resized_size(width, height) == expected
+    assert formula.estimate(width, height) == math.ceil(expected[0] / 28) * math.ceil(
+        expected[1] / 28
+    )
+
+
+@given(
+    width=sides,
+    height=sides,
+    # Limits that are not multiples of 28 exercise the padded edge check, which
+    # the bundled tiers (1568 = 56 x 28, 2576 = 92 x 28) never reach.
+    max_edge=st.integers(min_value=28, max_value=3000),
+    max_tokens=st.integers(min_value=1, max_value=5000),
+)
+def test_patch_formula_matches_reference_for_any_limits(
+    width: int, height: int, max_edge: int, max_tokens: int
+) -> None:
+    formula = PatchFormula(
+        kind="patches", patch_size=28, max_long_edge=max_edge, max_tokens=max_tokens
+    )
+    expected = _official_resized_size(width, height, max_edge, max_tokens)
+    assert formula.resized_size(width, height) == expected
 
 
 @given(width=sides, height=sides)
@@ -235,6 +334,18 @@ class TestDataFileValidation:
         assert old in VALID
         with pytest.raises(ValidationError):
             parse_provider(VALID.replace(old, new))
+
+    def test_alias_resolves_to_its_tier(self) -> None:
+        formulas = parse_provider(VALID + '\n[aliases]\nauto = "standard"\n')
+        assert formulas.estimate(1000, 1000, "auto") == formulas.estimate(1000, 1000, "standard")
+
+    @pytest.mark.parametrize(
+        ("aliases", "message"),
+        [('auto = "missing"', "unknown tier"), ('standard = "standard"', "hides a tier")],
+    )
+    def test_invalid_aliases_are_rejected(self, aliases: str, message: str) -> None:
+        with pytest.raises(ValidationError, match=message):
+            parse_provider(VALID + f"\n[aliases]\n{aliases}\n")
 
     def test_small_image_settings_must_come_in_pairs(self) -> None:
         with pytest.raises(ValidationError, match="together"):
