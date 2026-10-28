@@ -2,22 +2,26 @@
 # file when the provider changes its pricing, without a Sugo release.
 schema_version = 1
 provider = "claude"
-default_tier = "standard"
+default_tier = "high_resolution"
 
 [source]
-description = "Anthropic vision documentation, as recorded in docs/ARCHITECTURE.md section 7"
-checked = 2026-10-27
+description = "Anthropic documentation: Vision, section 'Resolution and token cost'"
+url = "https://platform.claude.com/docs/en/build-with-claude/vision"
+checked = 2026-10-28
 status = "verified"
 
-# Tokens = ceil(w / 28) * ceil(h / 28) after resizing to the tier's long-edge limit.
-[tiers.standard]
-kind = "patches"
-patch_size = 28
-max_long_edge = 1568
-max_tokens = 1568
-
+# Tokens = ceil(w / 28) * ceil(h / 28). Larger images are scaled, keeping the
+# aspect ratio, to the largest size within both the long-edge and token limits.
 [tiers.high_resolution]
 kind = "patches"
+applies_to = ["Claude 4.7 and later models"]
 patch_size = 28
 max_long_edge = 2576
 max_tokens = 4784
+
+[tiers.standard]
+kind = "patches"
+applies_to = ["All other Claude models"]
+patch_size = 28
+max_long_edge = 1568
+max_tokens = 1568

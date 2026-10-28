@@ -1,22 +1,54 @@
-# Image-token formula for OpenAI (ADR-003). Data, not code: update this file
-# when the provider changes its pricing, without a Sugo release.
+# Image-token formulas for OpenAI vision models (ADR-003). Data, not code: update
+# this file when the provider changes its pricing, without a Sugo release.
 #
-# UNVERIFIED: this is the tile formula of older models (high detail: fit within
-# 2048 x 2048, shortest side down to 768, 170 tokens per 512 x 512 tile plus 85).
-# Newer models are billed differently (docs/ARCHITECTURE.md section 25).
+# Only tiers whose parameters are all published are listed. Other patch-based
+# models (gpt-5.x and later) need the "model sizing table" of the same page:
+# their maximum dimension and patch budget per detail level.
 schema_version = 1
 provider = "openai"
-default_tier = "high_detail"
+default_tier = "gpt-6-astra-high"
 
 [source]
-description = "OpenAI vision documentation for older models; not checked against a primary source"
+description = "OpenAI documentation: Images and vision, section 'Calculating costs'"
+url = "https://platform.openai.com/docs/guides/images-vision#calculating-costs"
 checked = 2026-10-28
-status = "unverified"
+status = "verified"
 
-[tiers.high_detail]
+# 32 x 32 patches, fit within 65 535 px, shrunk to 2 500 patches, times 1.2.
+[tiers.gpt-6-astra-high]
+kind = "budgeted_patches"
+applies_to = ["gpt-6-astra, detail high"]
+patch_size = 32
+max_dimension = 65535
+patch_budget = 2500
+max_patches = 30000
+multiplier = 1.2
+
+# Tile formula (detail high or auto): fit within 2048 x 2048, shortest side down
+# to 768, then base tokens plus tile tokens per 512 x 512 square.
+[tiers."gpt-5.1-high"]
 kind = "tiles"
+applies_to = ["gpt-5.1, detail high or auto"]
+fit_within = 2048
+shortest_side = 768
+tile_size = 512
+tokens_per_tile = 140
+base_tokens = 70
+
+[tiers.gpt-4o-high]
+kind = "tiles"
+applies_to = ["gpt-4o, detail high or auto", "gpt-4.1, detail high or auto"]
 fit_within = 2048
 shortest_side = 768
 tile_size = 512
 tokens_per_tile = 170
 base_tokens = 85
+
+[tiers.gpt-4o-mini-high]
+kind = "tiles"
+applies_to = ["gpt-4o-mini, detail high or auto"]
+fit_within = 2048
+shortest_side = 768
+tile_size = 512
+tokens_per_tile = 5667
+base_tokens = 2833

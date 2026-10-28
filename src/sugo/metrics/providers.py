@@ -13,6 +13,7 @@ import datetime
 import math
 import re
 import tomllib
+from decimal import Decimal
 from enum import StrEnum
 from importlib import resources
 from typing import Annotated, Literal, Self
@@ -47,9 +48,18 @@ class FormulaSource(_Model):
     """Where a formula comes from, so every reported number can be traced."""
 
     description: Annotated[str, Field(min_length=1)]
+    # Recorded for people; Sugo never fetches it (principle 1).
+    url: Annotated[str, Field(pattern=r"^https://\S+$")]
     checked: datetime.date
     # Strict mode accepts only enum instances from Python input; TOML gives strings.
     status: Annotated[VerificationStatus, Field(strict=False)]
+
+
+class ImageRejectedError(ValueError):
+    """The provider would refuse the image instead of billing it."""
+
+
+ModelNames = Annotated[tuple[Annotated[str, Field(min_length=1)], ...], Field(strict=False)]
 
 
 def _scale_down(width: int, height: int, factor: float) -> tuple[int, int]:
@@ -57,31 +67,99 @@ def _scale_down(width: int, height: int, factor: float) -> tuple[int, int]:
     return max(1, math.floor(width * factor)), max(1, math.floor(height * factor))
 
 
+def _patches(width: int, height: int, patch_size: int) -> int:
+    """Number of square patches needed to cover the image; edge patches may overhang."""
+    return math.ceil(width / patch_size) * math.ceil(height / patch_size)
+
+
 class PatchFormula(_Model):
-    """Patch-based billing (Claude): one token per patch after a long-edge resize."""
+    """Patch-based billing (Claude): one token per patch, within two limits.
+
+    An image larger than the long-edge limit or the token limit is scaled to
+    the largest size that fits both, keeping its aspect ratio; the cost is the
+    patch count of that size.
+    """
 
     kind: Literal["patches"]
+    applies_to: ModelNames = ()
     patch_size: PositiveValue
     max_long_edge: PositiveValue
     max_tokens: PositiveValue
 
-    def estimate(self, width: int, height: int) -> int:
-        """Return the image tokens for an image of the given pixel size.
+    def _fits(self, long_side: int, short_side: int) -> bool:
+        return (
+            long_side <= self.max_long_edge
+            and _patches(long_side, short_side, self.patch_size) <= self.max_tokens
+        )
 
-        The provider shrinks further when the patch count still exceeds the cap;
-        capping the count gives the same result without guessing its rounding.
+    def estimate(self, width: int, height: int) -> int:
+        """Return the image tokens for an image of the given pixel size."""
+        long_side, short_side = max(width, height), min(width, height)
+
+        def short_for(long_edge: int) -> int:
+            return max(1, short_side * long_edge // long_side)
+
+        # The patch count never decreases as the long edge grows, so a binary
+        # search finds the largest long edge that fits both limits.
+        low, high = 1, min(long_side, self.max_long_edge)
+        while low < high:
+            middle = (low + high + 1) // 2
+            if self._fits(middle, short_for(middle)):
+                low = middle
+            else:
+                high = middle - 1
+        return _patches(low, short_for(low), self.patch_size)
+
+
+class BudgetedPatchFormula(_Model):
+    """Patch-based billing with a patch budget and a multiplier (recent OpenAI models).
+
+    Follows the provider's published steps: fit within the maximum dimension,
+    shrink to the patch budget, refuse images above the patch limit, then
+    multiply and round up.
+    """
+
+    kind: Literal["budgeted_patches"]
+    applies_to: ModelNames = ()
+    patch_size: PositiveValue
+    max_dimension: PositiveValue
+    patch_budget: PositiveValue | None = None
+    max_patches: PositiveValue
+    multiplier: Annotated[float, Field(gt=0, le=MAX_FORMULA_VALUE)]
+
+    def estimate(self, width: int, height: int) -> int:
+        """Return the billable image tokens for an image of the given pixel size.
+
+        Raises:
+            ImageRejectedError: If the provider would reject the image.
         """
-        long_edge = max(width, height)
-        if long_edge > self.max_long_edge:
-            width, height = _scale_down(width, height, self.max_long_edge / long_edge)
-        patches = math.ceil(width / self.patch_size) * math.ceil(height / self.patch_size)
-        return min(patches, self.max_tokens)
+        if max(width, height) > self.max_dimension:
+            width, height = _scale_down(width, height, self.max_dimension / max(width, height))
+        size = self.patch_size
+        count = _patches(width, height, size)
+        if self.patch_budget is not None and count > self.patch_budget:
+            shrink = math.sqrt(size**2 * self.patch_budget / (width * height))
+            # Shrink a little more so whole patches fit, as the provider documents.
+            scaled_w, scaled_h = width * shrink / size, height * shrink / size
+            adjusted = shrink * min(
+                math.floor(scaled_w) / scaled_w, math.floor(scaled_h) / scaled_h
+            )
+            width, height = _scale_down(width, height, adjusted)
+            count = _patches(width, height, size)
+        if count > self.max_patches:
+            raise ImageRejectedError(
+                f"the provider rejects images above {self.max_patches} patches"
+            )
+        # Decimal keeps the multiplier exact: in binary floating point 150 * 1.62 is
+        # 243.00000000000003, which ceil() would bill as 244.
+        return math.ceil(Decimal(count) * Decimal(str(self.multiplier)))
 
 
 class TileFormula(_Model):
     """Tile-based billing (Gemini, older OpenAI models): a fixed cost per tile."""
 
     kind: Literal["tiles"]
+    applies_to: ModelNames = ()
     tile_size: PositiveValue
     tokens_per_tile: PositiveValue
     base_tokens: TokenCount = 0
@@ -115,7 +193,9 @@ class TileFormula(_Model):
         return self.base_tokens + tiles * self.tokens_per_tile
 
 
-ImageFormula = Annotated[PatchFormula | TileFormula, Field(discriminator="kind")]
+ImageFormula = Annotated[
+    PatchFormula | BudgetedPatchFormula | TileFormula, Field(discriminator="kind")
+]
 
 
 class ProviderFormulas(_Model):
@@ -138,6 +218,7 @@ class ProviderFormulas(_Model):
 
         Raises:
             ValueError: If the size is not positive or the tier does not exist.
+            ImageRejectedError: If the provider would reject the image.
         """
         if width < 1 or height < 1:
             raise ValueError("image width and height must be positive")

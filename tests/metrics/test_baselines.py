@@ -3,7 +3,7 @@
 import pytest
 
 from sugo.metrics.baselines import Savings, image_savings, text_savings
-from sugo.metrics.providers import load_provider
+from sugo.metrics.providers import load_provider, parse_provider
 from sugo.metrics.tokenizer import count_tokens
 
 
@@ -33,11 +33,11 @@ def test_text_savings_counts_both_texts() -> None:
 
 
 def test_image_savings_uses_provider_formula() -> None:
-    savings = image_savings(1170, 2532, "Hello world", load_provider("claude"))
-    assert (savings.baseline_tokens, savings.result_tokens) == (1456, 2)
+    savings = image_savings(1920, 1080, "Hello world", load_provider("claude"))
+    assert (savings.baseline_tokens, savings.result_tokens) == (2691, 2)
     assert (savings.provider, savings.tier, savings.formula_verified) == (
         "claude",
-        "standard",
+        "high_resolution",
         True,
     )
 
@@ -48,15 +48,31 @@ def test_small_screenshot_can_cost_less_as_image() -> None:
     assert savings.saved_tokens < 0
 
 
-def test_unverified_formula_is_flagged_in_the_result() -> None:
-    assert not image_savings(1024, 1024, "x", load_provider("openai")).formula_verified
-
-
 def test_explicit_tier_is_recorded() -> None:
-    savings = image_savings(4000, 4000, "x", load_provider("claude"), tier="high_resolution")
-    assert (savings.tier, savings.baseline_tokens) == ("high_resolution", 4784)
+    savings = image_savings(1920, 1080, "x", load_provider("claude"), tier="standard")
+    assert (savings.tier, savings.baseline_tokens) == ("standard", 1560)
 
 
 def test_unknown_tier_is_rejected() -> None:
     with pytest.raises(ValueError, match="unknown tier"):
         image_savings(10, 10, "x", load_provider("gemini"), tier="ultra")
+
+
+def test_unverified_formula_is_flagged_in_the_result() -> None:
+    formulas = parse_provider(
+        """
+schema_version = 1
+provider = "example"
+default_tier = "standard"
+[source]
+description = "not checked"
+url = "https://example.com/docs"
+checked = 2026-10-28
+status = "unverified"
+[tiers.standard]
+kind = "tiles"
+tile_size = 512
+tokens_per_tile = 170
+"""
+    )
+    assert not image_savings(1024, 1024, "x", formulas).formula_verified
