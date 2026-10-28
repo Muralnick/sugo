@@ -12,7 +12,7 @@ Roadmap step 3 needs the first cleaner: removing the screenshot UI chrome typed 
 ## Decision
 
 - **Minimal decision:** `sugo.core.decisions.Decision` says one thing only: remove block *X* for reason *Y*. It is an immutable, strictly validated pydantic model (ADR-037); an empty reason or any extra field is refused, so a decision cannot carry new text.
-- **The core applies:** `apply_decisions(page, decisions, cleaner=name)` returns a new page where each named block is marked removed (soft deletion, principle 3). The core writes the cleaner's name into `removed_by` itself, so a cleaner cannot act under another one's name.
+- **The core applies:** `apply_decisions(page, decisions, cleaner=name)` returns a new page where each named block is marked removed (soft deletion, principle 3). The core writes the cleaner's name into `removed_by` from its caller, never from the decisions. Until the extension API exists the caller is trusted code; then the core will take the name from the extension registry, so a cleaner cannot act under another one's name.
 - **All or nothing:** the core checks a cleaner's decisions for a page as a whole. A decision naming a block that is not on the page, a block already removed, or the same block twice makes the whole set invalid: nothing is applied and `InvalidDecisionError` names the cleaner, so the caller can disable and report it (ARCHITECTURE §16). Error messages leave block ids out (principle 11).
 - **Internal for now:** decisions are not exported in `sugo.api` and get no public error code. They become public, possibly extended, with the extension API; that change will need its own ADR.
 - **First cleaner:** `sugo.cleaners.ui_chrome.UiChromeCleaner` proposes the removal of every `ui_chrome` block still present. Its `propose(page)` omits the `stats` argument of the documented contract until the analyzers exist (step 5).
@@ -30,4 +30,4 @@ Roadmap step 3 needs the first cleaner: removing the screenshot UI chrome typed 
 ## Consequences
 
 - Two cleaners that legitimately target the same block must skip removed blocks; the ordering rules of the extension API will make this explicit.
-- On a synthetic phone chat screenshot (4 messages, status bar with clock, network and battery), removing UI chrome cuts the text from 35 to 26 o200k_base tokens (−26%). Corpus numbers come with step 8.
+- On a synthetic phone chat screenshot (4 messages, status bar with clock, network and battery), removing UI chrome cuts the text from 35 to 26 o200k_base tokens (−26%). The measurement is `test_chat_screenshot_loses_only_the_status_bar`, which fails if the saving drops below 20%. Corpus numbers come with step 8.
