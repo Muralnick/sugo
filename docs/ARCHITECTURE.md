@@ -104,7 +104,7 @@ Models are immutable, strictly validated pydantic models (ADR-037): a change is 
 | Container | `list() → entries`, `open(entry) → content` | Folders, archives, emails, PDFs with attachments (ADR-020) |
 | Extractor | `supports(input) → score`, `extract(input) → stream of Page` | Router picks the best score |
 | Analyzer | `observe(page)`, `finalize() → stats` | For cleaners needing document-wide context |
-| Cleaner | `propose(page, stats) → [Decision]` | **Proposes**; the core validates and applies (ADR-028) |
+| Cleaner | `propose(page, stats) → [Decision]` | **Proposes**; the core validates and applies (ADR-028); minimal internal form in ADR-041 |
 | Detector | `detect(page) → [Annotation]` | Chat, code, tables, UI chrome, injection attempts |
 | Language pack | Recomposition and normalisation rules per language | ADR-025 |
 | Serializer | `render(blocks) → Markdown` | Cheapest table format that preserves structure (ADR-002) |
