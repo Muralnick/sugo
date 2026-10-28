@@ -156,7 +156,7 @@ Hyphen resolution order: (1) the document's own lexicon (the joined word appears
 
 ## 7. Metrics and hybrid image mode
 
-Two baselines (ADR-003): raw vs clean text (`tiktoken`, `o200k_base` default), and **image cost vs extracted Markdown** per provider. Provider formulas are **data files** with source, date and verification status:
+Two baselines (ADR-003): raw vs clean text (`tiktoken`, `o200k_base` default, vocabulary bundled and hash-verified so counting never touches the network, ADR-038), and **image cost vs extracted Markdown** per provider. Provider formulas are **data files** with source, date and verification status:
 
 | Provider | Formula (as documented, October 2026) | Status |
 |---|---|---|

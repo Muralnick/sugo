@@ -23,3 +23,5 @@ Rules are enforced by tools wherever possible: a written rule that no tool check
 ## Licence allow-list
 
 MIT, BSD-2-Clause, BSD-3-Clause, Apache-2.0, ISC, PSF-2.0, MPL-2.0, LGPL (dynamic use), AGPL-3.0, GPL-3.0-compatible. Anything else requires an ADR.
+
+Approved exceptions: CNRI-Python, only as part of `regex` (dependency of tiktoken, ADR-038).

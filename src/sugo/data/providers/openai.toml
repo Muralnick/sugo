@@ -1,0 +1,22 @@
+# Image-token formula for OpenAI (ADR-003). Data, not code: update this file
+# when the provider changes its pricing, without a Sugo release.
+#
+# UNVERIFIED: this is the tile formula of older models (high detail: fit within
+# 2048 x 2048, shortest side down to 768, 170 tokens per 512 x 512 tile plus 85).
+# Newer models are billed differently (docs/ARCHITECTURE.md section 25).
+schema_version = 1
+provider = "openai"
+default_tier = "high_detail"
+
+[source]
+description = "OpenAI vision documentation for older models; not checked against a primary source"
+checked = 2026-10-28
+status = "unverified"
+
+[tiers.high_detail]
+kind = "tiles"
+fit_within = 2048
+shortest_side = 768
+tile_size = 512
+tokens_per_tile = 170
+base_tokens = 85

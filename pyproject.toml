@@ -8,6 +8,7 @@ license-files = ["LICENSE"]
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "pydantic>=2.14.1,<3",
+    "tiktoken>=0.14.0,<0.15",
 ]
 classifiers = [
     "Development Status :: 1 - Planning",
@@ -109,7 +110,7 @@ strict_equality = true
 [[tool.mypy.overrides]]
 # Strict typing where correctness matters most (CODE_STYLE.md, ADR-029).
 # Add "sugo.security.*" when that package is created (warn_unused_configs).
-module = ["sugo.core.*", "sugo.api.*"]
+module = ["sugo.core.*", "sugo.api.*", "sugo.metrics.*"]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 disallow_untyped_calls = true
