@@ -6,7 +6,9 @@ readme = "README.md"
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "pydantic>=2.14.1,<3",
+]
 classifiers = [
     "Development Status :: 1 - Planning",
     "Programming Language :: Python :: 3.12",
@@ -18,6 +20,7 @@ classifiers = [
 [dependency-groups]
 # Development tools only; see ADR-035. Exact versions and hashes live in uv.lock.
 dev = [
+    "hypothesis>=6.169.1",
     "import-linter>=2.15",
     "mypy>=2.4.0",
     "pytest>=9.1.1",
@@ -93,6 +96,8 @@ select = [
 
 [tool.mypy]
 python_version = "3.12"
+# Type-checks pydantic model constructors (ships with pydantic, ADR-037).
+plugins = ["pydantic.mypy"]
 files = ["src", "tests"]
 mypy_path = "src"
 warn_unused_configs = true
