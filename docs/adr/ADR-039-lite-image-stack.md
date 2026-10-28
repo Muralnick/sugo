@@ -17,6 +17,20 @@ Roadmap step 2 builds the `lite` image pipeline: safe decoding, classification, 
 - RapidOCR's default detector setting (`limit_type: min`, 736 px) upscales small images and multiplies detection time; `max` with about 960 px avoids it.
 - A dense phone screenshot (30 lines) takes about 7.7 s warm, against the < 2 s target in `docs/TESTING.md`. Recognition dominates. This gap is recorded, not hidden; the target is not changed without a new ADR.
 
+### Model size comparison (step 2b)
+
+Same synthetic phone screenshot, 32 lines in Italian, German, Spanish, French, Japanese, Chinese and code; median of three warm runs on the reference machine. The tiny models were downloaded to a scratch directory for this measurement only (hashes checked against RapidOCR's registry); they are not part of Sugo.
+
+| Models | Time | Character error rate | Notes |
+|---|---|---|---|
+| small detection + small recognition (bundled) | ~9.7 s | 0% | All languages correct |
+| tiny detection + tiny recognition | ~2.1 s | 2.9% | Japanese unsupported by the tiny model and garbled; "Il" read as "II" |
+| tiny detection + small recognition | ~6.6 s | 0% | Detection is not the bottleneck |
+
+The tiny models nearly meet the < 2 s target but break Japanese, one of the v0.1 languages. Choosing per script, or another speed-up, needs the model module and a decision of its own.
+
+`benchmarks/ocr_speed.py` reproduces the measurement for the bundled models (step 2b result: 7.4 s warm, 411 MB, 30/30 lines, 0% character errors).
+
 ## Decision
 
 - The image stack is the optional extra **`sugo[lite]`** (ADR-007). The dev environment installs it so every test runs.
@@ -29,7 +43,7 @@ Roadmap step 2 builds the `lite` image pipeline: safe decoding, classification, 
 | `rapidocr` | Step 2b | OCR pipeline and bundled models | Apache-2.0 |
 | `onnxruntime` | Step 2b | Model inference | MIT |
 
-  Transitive dependencies of `rapidocr` (OpenCV headless, shapely, pyclipper, omegaconf, PyYAML, tqdm, colorlog, requests and others) are reviewed when step 2b adds it.
+  Transitive dependencies added in step 2b, all on the allow-list: `opencv-python-headless` (Apache-2.0; its wheel bundles FFmpeg libraries under LGPL, used dynamically), `shapely` (BSD-3-Clause), `pyclipper` (MIT), `omegaconf` (BSD), `pyyaml` (MIT), `tqdm` (MPL-2.0 AND MIT), `colorlog` (MIT), `protobuf` (BSD-3-Clause), `flatbuffers` (Apache-2.0), `six` (MIT). `requests` and `urllib3` were already present through tiktoken (ADR-038).
 - **Licence exceptions approved by the maintainer on 2026-10-28:** MIT-CMU (Pillow), and Zlib, 0BSD and CC0-1.0 for the parts of numpy that use them. All are permissive.
 - **Models:** the PP-OCRv6 *small* models bundled in the pinned `rapidocr` wheel are used directly. Sugo checks their SHA-256 on load and never lets RapidOCR download anything. Other sizes and the Korean model wait for the model module (ADR-013).
 - **Decoding safety:** formats are detected from magic bytes; only PNG, JPEG and WEBP are accepted; file size and pixel count are capped before decoding (`sugo/core/constants.py`); Pillow's decompression-bomb warning is made fatal as a second guard.
@@ -46,4 +60,5 @@ Roadmap step 2 builds the `lite` image pipeline: safe decoding, classification, 
 
 - `sugo[lite]` weighs about 170 MB installed, most of it OpenCV and ONNX Runtime.
 - Native decoders and ONNX Runtime remain the main attack surface (THREAT_MODEL.md); worker isolation and sandboxing come with ADR-018 and ADR-031.
-- Deskew and perspective correction of document photos are not part of step 2a; they need geometry routines that arrive with OpenCV in step 2b.
+- Deskew and perspective correction of document photos are not part of steps 2a and 2b; they come in a separate pull request after the layout module (2c), since OpenCV is now available.
+- RapidOCR silently drops lines below its own score threshold; Sugo disables that filter and marks such lines illegible (principles 3 and 4). A confident score is no proof of correct text (a noisy test image produced "Involce" at 0.96), so content preservation must be measured on the corpus (step 8).

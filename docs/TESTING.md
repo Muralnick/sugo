@@ -68,6 +68,12 @@ Reference machine: 8 GB RAM, 4 cores; no GPU for `lite` and `normal`.
 | Complex page, `normal` on CPU | 3–8 s |
 | Peak RAM | `lite` < 1 GB; `normal` and `quality` < 2.5 GB (+ VRAM) |
 
+Measured so far (targets unchanged until a decision is recorded):
+
+| Operation | Measured | Script |
+|---|---|---|
+| Dense phone screenshot (30 lines) → text, warm, `lite` small models | 7.4 s, 411 MB peak, 0% character errors (October 2026) | `benchmarks/ocr_speed.py` |
+
 ## Logging and diagnostics
 
 | Aspect | Decision |
