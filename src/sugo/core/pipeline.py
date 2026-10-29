@@ -15,6 +15,7 @@ instead, so a full disk loses nothing; memory then grows with the document.
 """
 
 import hashlib
+import json
 import logging
 from collections import Counter
 from collections.abc import Callable, Generator, Mapping
@@ -26,11 +27,13 @@ from types import MappingProxyType
 from typing import ClassVar, Protocol
 
 from sugo.analyzers.edges import EdgeAnalyzer, EdgeStats
+from sugo.chunkers.sections import SectionChunker
 from sugo.cleaners.headers_footers import HeaderFooterCleaner
 from sugo.cleaners.hidden_text import HiddenTextCleaner
 from sugo.cleaners.page_numbers import PageNumberCleaner
 from sugo.cleaners.ui_chrome import UiChromeCleaner
-from sugo.core.constants import MAX_IMAGE_FILE_BYTES, MAX_PDF_FILE_BYTES
+from sugo.core.chunks import Chunk
+from sugo.core.constants import CHUNK_MIN_TOKENS, MAX_IMAGE_FILE_BYTES, MAX_PDF_FILE_BYTES
 from sugo.core.decisions import Decision, apply_decisions
 from sugo.core.models import Page
 from sugo.extractors.image.extract import extract_page
@@ -100,10 +103,17 @@ class Conversion:
 
     markdown: str
     kind: InputKind
+    # The source as given by the caller, e.g. "clients/agreement.pdf".
+    source: str | None
     source_sha256: str
     pages: int
     # Blocks removed, per cleaner name, so the user can see what went and why.
     removed: Mapping[str, int]
+    # Empty unless chunks were asked for (``max_chunk_tokens``).
+    chunks: tuple[Chunk, ...]
+    sugo_version: str
+    # Digest of the settings that change the output (cleaners, chunk size).
+    config_hash: str
 
 
 def convert_file(
@@ -111,8 +121,10 @@ def convert_file(
     *,
     cache: PageCache | None = None,
     ocr: Callable[[], OcrEngine] = default_ocr_engine,
+    source: str | None = None,
+    max_chunk_tokens: int | None = None,
 ) -> Conversion:
-    """Read a file and convert it.
+    """Read a file and convert it; ``source`` defaults to the path as given.
 
     Raises:
         InputUnsupportedError: If the file is neither a PDF nor a supported image.
@@ -123,7 +135,13 @@ def convert_file(
     with path.open("rb") as file:
         # One byte more than the limit lets the extractor report "too large".
         data = file.read(_MAX_INPUT_BYTES + 1)
-    return convert(data, cache=cache, ocr=ocr)
+    return convert(
+        data,
+        cache=cache,
+        ocr=ocr,
+        source=path.as_posix() if source is None else source,
+        max_chunk_tokens=max_chunk_tokens,
+    )
 
 
 def convert(
@@ -131,13 +149,18 @@ def convert(
     *,
     cache: PageCache | None = None,
     ocr: Callable[[], OcrEngine] = default_ocr_engine,
+    source: str | None = None,
+    max_chunk_tokens: int | None = None,
 ) -> Conversion:
-    """Convert a document's bytes into Markdown.
+    """Convert a document's bytes into Markdown, and into chunks if asked.
 
     Args:
         data: The file's content.
         cache: The page cache; None uses a private temporary one for this job.
         ocr: Called at most once, when a page needs OCR, to get the engine.
+        source: Name of the document, e.g. its path as the user gave it. It
+            gives the document its id, kept across new editions (ADR-047).
+        max_chunk_tokens: Chunk size in tokens; None makes no chunks.
 
     Raises:
         InputUnsupportedError: If the data is neither a PDF nor a supported image.
@@ -145,17 +168,20 @@ def convert(
         sugo.extractors.image.loader.ImageLoadError: If an image is refused.
     """
     kind = detect_kind(data)
+    if max_chunk_tokens is not None and max_chunk_tokens < CHUNK_MIN_TOKENS:
+        raise ValueError(f"max_chunk_tokens must be at least {CHUNK_MIN_TOKENS}")
+    options = _Options(source=source, max_chunk_tokens=max_chunk_tokens)
     if cache is not None:
-        return _Job(data, kind, cache, ocr).run()
+        return _Job(data, kind, cache, ocr, options).run()
     try:
         job_cache = PageCache.ephemeral()
     except (CacheUnavailableError, StorageDirError, OSError):
         # No room even for a temporary store: the job still runs, with its
         # pages in memory.
         _log.warning("no temporary page store; pages kept in memory")
-        return _Job(data, kind, None, ocr).run()
+        return _Job(data, kind, None, ocr, options).run()
     with job_cache:
-        return _Job(data, kind, job_cache, ocr).run()
+        return _Job(data, kind, job_cache, ocr, options).run()
 
 
 def detect_kind(data: bytes) -> InputKind:
@@ -175,8 +201,18 @@ def detect_kind(data: bytes) -> InputKind:
     return InputKind.IMAGE
 
 
+@dataclass(frozen=True)
+class _Options:
+    source: str | None
+    max_chunk_tokens: int | None
+
+    def config_hash(self) -> str:
+        settings = {"cleaners": _CLEANING, "max_chunk_tokens": self.max_chunk_tokens}
+        return hashlib.sha256(json.dumps(settings, sort_keys=True).encode()).hexdigest()
+
+
 class _Job:
-    """One conversion: the three passes over one document."""
+    """One conversion: the passes over one document (the fourth, chunking, if asked)."""
 
     def __init__(
         self,
@@ -184,8 +220,10 @@ class _Job:
         kind: InputKind,
         cache: PageCache | None,
         ocr: Callable[[], OcrEngine],
+        options: _Options,
     ) -> None:
         self._data = data
+        self._options = options
         self._kind = kind
         self._cache = cache
         self._ocr = _OnceOcr(ocr)
@@ -205,21 +243,44 @@ class _Job:
         # A cleaned page depends on every page of the document, through the
         # statistics: if any page reads differently, all are cleaned again.
         cleaning = f"{_CLEANING};{stats.digest()}"
+        sugo_version = version("sugo")
+        config_hash = self._options.config_hash()
+        chunker = (
+            None
+            if self._options.max_chunk_tokens is None
+            else SectionChunker(
+                source=self._options.source,
+                source_sha256=self._sha256,
+                sugo_version=sugo_version,
+                config_hash=config_hash,
+                max_tokens=self._options.max_chunk_tokens,
+            )
+        )
         removed: Counter[str] = Counter()
         parts: list[str] = []
+        chunks: list[Chunk] = []
         for index in range(count):
             page = self._cleaned(index, stats, cleaning)
             removed.update(block.removed_by for block in page.blocks if block.removed_by)
             text = render(page.blocks)
             if text:
                 parts.append(text)
+            if chunker is not None:
+                # Pass 4 runs alongside pass 3, so pages are read only once.
+                chunks.extend(chunker.add(page))
+        if chunker is not None:
+            chunks.extend(chunker.finish())
         return Conversion(
             # Pages follow each other like paragraphs (ADR-046).
             markdown="\n\n".join(parts),
             kind=self._kind,
+            source=self._options.source,
             source_sha256=self._sha256,
             pages=count,
             removed=MappingProxyType(dict(sorted(removed.items()))),
+            chunks=tuple(chunks),
+            sugo_version=sugo_version,
+            config_hash=config_hash,
         )
 
     def _extract(self) -> int:

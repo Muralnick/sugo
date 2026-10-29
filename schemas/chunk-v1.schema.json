@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Muralnick/sugo/main/schemas/chunk-v1.schema.json",
+  "additionalProperties": false,
+  "description": "A piece of a document sized for retrieval, with where it comes from.",
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^c_[0-9a-f]{32}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "document_id": {
+      "pattern": "^d_[0-9a-f]{32}$",
+      "title": "Document Id",
+      "type": "string"
+    },
+    "source": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Source"
+    },
+    "source_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "pattern": "^[0-9a-f]+$",
+      "title": "Source Sha256",
+      "type": "string"
+    },
+    "text": {
+      "minLength": 1,
+      "title": "Text",
+      "type": "string"
+    },
+    "tokens": {
+      "minimum": 1,
+      "title": "Tokens",
+      "type": "integer"
+    },
+    "heading_path": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Heading Path",
+      "type": "array"
+    },
+    "pages": {
+      "items": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "title": "Pages",
+      "type": "array"
+    },
+    "language": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Language"
+    },
+    "source_date": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Date"
+    },
+    "sugo_version": {
+      "minLength": 1,
+      "title": "Sugo Version",
+      "type": "string"
+    },
+    "config_hash": {
+      "maxLength": 64,
+      "minLength": 64,
+      "pattern": "^[0-9a-f]+$",
+      "title": "Config Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "document_id",
+    "source",
+    "source_sha256",
+    "text",
+    "tokens",
+    "heading_path",
+    "pages",
+    "language",
+    "source_date",
+    "sugo_version",
+    "config_hash"
+  ],
+  "title": "Chunk",
+  "type": "object"
+}

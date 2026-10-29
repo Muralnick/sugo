@@ -367,22 +367,22 @@ JSON-RPC 2.0 over the local channel (same style as MCP), versioned with a handsh
 ```json
 {
   "schema_version": "1.0",
-  "id": "c_8f3a91e2",
-  "document_id": "d_51c0aa7b",
+  "id": "c_8f3a91e2c04b7d1a5e6f90b2d3c4a5e6",
+  "document_id": "d_51c0aa7b9e2d4f6a8b0c1d2e3f405162",
   "text": "## Art. 5 – Withdrawal\nThe contract may be…",
   "tokens": 187,
   "heading_path": ["Supply agreement", "Art. 5 – Withdrawal"],
   "pages": [4, 5],
   "source": "clients.zip!/2025/agreement.pdf",
+  "source_sha256": "e3b0c442…",
   "language": "it",
   "source_date": "2025-03-14",
-  "processed_at": "2026-10-27T10:12:00Z",
   "sugo_version": "0.1.0",
   "config_hash": "a91f…"
 }
 ```
 
-Chunk `id` is **content-addressed**: unchanged text keeps its id, so vector databases re-embed only changed chunks. Optional YAML front matter in Markdown (source, hash, version, config). Evolution: added fields = minor; renamed/removed = major with deprecation; cleaning improvements noted in the changelog. JSON Schemas published in `schemas/` and validated in tests. The extension API is versioned separately.
+Full field list, ids and the published schema: ADR-047 (no timestamp, so output is reproducible; ids are 128-bit). Chunk `id` is **content-addressed**: unchanged text keeps its id, so vector databases re-embed only changed chunks. Optional YAML front matter in Markdown (source, hash, version, config). Evolution: added fields = minor; renamed/removed = major with deprecation; cleaning improvements noted in the changelog. JSON Schemas published in `schemas/` and validated in tests. The extension API is versioned separately.
 
 ---
 

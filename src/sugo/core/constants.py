@@ -280,3 +280,18 @@ CACHE_TOUCH_INTERVAL_S: Final = 600
 # The write-ahead log is cut back to this size after each checkpoint, so it
 # does not keep the space of a large job once the job is done.
 CACHE_WAL_LIMIT_BYTES: Final = 64 * 1024 * 1024
+
+# --- Chunks (roadmap step 6, ADR-047) ----------------------------------------
+
+# Default chunk size in o200k_base tokens. 512 suits most embedding models
+# (many are trained on 512-token passages) and keeps a retrieved chunk cheap
+# to put in a prompt (ARCHITECTURE §14, [chunking] max_tokens).
+CHUNK_MAX_TOKENS: Final = 512
+
+# Smallest chunk size accepted: below this, a heading and one sentence no
+# longer fit, and chunks lose their meaning.
+CHUNK_MIN_TOKENS: Final = 32
+
+# Hex digits of the chunk and document ids: 128 bits, so collisions stay
+# negligible even across billions of chunks in one vector database.
+OUTPUT_ID_HEX_DIGITS: Final = 32
