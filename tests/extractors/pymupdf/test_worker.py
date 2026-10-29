@@ -147,7 +147,17 @@ def test_restarted_worker_skips_the_stream_check(raw_pdf: RawPdf) -> None:
     # The first worker checked the same bytes; restarts must not pay for it again.
     content = b"q BI /W 1 /H 1 /CS /G /BPC 8 /F /Br ID x EI Q"
     data = raw_pdf(b"/Filter /FlateDecode", content=zlib.compress(content))
-    assert isinstance(messages(data, first_page=1)[0], Opened)
+    opened = [m for m, _ in run(data, 1, check_streams=False)]
+    assert isinstance(opened[0], Opened)
+
+
+def test_starting_from_a_later_page_still_checks_every_stream(raw_pdf: RawPdf) -> None:
+    # Resuming a job from a cached page must not skip the check.
+    content = b"q BI /W 1 /H 1 /CS /G /BPC 8 /F /Br ID x EI Q"
+    data = raw_pdf(b"/Filter /FlateDecode", content=zlib.compress(content))
+    (refusal,) = messages(data, first_page=1)
+    assert isinstance(refusal, Refused)
+    assert refusal.code == "PDF_UNSUPPORTED"
 
 
 def test_hidden_space_does_not_carry_a_hidden_word_into_visible_text(

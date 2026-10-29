@@ -86,9 +86,11 @@ def main() -> None:
     pymupdf.TOOLS.mupdf_display_errors(False)
     pymupdf.TOOLS.mupdf_display_warnings(False)
     first_page = int(sys.argv[1])
+    # Anything but an explicit "trust" checks every stream: the safe default.
+    check_streams = sys.argv[2:3] != ["trust"]
     data = sys.stdin.buffer.read(MAX_PDF_FILE_BYTES + 1)
     with _private_stdout() as out:
-        write_all(out, run(data, first_page))
+        write_all(out, run(data, first_page, check_streams=check_streams))
 
 
 @contextlib.contextmanager
@@ -107,10 +109,14 @@ def _private_stdout() -> Iterator[IO[bytes]]:
         yield out
 
 
-def run(data: bytes, first_page: int) -> Iterator[tuple[Message, bytes | None]]:
+def run(
+    data: bytes, first_page: int, *, check_streams: bool = True
+) -> Iterator[tuple[Message, bytes | None]]:
     """Check the document, then yield one message per page from ``first_page``.
 
-    A scan page comes with its RGB pixels; every other message with None.
+    ``check_streams`` is False only for a restarted worker: the first one
+    already searched every decoded stream of the same bytes. A scan page
+    comes with its RGB pixels; every other message with None.
     """
     try:
         document = pymupdf.open(stream=data, filetype="pdf")
@@ -118,8 +124,7 @@ def run(data: bytes, first_page: int) -> Iterator[tuple[Message, bytes | None]]:
         yield Refused(code="PDF_INVALID", message="the file is not a readable PDF"), None
         return
     with document:
-        # A restarted worker reads the same bytes, already checked by the first.
-        refusal = _check(document, streams=first_page == 0)
+        refusal = _check(document, streams=check_streams)
         if refusal is not None:
             yield refusal, None
             return
