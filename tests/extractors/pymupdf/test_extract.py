@@ -1,6 +1,7 @@
 """Tests for PDF extraction through the worker process, including hostile workers."""
 
 import sys
+import zlib
 from collections.abc import Callable
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from sugo.extractors.pymupdf.extract import (
     PdfTooLargeError,
     PdfUnsupportedError,
     extract_pdf,
+    is_failed_page,
     read_pdf_file,
 )
 from sugo.serializers.markdown import render
@@ -187,3 +189,26 @@ def test_mupdf_printing_errors_cannot_corrupt_the_frames(raw_pdf: RawPdf) -> Non
     # A corrupt stream makes MuPDF print to stdout; the worker's frames use a private copy.
     data = raw_pdf(b"/Filter /FlateDecode", content=b"not zlib data at all")
     assert [p.index for p in extract_pdf(data)] == [0]
+
+
+def test_extraction_can_start_from_a_later_page() -> None:
+    pages = list(extract_pdf(pdf("First page", "Second page", "Third page"), start=1))
+    assert [(p.index, render(p.blocks)) for p in pages] == [
+        (1, "Second page"),
+        (2, "Third page"),
+    ]
+    assert list(extract_pdf(pdf("Only page"), start=1)) == []
+
+
+def test_start_from_a_later_page_still_refuses_hidden_brotli(raw_pdf: RawPdf) -> None:
+    content = b"q BI /W 1 /H 1 /CS /G /BPC 8 /F /Br ID x EI Q"
+    data = raw_pdf(b"/Filter /FlateDecode", content=zlib.compress(content))
+    with pytest.raises(PdfUnsupportedError):
+        list(extract_pdf(data, start=1))
+
+
+def test_failed_pages_are_recognised() -> None:
+    worker = fake_worker("opened(2)\nsend(p.PageFailed(index=first))\nnative(1, 'x')\n")
+    failed, read = extract_pdf(pdf("a", "b"), worker=worker)
+    assert is_failed_page(failed)
+    assert not is_failed_page(read)

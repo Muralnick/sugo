@@ -59,7 +59,8 @@ from sugo.extractors.pymupdf.protocol import (
 # change which code the worker runs.
 WORKER_COMMAND: tuple[str, ...] = (sys.executable, "-I", "-m", "sugo.extractors.pymupdf.worker")
 # The PDF signature may follow a few bytes of junk, which readers tolerate.
-_SIGNATURE_WINDOW = 1024
+PDF_SIGNATURE = b"%PDF-"
+PDF_SIGNATURE_WINDOW = 1024
 
 
 class PdfError(ValueError):
@@ -127,11 +128,14 @@ def extract_pdf(
     worker: Sequence[str] = WORKER_COMMAND,
     open_timeout: float = PDF_OPEN_TIMEOUT_S,
     page_timeout: float = PDF_PAGE_TIMEOUT_S,
+    start: int = 0,
 ) -> Iterator[Page]:
-    """Yield the pages of a PDF in order.
+    """Yield the pages of a PDF in order, from page ``start``.
 
     Args:
         data: The PDF file's bytes.
+        start: First page to read, to resume a job whose earlier pages are
+            cached. The whole document is still checked before any page.
         ocr: Called at most once, at the first scanned page, to get an OCR engine.
         worker: Command that starts the worker; tests replace it.
         open_timeout: Seconds allowed to open and check the document.
@@ -142,12 +146,23 @@ def extract_pdf(
     """
     if len(data) > MAX_PDF_FILE_BYTES:
         raise PdfTooLargeError(f"PDF file exceeds {MAX_PDF_FILE_BYTES} bytes")
-    if b"%PDF-" not in data[:_SIGNATURE_WINDOW]:
+    if PDF_SIGNATURE not in data[:PDF_SIGNATURE_WINDOW]:
         raise PdfError("not a PDF file")
     problem = raw_problem(data)
     if problem is not None:
         raise PdfUnsupportedError(problem)
-    return _pages(data, _LazyOcr(ocr), worker, open_timeout, page_timeout)
+    if start < 0:
+        raise ValueError("start must not be negative")
+    return _pages(data, _LazyOcr(ocr), worker, open_timeout, page_timeout, start)
+
+
+def is_failed_page(page: Page) -> bool:
+    """Whether a page is the illegible placeholder for one the worker could not read.
+
+    Such a page may read fine on a retry (a timeout on a busy machine), so
+    callers should not cache it.
+    """
+    return page.origin is PageOrigin.NATIVE and page.blocks == (_FAILED_BLOCK,)
 
 
 def _pages(
@@ -156,12 +171,16 @@ def _pages(
     command: Sequence[str],
     open_timeout: float,
     page_timeout: float,
+    start: int,
 ) -> Iterator[Page]:
     boxes: tuple[PageBox, ...] | None = None
-    first = 0
+    first = start
     restarts = 0
     while boxes is None or first < len(boxes):
-        with _Worker(command, data, first) as worker:
+        # Only the first worker checks every stream: a restarted one reads the
+        # same bytes. Tied to the first start, not to page 0, so resuming a
+        # job from a later page is checked just the same.
+        with _Worker(command, data, first, check_streams=boxes is None) as worker:
             try:
                 boxes = _open(worker, open_timeout, boxes).pages
             except _WorkerError:
@@ -219,16 +238,20 @@ def _page(worker: "_Worker", index: int, box: PageBox, ocr: "_LazyOcr", timeout:
     return _page_of(index, box, PageOrigin.OCR, blocks)
 
 
+# The only block of a page the worker could not read. Native layout never
+# flags a block illegible, so this block is never confused with real text.
+_FAILED_BLOCK = Block(
+    id="b0",
+    type=BlockType.PARAGRAPH,
+    reading_order=0,
+    origin_engine=ENGINE_NAME,
+    flags=(BlockFlag.ILLEGIBLE,),
+)
+
+
 def _failed_page(index: int, box: PageBox) -> Page:
     """A page the worker could not read: one illegible block, never a silent gap."""
-    block = Block(
-        id="b0",
-        type=BlockType.PARAGRAPH,
-        reading_order=0,
-        origin_engine=ENGINE_NAME,
-        flags=(BlockFlag.ILLEGIBLE,),
-    )
-    return _page_of(index, box, PageOrigin.NATIVE, (block,))
+    return _page_of(index, box, PageOrigin.NATIVE, (_FAILED_BLOCK,))
 
 
 def _page_of(index: int, box: PageBox, origin: PageOrigin, blocks: tuple[Block, ...]) -> Page:
@@ -274,10 +297,12 @@ class _Worker:
     stdout into a queue that the caller waits on with a timeout.
     """
 
-    def __init__(self, command: Sequence[str], data: bytes, first_page: int) -> None:
+    def __init__(
+        self, command: Sequence[str], data: bytes, first_page: int, *, check_streams: bool
+    ) -> None:
         # No shell: the command is a fixed list of arguments.
         self._process = subprocess.Popen(  # noqa: S603
-            [*command, str(first_page)],
+            [*command, str(first_page), "check" if check_streams else "trust"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,

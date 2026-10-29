@@ -47,3 +47,4 @@
 | [043](ADR-043-pdf-extractor.md) | Native PDF extractor in an isolated worker | Accepted (merge waits for PyMuPDF 2.x) |
 | [044](ADR-044-headers-footers.md) | Running headers, footers and page numbers | Accepted |
 | [045](ADR-045-page-cache.md) | Page cache and page store in SQLite | Accepted |
+| [046](ADR-046-pipeline.md) | Multi-pass conversion pipeline (standalone) | Accepted |
