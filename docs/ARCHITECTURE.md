@@ -107,7 +107,7 @@ Models are immutable, strictly validated pydantic models (ADR-037): a change is 
 | Cleaner | `propose(page, stats) → [Decision]` | **Proposes**; the core validates and applies (ADR-028); minimal internal form in ADR-041 |
 | Detector | `detect(page) → [Annotation]` | Chat, code, tables, UI chrome, injection attempts |
 | Language pack | Recomposition and normalisation rules per language | ADR-025 |
-| Serializer | `render(blocks) → Markdown` | Cheapest table format that preserves structure (ADR-002) |
+| Serializer | `render(blocks) → Markdown` | Cheapest table format that preserves structure (ADR-002); format in ADR-042 |
 | Chunker | `chunk(document) → [Chunk]` | Heading path, pages, token budget, tables kept whole |
 | Exporter | `export(...) → files` | Markdown, JSON, JSONL |
 | Optimizer | `optimize(image, provider) → image` | Provider-aware image budget (ADR-017) |

@@ -43,3 +43,4 @@
 | [039](ADR-039-lite-image-stack.md) | Image stack for the lite level | Accepted |
 | [040](ADR-040-screenshot-detectors.md) | Screenshot detectors and chat speaker side | Accepted |
 | [041](ADR-041-cleaner-decisions.md) | Minimal cleaner decisions, applied by the core | Accepted |
+| [042](ADR-042-markdown-serializer.md) | Markdown output format | Accepted |

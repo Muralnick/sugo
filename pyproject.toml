@@ -121,7 +121,14 @@ strict_equality = true
 [[tool.mypy.overrides]]
 # Strict typing where correctness matters most (CODE_STYLE.md, ADR-029).
 # Add "sugo.security.*" when that package is created (warn_unused_configs).
-module = ["sugo.core.*", "sugo.api.*", "sugo.metrics.*", "sugo.extractors.*", "sugo.cleaners.*"]
+module = [
+    "sugo.core.*",
+    "sugo.api.*",
+    "sugo.metrics.*",
+    "sugo.extractors.*",
+    "sugo.cleaners.*",
+    "sugo.serializers.*",
+]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 disallow_untyped_calls = true
@@ -165,6 +172,21 @@ type = "forbidden"
 source_modules = ["sugo.cleaners"]
 forbidden_modules = [
     "sugo.extractors",
+    "sugo.ports",
+    "sugo.sources",
+    "sugo.models",
+    "sugo.setup",
+    "sugo._internal.net",
+]
+
+# Serializers render the IR and measure it; they never read inputs or networks.
+[[tool.importlinter.contracts]]
+name = "Serializers work on the IR only"
+type = "forbidden"
+source_modules = ["sugo.serializers"]
+forbidden_modules = [
+    "sugo.extractors",
+    "sugo.cleaners",
     "sugo.ports",
     "sugo.sources",
     "sugo.models",
