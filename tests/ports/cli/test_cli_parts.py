@@ -122,3 +122,14 @@ def test_clipboard_check_on_linux_without_tools(monkeypatch: pytest.MonkeyPatch)
     assert doctor._clipboard().status is doctor.Status.WARNING
     monkeypatch.setattr("shutil.which", lambda tool: f"/usr/bin/{tool}")
     assert doctor._clipboard().detail == "wl-paste, xclip"
+
+
+def test_doctor_details_are_shown_as_written(monkeypatch: pytest.MonkeyPatch) -> None:
+    from typer.testing import CliRunner
+
+    from sugo.ports.cli import app as cli
+
+    monkeypatch.setattr(
+        cli, "run_checks", lambda: [doctor.Check("x", doctor.Status.OK, 'pip install "sugo[lite]"')]
+    )
+    assert 'pip install "sugo[lite]"' in CliRunner().invoke(cli.app, ["doctor"]).stdout

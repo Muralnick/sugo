@@ -42,8 +42,8 @@ if TYPE_CHECKING:
 
 _log = logging.getLogger(__name__)
 # Markup and highlighting off: file names and messages are shown as typed.
-_stderr = Console(stderr=True, highlight=False, soft_wrap=True)
-_stdout = Console(highlight=False)
+_stderr = Console(stderr=True, markup=False, highlight=False, soft_wrap=True)
+_stdout = Console(markup=False, highlight=False)
 _STATUS_STYLES = {Status.OK: "green", Status.WARNING: "yellow", Status.ERROR: "bold red"}
 
 

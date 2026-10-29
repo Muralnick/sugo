@@ -55,6 +55,12 @@ With `--json`, the conversion commands print one object, `{"documents": [...]}`.
 
 When every file fails, the exit code is that of the failures, or 1 if they differ. Unexpected exceptions are not caught: they end with a plain Python traceback (no locals) and exit 1, so bugs are reported rather than hidden.
 
+### Terminal safety (security review)
+
+A crafted PDF can carry real control characters, e.g. a font whose encoding maps a letter to `/uni001B`. Printed to a terminal they become escape sequences that clear the screen, fake a prompt, set the window title or write the clipboard (OSC 52, honoured by Windows Terminal). The Markdown serializer therefore drops C0 controls except tab and line feed, DEL and C1 from every block, table cell and chunk heading path **before escaping** (`drop_controls`), so a dropped character can never hide structure from the escaper. Controls that `str.splitlines` treats as line breaks (CR, VT, FF, FS, GS, RS, NEL) become line feeds, keeping lines as before. They never print, so no visible content is lost. Every output inherits this — stdout, files, `--json`, JSONL and the MCP port — and a property test checks that no control character survives rendering. Rich markup is off on both consoles.
+
+Residual (low): on Linux and macOS, Pillow's `ImageGrab` decodes the clipboard with all its image plugins before Sugo's PNG/JPEG/WEBP allow-list. The clipboard is filled by the user's own applications; reading the raw PNG bytes instead is left for a later change.
+
 ### Privacy
 
 Error messages come from Sugo's own exceptions, which never quote document text. For an `OSError` only the reason is shown, not the full message with its path. The CLI prefixes a failure with the file name the user typed, because the user needs it. That goes to the user's own terminal only and is never logged (principle 11). Logging goes to stderr at WARNING level.
@@ -71,7 +77,7 @@ Error messages come from Sugo's own exceptions, which never quote document text.
 
 ## Consequences
 
-- New public contracts: commands, options, the `--json` shape, the exit-code mapping and six error codes.
+- New public contracts: commands, options, the `--json` shape, the exit-code mapping and six error codes (maintainer decision).
 - Base install grows by Typer, Rich and their dependencies, about 3 MB.
 - Messages are English only. Italian (ADR-024) still has to come before the v0.1 release.
 - A file named like a command (`stats`) needs `sugo convert stats` or `sugo ./stats`.
