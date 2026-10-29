@@ -23,7 +23,13 @@ from sugo.core.models import (
     TableCell,
 )
 from sugo.storage import page_cache
-from sugo.storage.page_cache import CacheLevel, PageCache, extraction_key, output_key
+from sugo.storage.page_cache import (
+    CacheLevel,
+    CacheUnavailableError,
+    PageCache,
+    extraction_key,
+    output_key,
+)
 from sugo.storage.paths import CACHE_DIR_ENV, StorageDirError, cache_dir, ensure_private_dir
 
 SHA = "0" * 64
@@ -43,6 +49,9 @@ def page(index: int = 0, text: str = "Hello") -> Page:
 
 def key(index: int = 0) -> bytes:
     return extraction_key(source_sha256=SHA, page_index=index, engine="pymupdf")
+
+
+DAY = 24 * 3600
 
 
 class Clock:
@@ -119,8 +128,8 @@ def test_keys_depend_on_every_input(monkeypatch: pytest.MonkeyPatch) -> None:
     assert len(others) == 3
     assert output_key(extraction=base, cleaning="a") != output_key(extraction=base, cleaning="b")
     assert output_key(extraction=base, cleaning="a") != base
-    # A new Sugo version never reuses pages made by the old code.
-    monkeypatch.setattr(page_cache, "_sugo_version", lambda: "9.9.9")
+    # Changed Sugo code never reuses pages made by the old code.
+    monkeypatch.setattr(page_cache, "_code_fingerprint", lambda: "changed code")
     assert extraction_key(source_sha256=SHA, page_index=0, engine="pymupdf") != base
 
 
@@ -176,13 +185,30 @@ def test_least_recently_used_pages_are_evicted(tmp_path: Path) -> None:
         for index in range(3):
             clock.now += 1
             cache.put(EXTRACTION, key(index), page(index))
-        clock.now += 1
-        cache.get(EXTRACTION, key(0))  # Page 0 is now the most recently used.
-        clock.now += 1
+        # Two days later: page 0 is read again, then a new page is written.
+        clock.now += 2 * DAY
+        cache.get(EXTRACTION, key(0))
         cache.put(EXTRACTION, key(3), page(3))
         kept = [i for i in range(4) if cache.get(EXTRACTION, key(i)) is not None]
     # Over the limit: down to 90% of it, oldest first (pages 1, then 2).
     assert kept == [0, 3]
+
+
+def test_pages_used_today_are_never_evicted(tmp_path: Path) -> None:
+    # A job larger than the cache must find all its pages in its later passes.
+    with PageCache(tmp_path / "cache.db", max_bytes=500) as cache:
+        for index in range(10):
+            cache.put(EXTRACTION, key(index), page(index))
+        assert all(cache.get(EXTRACTION, key(i)) == page(i) for i in range(10))
+        assert cache.stats().bytes > 500
+
+
+def test_reading_a_recent_page_does_not_write(cache: PageCache) -> None:
+    cache.put(EXTRACTION, key(), page())
+    statements: list[str] = []
+    cache._db.set_trace_callback(statements.append)
+    assert cache.get(EXTRACTION, key()) == page()
+    assert not any(s.startswith(("UPDATE", "DELETE", "BEGIN")) for s in statements)
 
 
 def test_purge_removes_pages_unused_for_too_long(tmp_path: Path) -> None:
@@ -269,3 +295,98 @@ def test_cache_dir_symlink_is_refused(tmp_path: Path) -> None:
         ensure_private_dir(tmp_path / "link")
     with pytest.raises(StorageDirError):
         PageCache(tmp_path / "link" / "cache.db")
+
+
+def test_code_fingerprint_covers_sugo_source() -> None:
+    fingerprint = page_cache._code_fingerprint()
+    assert len(fingerprint) == 64
+    assert fingerprint == page_cache._code_fingerprint()
+
+
+def test_cache_opens_while_another_process_writes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(page_cache, "CACHE_BUSY_TIMEOUT_S", 0.05)
+    path = tmp_path / "cache.db"
+    with PageCache(path) as first:
+        first.put(EXTRACTION, key(), page())
+    other = sqlite3.connect(path, isolation_level=None)
+    other.execute("BEGIN IMMEDIATE")  # Another process is writing.
+    try:
+        # Opening a current cache only reads, so it never waits for writers.
+        with PageCache(path) as second:
+            assert second.get(EXTRACTION, key()) == page()
+    finally:
+        other.execute("ROLLBACK")
+        other.close()
+
+
+def test_locked_cache_is_left_alone(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(page_cache, "CACHE_BUSY_TIMEOUT_S", 0.05)
+    path = tmp_path / "cache.db"
+    # A database another process holds exclusively, before Sugo set it up.
+    other = sqlite3.connect(path, isolation_level=None)
+    other.execute("CREATE TABLE theirs (x)")
+    other.execute("BEGIN EXCLUSIVE")
+    other.execute("INSERT INTO theirs VALUES (1)")
+    try:
+        with pytest.raises(CacheUnavailableError):
+            PageCache(path)
+    finally:
+        other.execute("COMMIT")
+    # Nothing was deleted: the other process's data is still there.
+    assert other.execute("SELECT x FROM theirs").fetchall() == [(1,)]
+    other.close()
+
+
+def test_clear_keeps_the_file_other_processes_use(tmp_path: Path) -> None:
+    path = tmp_path / "cache.db"
+    with PageCache(path) as job, PageCache(path) as command:
+        job.put(EXTRACTION, key(0), page(0))
+        inode = path.stat().st_ino
+        command.clear()
+        assert path.stat().st_ino == inode
+        assert job.get(EXTRACTION, key(0)) is None
+        job.put(EXTRACTION, key(1), page(1))
+        assert command.get(EXTRACTION, key(1)) == page(1)
+
+
+def test_deleted_pages_give_disk_space_back(tmp_path: Path) -> None:
+    path = tmp_path / "cache.db"
+    big = page(text=os.urandom(200_000).hex())
+    with PageCache(path) as cache:
+        for index in range(10):
+            cache.put(EXTRACTION, key(index), big)
+        full = path.stat().st_size + path.with_name("cache.db-wal").stat().st_size
+        cache.purge(older_than_s=-1)
+        empty = path.stat().st_size + path.with_name("cache.db-wal").stat().st_size
+    assert empty < full / 10
+
+
+def test_page_too_large_to_read_back_is_not_stored(
+    cache: PageCache, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(page_cache, "CACHE_MAX_RECORD_BYTES", 100)
+    cache.put(EXTRACTION, key(), page())
+    assert cache.stats().entries == 0
+
+
+def test_unreachable_disk_skips_caching(cache: PageCache, monkeypatch: pytest.MonkeyPatch) -> None:
+    def gone(_: Path) -> None:
+        raise FileNotFoundError
+
+    monkeypatch.setattr(page_cache.shutil, "disk_usage", gone)
+    cache.put(EXTRACTION, key(), page())
+    assert cache.stats().entries == 0
+
+
+def test_size_queries_never_read_records(cache: PageCache) -> None:
+    plans = [
+        " ".join(str(row[-1]) for row in cache._db.execute("EXPLAIN QUERY PLAN " + query))
+        for query in (
+            "SELECT COUNT(*), SUM(size) FROM entries INDEXED BY entries_by_use",
+            "SELECT level, key, size FROM entries INDEXED BY entries_by_use"
+            " WHERE last_used < 0 ORDER BY last_used, level, key",
+        )
+    ]
+    assert all("COVERING INDEX entries_by_use" in plan for plan in plans), plans

@@ -9,7 +9,8 @@ Pages are stored as their validated JSON, compressed with zlib: never pickle,
 since reading a pickle runs code. Everything read back is treated as
 untrusted: a record that is too big, does not decompress or fails the IR
 validation is dropped and counted as a miss. The cache is regenerable, so a
-broken or outdated database is rebuilt from scratch rather than repaired.
+damaged or outdated database is rebuilt from scratch rather than repaired;
+one that is merely locked by another process is left alone.
 
 Log messages never contain document text, keys or file names (principle 11).
 """
@@ -26,19 +27,22 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cache
-from importlib.metadata import version
 from pathlib import Path
 from types import TracebackType
 from typing import Self
 
 from pydantic import ValidationError
 
+import sugo
 from sugo.core.constants import (
     CACHE_BUSY_TIMEOUT_S,
     CACHE_EVICT_TO_SHARE,
     CACHE_MAX_BYTES,
     CACHE_MAX_RECORD_BYTES,
     CACHE_MIN_FREE_BYTES,
+    CACHE_PROTECT_RECENT_S,
+    CACHE_TOUCH_INTERVAL_S,
+    CACHE_WAL_LIMIT_BYTES,
 )
 from sugo.core.models import Page
 from sugo.storage.paths import cache_dir, ensure_private_dir
@@ -49,17 +53,15 @@ CACHE_FILE_NAME = "cache.db"
 # Bumped when the table layout or the record format changes; an older cache
 # is then rebuilt, never migrated, because everything in it is regenerable.
 _SCHEMA_VERSION = 1
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS entries (
-    level TEXT NOT NULL,
-    key BLOB NOT NULL,
-    record BLOB NOT NULL,
-    size INTEGER NOT NULL,
-    last_used REAL NOT NULL,
-    PRIMARY KEY (level, key)
-);
-CREATE INDEX IF NOT EXISTS entries_by_use ON entries (last_used);
-"""
+_SCHEMA = (
+    # The record comes last, so reading the other columns never follows a
+    # record into its overflow pages.
+    "CREATE TABLE entries ("
+    " level TEXT NOT NULL, key BLOB NOT NULL, size INTEGER NOT NULL,"
+    " last_used REAL NOT NULL, record BLOB NOT NULL, PRIMARY KEY (level, key))",
+    # Covers the size total and the eviction order without touching records.
+    "CREATE INDEX entries_by_use ON entries (last_used, size, level, key)",
+)
 
 
 class CacheLevel(StrEnum):
@@ -97,15 +99,31 @@ def output_key(*, extraction: bytes, cleaning: str) -> bytes:
 
 
 def _digest(*parts: str | int) -> bytes:
-    # Sugo's own version is part of every key: a fixed extractor or cleaner
-    # must not keep serving pages produced by the old code.
-    encoded = json.dumps([_sugo_version(), *parts], ensure_ascii=False)
+    encoded = json.dumps([_code_fingerprint(), *parts], ensure_ascii=False)
     return hashlib.sha256(encoded.encode()).digest()
 
 
 @cache
-def _sugo_version() -> str:
-    return version("sugo")
+def _code_fingerprint() -> str:
+    """Digest of Sugo's own source code, part of every key.
+
+    Fixed extractors or cleaners must never get pages made by the old code.
+    The package version alone would not show it: it changes only on a
+    release, and never in a development checkout.
+    """
+    root = Path(sugo.__file__).parent
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*.py")):
+        digest.update(path.relative_to(root).as_posix().encode() + b"\0")
+        digest.update(hashlib.sha256(path.read_bytes()).digest())
+    return digest.hexdigest()
+
+
+class CacheUnavailableError(RuntimeError):
+    """The cache cannot be opened now: locked by another process, or read-only.
+
+    The caller runs the job without a cache; the file is left untouched.
+    """
 
 
 class PageCache:
@@ -113,8 +131,8 @@ class PageCache:
 
     Several processes may use the same cache: SQLite serialises writers, and
     a process that waits too long skips the cache operation instead of
-    failing the job. A database damaged while in use is skipped the same
-    way, and ``clear`` (``sugo cache clear``) starts a new one.
+    failing the job. Files are never deleted while the cache may be in use,
+    except when SQLite reports them damaged.
     """
 
     def __init__(
@@ -129,6 +147,8 @@ class PageCache:
         Raises:
             StorageDirError: If the directory holding ``path`` is not private
                 to the user and cannot be made so.
+            CacheUnavailableError: If the database is locked for too long or
+                cannot be written.
         """
         if max_bytes <= 0:
             raise ValueError("max_bytes must be positive")
@@ -169,25 +189,29 @@ class PageCache:
         """Return the cached page, or None if absent, unreadable or invalid."""
         try:
             row = self._db.execute(
-                "SELECT record FROM entries WHERE level = ? AND key = ?", (level.value, key)
+                "SELECT record, last_used FROM entries WHERE level = ? AND key = ?",
+                (level.value, key),
             ).fetchone()
         except sqlite3.DatabaseError:
             _log.warning("page cache busy or unreadable; reading skipped")
             return None
         if row is None:
             return None
-        page = _decode(row[0])
+        record, last_used = row
+        page = _decode(record)
+        now = self._clock()
         try:
-            with self._db:
-                if page is None:
-                    _log.warning("dropped an invalid page cache entry")
+            if page is None:
+                _log.warning("dropped an invalid page cache entry")
+                with self._db:
                     self._db.execute(
                         "DELETE FROM entries WHERE level = ? AND key = ?", (level.value, key)
                     )
-                else:
+            elif last_used < now - CACHE_TOUCH_INTERVAL_S:
+                with self._db:
                     self._db.execute(
                         "UPDATE entries SET last_used = ? WHERE level = ? AND key = ?",
-                        (self._clock(), level.value, key),
+                        (now, level.value, key),
                     )
         except sqlite3.DatabaseError:
             # A busy writer only delays the LRU bookkeeping.
@@ -197,40 +221,52 @@ class PageCache:
     def put(self, level: CacheLevel, key: bytes, page: Page) -> None:
         """Store a page, then evict the least recently used ones past the size limit.
 
-        Skipped, with a warning, when the disk is nearly full or another
-        process holds the cache for too long: the job goes on without it.
+        Skipped, with a warning, when the page is too large to be read back,
+        the disk is nearly full or unreachable, or another process holds the
+        cache for too long: the job goes on without it.
         """
-        record = zlib.compress(page.model_dump_json().encode())
-        if shutil.disk_usage(self._path.parent).free - len(record) < CACHE_MIN_FREE_BYTES:
-            _log.warning("little free disk space; page not cached")
+        raw = page.model_dump_json().encode()
+        if len(raw) > CACHE_MAX_RECORD_BYTES:
+            _log.warning("page too large for the cache; not cached")
             return
+        record = zlib.compress(raw)
         try:
+            if shutil.disk_usage(self._path.parent).free - len(record) < CACHE_MIN_FREE_BYTES:
+                _log.warning("little free disk space; page not cached")
+                return
             with self._db:
                 self._db.execute(
                     "INSERT OR REPLACE INTO entries VALUES (?, ?, ?, ?, ?)",
-                    (level.value, key, record, len(record), self._clock()),
+                    (level.value, key, len(record), self._clock(), record),
                 )
             self._estimated_bytes += len(record)
             if self._estimated_bytes > self._max_bytes:
                 if self.stats().bytes > self._max_bytes:
                     self.evict(int(self._max_bytes * CACHE_EVICT_TO_SHARE))
                 self._estimated_bytes = self.stats().bytes
-        except sqlite3.DatabaseError:
+        except (sqlite3.DatabaseError, OSError):
             _log.warning("page cache busy or unwritable; page not cached")
 
     def stats(self) -> CacheStats:
         """Return how many pages the cache holds and how many bytes they take."""
+        # The covering index holds every size, so this never reads the records.
         entries, size = self._db.execute(
-            "SELECT COUNT(*), COALESCE(SUM(size), 0) FROM entries"
+            "SELECT COUNT(*), COALESCE(SUM(size), 0) FROM entries INDEXED BY entries_by_use"
         ).fetchone()
         return CacheStats(entries=entries, bytes=size)
 
     def evict(self, max_bytes: int) -> int:
-        """Remove least recently used pages until at most ``max_bytes`` remain; return how many."""
+        """Remove least recently used pages until at most ``max_bytes`` remain; return how many.
+
+        Pages used in the last day are kept, so the cache may stay above
+        ``max_bytes`` while a large job is running.
+        """
         total = self.stats().bytes
         doomed: list[tuple[str, bytes]] = []
         rows = self._db.execute(
-            "SELECT level, key, size FROM entries ORDER BY last_used, level, key"
+            "SELECT level, key, size FROM entries INDEXED BY entries_by_use"
+            " WHERE last_used < ? ORDER BY last_used, level, key",
+            (self._clock() - CACHE_PROTECT_RECENT_S,),
         )
         for level, key, size in rows:
             if total <= max_bytes:
@@ -239,6 +275,7 @@ class PageCache:
             total -= size
         with self._db:
             self._db.executemany("DELETE FROM entries WHERE level = ? AND key = ?", doomed)
+        self._reclaim()
         return len(doomed)
 
     def purge(self, older_than_s: float) -> int:
@@ -247,6 +284,7 @@ class PageCache:
             cursor = self._db.execute(
                 "DELETE FROM entries WHERE last_used < ?", (self._clock() - older_than_s,)
             )
+        self._reclaim()
         return cursor.rowcount
 
     def verify(self) -> int:
@@ -258,13 +296,22 @@ class PageCache:
         ]
         with self._db:
             self._db.executemany("DELETE FROM entries WHERE level = ? AND key = ?", broken)
+        self._reclaim()
         return len(broken)
 
     def clear(self) -> None:
-        """Remove every page by starting a new database; also repairs a damaged one."""
-        self._db.close()
-        self._remove_files()
-        self._db = self._connect()
+        """Remove every page and give the space back; a damaged database is replaced."""
+        try:
+            with self._db:
+                self._db.execute("DELETE FROM entries")
+            self._reclaim()
+        except sqlite3.OperationalError:
+            raise CacheUnavailableError("page cache is busy") from None
+        except sqlite3.DatabaseError:
+            _log.warning("page cache damaged; starting a new one")
+            self._db.close()
+            self._remove_files()
+            self._db = self._connect()
         self._estimated_bytes = 0
 
     def close(self) -> None:
@@ -288,32 +335,64 @@ class PageCache:
     def _open(self) -> sqlite3.Connection:
         try:
             return self._connect()
+        except sqlite3.OperationalError:
+            # Locked by another process, or read-only: someone may be using
+            # it, so it is left alone and the job runs without a cache.
+            raise CacheUnavailableError("page cache is busy or read-only") from None
         except sqlite3.DatabaseError:
-            # Not a database, damaged, or from an incompatible Sugo: the cache
-            # is regenerable, so it starts again empty.
+            # Not a database, or damaged: the cache is regenerable, so it
+            # starts again empty.
             _log.warning("page cache unreadable; starting a new one")
             self._remove_files()
             return self._connect()
 
     def _connect(self) -> sqlite3.Connection:
+        # Autocommit; "with db" or BEGIN opens each transaction explicitly.
         db = sqlite3.connect(self._path, timeout=CACHE_BUSY_TIMEOUT_S, isolation_level=None)
         try:
             # A file planted in the cache directory cannot use triggers or
             # views to run functions SQLite marks unsafe.
             db.execute("PRAGMA trusted_schema = OFF")
-            db.execute("PRAGMA journal_mode = WAL")
             db.execute("PRAGMA synchronous = NORMAL")
-            row = db.execute("PRAGMA user_version").fetchone()
-            if row[0] not in (0, _SCHEMA_VERSION):
-                db.execute("DROP TABLE IF EXISTS entries")
-            db.executescript(_SCHEMA)
-            db.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
-            # Autocommit mode above; "with db" then wraps each change in a transaction.
+            db.execute(f"PRAGMA journal_size_limit = {CACHE_WAL_LIMIT_BYTES}")
+            # Opening a current cache only reads; the schema is written once.
+            if db.execute("PRAGMA user_version").fetchone()[0] != _SCHEMA_VERSION:
+                self._create_schema(db)
             db.isolation_level = "DEFERRED"
         except BaseException:
             db.close()
             raise
         return db
+
+    @staticmethod
+    def _create_schema(db: sqlite3.Connection) -> None:
+        if db.execute("PRAGMA user_version").fetchone()[0] != 0:
+            # An older layout: drop it, then compact so the settings below,
+            # which apply only to an empty file, take effect.
+            db.execute("DROP TABLE IF EXISTS entries")
+            db.execute("VACUUM")
+        # Free pages go back to the file system after evictions.
+        db.execute("PRAGMA auto_vacuum = INCREMENTAL")
+        db.execute("PRAGMA journal_mode = WAL")
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            # Another process may have created it while this one waited.
+            if db.execute("PRAGMA user_version").fetchone()[0] != _SCHEMA_VERSION:
+                for statement in _SCHEMA:
+                    db.execute(statement)
+                db.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
+            db.execute("COMMIT")
+        except BaseException:
+            db.execute("ROLLBACK")
+            raise
+
+    def _reclaim(self) -> None:
+        """Give the space of deleted pages back to the file system."""
+        try:
+            self._db.execute("PRAGMA incremental_vacuum").fetchall()
+            self._db.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+        except sqlite3.OperationalError:
+            _log.warning("page cache busy; space not given back yet")
 
     def _remove_files(self) -> None:
         for suffix in ("", "-wal", "-shm"):

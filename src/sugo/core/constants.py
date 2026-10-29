@@ -161,3 +161,17 @@ CACHE_MAX_RECORD_BYTES: Final = 64 * 1024 * 1024
 # Seconds a process waits for another one writing to the same cache, e.g.
 # two CLI commands run at once, before giving up on that cache operation.
 CACHE_BUSY_TIMEOUT_S: Final = 5.0
+
+# Pages used in the last day are never evicted, even past the size limit: a
+# running job, here or in another process, must find its own pages again in
+# its later passes (the page store, ADR-006). The limit is soft for them.
+CACHE_PROTECT_RECENT_S: Final = 24 * 3600
+
+# A cache hit refreshes the page's last use only if older than this, so
+# reading a cached document does not take the write lock once per page.
+# Far below CACHE_PROTECT_RECENT_S, so a page in use is always protected.
+CACHE_TOUCH_INTERVAL_S: Final = 600
+
+# The write-ahead log is cut back to this size after each checkpoint, so it
+# does not keep the space of a large job once the job is done.
+CACHE_WAL_LIMIT_BYTES: Final = 64 * 1024 * 1024
