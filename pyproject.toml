@@ -222,6 +222,43 @@ forbidden_modules = [
     "sugo._internal.net",
 ]
 
+# Chunkers split cleaned IR pages, rendering and counting with the serializer
+# and the tokenizer; they never read inputs, caches or networks (ADR-047).
+[[tool.importlinter.contracts]]
+name = "Chunkers work on the IR only"
+type = "forbidden"
+source_modules = ["sugo.chunkers"]
+forbidden_modules = [
+    "sugo.extractors",
+    "sugo.cleaners",
+    "sugo.analyzers",
+    "sugo.storage",
+    "sugo.exporters",
+    "sugo.ports",
+    "sugo.sources",
+    "sugo.models",
+    "sugo.setup",
+    "sugo._internal.net",
+]
+
+# Exporters write finished output; they never parse inputs or networks (ADR-047).
+[[tool.importlinter.contracts]]
+name = "Exporters write output only"
+type = "forbidden"
+source_modules = ["sugo.exporters"]
+forbidden_modules = [
+    "sugo.extractors",
+    "sugo.cleaners",
+    "sugo.analyzers",
+    "sugo.chunkers",
+    "sugo.storage",
+    "sugo.ports",
+    "sugo.sources",
+    "sugo.models",
+    "sugo.setup",
+    "sugo._internal.net",
+]
+
 # Serializers render the IR and measure it; they never read inputs or networks.
 [[tool.importlinter.contracts]]
 name = "Serializers work on the IR only"

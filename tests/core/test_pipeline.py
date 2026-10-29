@@ -17,6 +17,7 @@ from sugo.core.pipeline import (
     convert_file,
     detect_kind,
 )
+from sugo.exporters.jsonl import write_jsonl
 from sugo.extractors.image.ocr_engine import OcrEngine, bundled_models
 from sugo.extractors.pymupdf.extract import _failed_page, extract_pdf
 from sugo.extractors.pymupdf.protocol import PageBox
@@ -193,3 +194,38 @@ def test_engines_have_distinct_identities() -> None:
     image = pipeline._engine_identity(InputKind.IMAGE)
     assert pdf.startswith("pdf:pymupdf=")
     assert image.startswith("image:rapidocr=")
+
+
+def test_chunks_cover_the_markdown_and_trace_their_pages() -> None:
+    result = convert(report(4), source="reports/acme.pdf", max_chunk_tokens=32)
+    assert len(result.chunks) > 1
+    assert " ".join(c.text for c in result.chunks).split() == result.markdown.split()
+    assert {c.document_id for c in result.chunks} == {result.chunks[0].document_id}
+    assert all(c.source == "reports/acme.pdf" for c in result.chunks)
+    assert sorted({p for c in result.chunks for p in c.pages}) == [1, 2, 3, 4]
+    assert result.chunks[0].config_hash == result.config_hash
+
+
+def test_no_chunks_unless_asked() -> None:
+    assert convert(report(4)).chunks == ()
+
+
+def test_chunk_size_changes_the_config_hash() -> None:
+    data = report(4)
+    small = convert(data, max_chunk_tokens=32)
+    large = convert(data, max_chunk_tokens=512)
+    assert small.config_hash != large.config_hash
+
+
+def test_too_small_chunks_are_refused() -> None:
+    with pytest.raises(ValueError, match="at least 32"):
+        convert(report(1), max_chunk_tokens=8)
+
+
+def test_output_is_reproducible(tmp_path: Path) -> None:
+    # Principle 6: same input and configuration, same bytes.
+    data = report(4)
+    for name in ("a", "b"):
+        result = convert(data, source="acme.pdf", max_chunk_tokens=64)
+        write_jsonl(tmp_path / f"{name}.jsonl", result.chunks)
+    assert (tmp_path / "a.jsonl").read_bytes() == (tmp_path / "b.jsonl").read_bytes()
