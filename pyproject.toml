@@ -290,6 +290,14 @@ source_modules = ["sugo"]
 forbidden_modules = ["pymupdf", "fitz"]
 ignore_imports = ["sugo.extractors.pymupdf.worker -> pymupdf"]
 
+# The MCP server speaks over stdio only; it never opens a socket or reaches
+# the network gateway (ADR-049).
+[[tool.importlinter.contracts]]
+name = "MCP server uses stdio only"
+type = "forbidden"
+source_modules = ["sugo.ports.mcp"]
+forbidden_modules = ["http", "socket", "socketserver", "ssl", "sugo._internal.net"]
+
 # Network boundaries (ADR-036). Each contract ignores the imports made by the
 # modules it allows, which also cuts indirect chains through them; unmatched
 # ignores are expected until those packages exist.

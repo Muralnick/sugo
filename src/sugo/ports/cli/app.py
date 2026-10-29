@@ -37,7 +37,6 @@ from sugo.ports.cli.errors import (
 if TYPE_CHECKING:
     from sugo.core.estimate import SavingsEstimate
     from sugo.core.pipeline import Conversion
-    from sugo.metrics.baselines import Savings
     from sugo.storage.page_cache import PageCache
 
 _log = logging.getLogger(__name__)
@@ -293,7 +292,7 @@ def stats_command(
     with _failures(json_output):
         _require_lite()
         from sugo.core import pipeline
-        from sugo.core.estimate import estimate_savings
+        from sugo.core.estimate import estimate_json, estimate_savings
 
         source = file.as_posix()
         with (
@@ -310,34 +309,13 @@ def stats_command(
             _write_json(
                 {
                     "source": source,
-                    "kind": estimate.kind.value,
-                    "pages": estimate.pages,
                     "failed_pages": list(conversion.failed_pages),
-                    "text": _savings_json(estimate.text),
-                    "images": [
-                        {
-                            "provider": image.provider,
-                            "tier": image.tier,
-                            "formula_verified": image.formula_verified,
-                            **_savings_json(image),
-                        }
-                        for image in estimate.images
-                    ],
-                    "rejected_by": list(estimate.rejected_by),
+                    **estimate_json(estimate),
                 }
             )
         else:
             _print_stats(source, estimate)
         _finish(1, [], partial=bool(conversion.failed_pages))
-
-
-def _savings_json(savings: "Savings") -> dict[str, Any]:
-    return {
-        "baseline_tokens": savings.baseline_tokens,
-        "result_tokens": savings.result_tokens,
-        "saved_tokens": savings.saved_tokens,
-        "saved_percent": round(savings.saved_percent, 1),
-    }
 
 
 def _print_stats(source: str, estimate: "SavingsEstimate") -> None:
@@ -431,6 +409,35 @@ def doctor_command(
         _stdout.print(table)
     if any(check.status is Status.ERROR for check in checks):
         raise typer.Exit(ExitCode.ERROR)
+
+
+# --- mcp ----------------------------------------------------------------------
+
+
+@app.command("mcp")
+def mcp_command(
+    root: Annotated[
+        list[Path],
+        typer.Option(
+            "--root",
+            exists=True,
+            file_okay=False,
+            help="A folder agents may read; repeatable. Required.",
+        ),
+    ],
+) -> None:
+    """Serve Sugo to AI agents over MCP (stdio), reading only inside the given folders."""
+    from sugo.ports.mcp.access import Roots
+
+    try:
+        roots = Roots(root)
+    except ValueError as error:
+        raise typer.BadParameter(str(error), param_hint="'--root'") from None
+    with _failures(json_output=False):
+        _require_lite()
+        from sugo.ports.mcp.server import serve
+
+        serve(roots)
 
 
 # --- shared -------------------------------------------------------------------
