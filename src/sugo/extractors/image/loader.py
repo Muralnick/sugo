@@ -66,8 +66,10 @@ class LoadedImage:
     """A decoded image: read-only 8-bit RGB pixels, height x width x 3."""
 
     pixels: RgbArray
-    format: ImageFormat
-    # Hash of the original file bytes, for provenance and caching (principle 5).
+    # None for pixels rendered by Sugo itself, such as a scanned PDF page.
+    format: ImageFormat | None
+    # Hash of the original file bytes, or of the pixels when rendered, for
+    # provenance and caching (principle 5).
     sha256: str
 
     @property

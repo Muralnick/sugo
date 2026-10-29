@@ -1,9 +1,8 @@
 """Rebuild reading order and paragraphs from OCR lines, producing IR blocks.
 
-Reading order uses a recursive XY-cut: the region is split at the widest
-horizontal whitespace bands (between paragraphs), then at vertical ones
-(between columns), and each part is processed the same way, top to bottom and
-left to right. What cannot be split further is a paragraph.
+Reading order uses the recursive XY-cut shared by all extractors
+(``sugo.extractors.reading_order``); what it cannot split further is a
+paragraph.
 
 Lines of a paragraph are joined with newlines, not spaces, so nothing is lost
 (a hyphen at a line end may be a real hyphen or a line-break one); language
@@ -23,10 +22,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 
-from sugo.core.constants import LAYOUT_COLUMN_GAP, LAYOUT_PARAGRAPH_GAP, LAYOUT_SAME_ROW_OVERLAP
 from sugo.core.models import BBox, Block, BlockFlag, BlockType, Page, PageOrigin
 from sugo.extractors.image.detectors import Detection, detect, is_ui_chrome, plain_text
 from sugo.extractors.image.ocr_engine import OcrLine
+from sugo.extractors.reading_order import text_rows, xy_cut
 
 Group = list[OcrLine]
 
@@ -80,7 +79,7 @@ def build_blocks(
     line_height = statistics.median(heights) or max(heights) or 1.0
     paragraphs = [
         paragraph
-        for group in _xy_cut(ordered, line_height)
+        for group in xy_cut(ordered, line_height)
         for paragraph in _paragraphs(group, screenshot=screenshot)
     ]
     readable = [p for p in paragraphs if p.kind is _Kind.TEXT]
@@ -102,37 +101,6 @@ def _canonical_key(line: OcrLine) -> tuple[float, float, float, float, str, bool
     return (box.y0, box.x0, box.y1, box.x1, line.text, line.illegible, line.confidence)
 
 
-def _xy_cut(lines: Group, line_height: float) -> list[Group]:
-    """Split lines at whitespace bands, recursively, in reading order."""
-    if len(lines) <= 1:
-        return [lines]
-    by_rows = _split(lines, line_height * LAYOUT_PARAGRAPH_GAP, vertical=True)
-    if len(by_rows) > 1:
-        return [leaf for part in by_rows for leaf in _xy_cut(part, line_height)]
-    by_columns = _split(lines, line_height * LAYOUT_COLUMN_GAP, vertical=False)
-    if len(by_columns) > 1:
-        return [leaf for part in by_columns for leaf in _xy_cut(part, line_height)]
-    return [lines]
-
-
-def _split(lines: Group, min_gap: float, *, vertical: bool) -> list[Group]:
-    """Split lines at gaps wider than ``min_gap`` along one axis, in axis order."""
-
-    def span(line: OcrLine) -> tuple[float, float]:
-        box = line.bbox
-        return (box.y0, box.y1) if vertical else (box.x0, box.x1)
-
-    groups: list[Group] = []
-    end = float("-inf")
-    for line in sorted(lines, key=lambda line: (*span(line), line.bbox.x0, line.bbox.y0)):
-        start, stop = span(line)
-        if not groups or start - end > min_gap:
-            groups.append([])
-        groups[-1].append(line)
-        end = max(end, stop)
-    return groups
-
-
 def _paragraphs(group: Group, *, screenshot: bool) -> list[_Paragraph]:
     """Turn a leaf of the XY-cut into paragraphs; illegible and chrome lines stand alone."""
     result: list[_Paragraph] = []
@@ -144,7 +112,7 @@ def _paragraphs(group: Group, *, screenshot: bool) -> list[_Paragraph]:
             result.append(_Paragraph(_Kind.TEXT, tuple(tuple(row) for row in rows)))
             rows.clear()
 
-    for row_index, row in enumerate(_rows(group)):
+    for row_index, row in enumerate(text_rows(group)):
         for line in row:
             if line.illegible or (screenshot and is_ui_chrome(line)):
                 flush()
@@ -158,24 +126,6 @@ def _paragraphs(group: Group, *, screenshot: bool) -> list[_Paragraph]:
             last_row = row_index
     flush()
     return result
-
-
-def _rows(group: Group) -> list[Group]:
-    """Group lines into text rows (vertical overlap), each sorted left to right."""
-    rows: list[Group] = []
-    for line in sorted(group, key=lambda line: (line.bbox.y0, line.bbox.x0)):
-        row = rows[-1] if rows else None
-        if row is not None and _same_row(row[0], line):
-            row.append(line)
-        else:
-            rows.append([line])
-    return [sorted(row, key=lambda line: (line.bbox.x0, line.bbox.y0)) for row in rows]
-
-
-def _same_row(a: OcrLine, b: OcrLine) -> bool:
-    overlap = min(a.bbox.y1, b.bbox.y1) - max(a.bbox.y0, b.bbox.y0)
-    shorter = min(a.bbox.y1 - a.bbox.y0, b.bbox.y1 - b.bbox.y0)
-    return shorter > 0 and overlap > LAYOUT_SAME_ROW_OVERLAP * shorter
 
 
 def _make_block(
