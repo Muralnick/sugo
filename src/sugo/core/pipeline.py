@@ -10,8 +10,8 @@ a time, whatever the document's length.
 The input is routed by its content, never by its file name: PDFs to the
 isolated PDF extractor (ADR-043), PNG, JPEG and WEBP to the image pipeline.
 Without a persistent cache the job uses a private temporary one, deleted at
-the end. Pages the cache could not store are kept in memory instead, so a
-full disk slows nothing down and loses nothing.
+the end. Extracted pages the cache could not store are kept in memory
+instead, so a full disk loses nothing; memory then grows with the document.
 """
 
 import hashlib
@@ -44,7 +44,14 @@ from sugo.extractors.pymupdf.extract import (
     is_failed_page,
 )
 from sugo.serializers.markdown import render
-from sugo.storage.page_cache import CacheLevel, PageCache, extraction_key, output_key
+from sugo.storage.page_cache import (
+    CacheLevel,
+    CacheUnavailableError,
+    PageCache,
+    extraction_key,
+    output_key,
+)
+from sugo.storage.paths import StorageDirError
 
 _log = logging.getLogger(__name__)
 
@@ -138,10 +145,17 @@ def convert(
         sugo.extractors.image.loader.ImageLoadError: If an image is refused.
     """
     kind = detect_kind(data)
-    if cache is None:
-        with PageCache.ephemeral() as job_cache:
-            return _Job(data, kind, job_cache, ocr).run()
-    return _Job(data, kind, cache, ocr).run()
+    if cache is not None:
+        return _Job(data, kind, cache, ocr).run()
+    try:
+        job_cache = PageCache.ephemeral()
+    except (CacheUnavailableError, StorageDirError, OSError):
+        # No room even for a temporary store: the job still runs, with its
+        # pages in memory.
+        _log.warning("no temporary page store; pages kept in memory")
+        return _Job(data, kind, None, ocr).run()
+    with job_cache:
+        return _Job(data, kind, job_cache, ocr).run()
 
 
 def detect_kind(data: bytes) -> InputKind:
@@ -165,7 +179,11 @@ class _Job:
     """One conversion: the three passes over one document."""
 
     def __init__(
-        self, data: bytes, kind: InputKind, cache: PageCache, ocr: Callable[[], OcrEngine]
+        self,
+        data: bytes,
+        kind: InputKind,
+        cache: PageCache | None,
+        ocr: Callable[[], OcrEngine],
     ) -> None:
         self._data = data
         self._kind = kind
@@ -173,8 +191,10 @@ class _Job:
         self._ocr = _OnceOcr(ocr)
         self._sha256 = hashlib.sha256(data).hexdigest()
         self._engine = _engine_identity(kind)
-        # Pages the cache could not store, by level and index.
-        self._spilled: dict[tuple[CacheLevel, int], Page] = {}
+        # Extracted pages the cache could not or must not store, by index.
+        self._spilled: dict[int, Page] = {}
+        # Pages the PDF worker could not read in this run.
+        self._failed: set[int] = set()
 
     def run(self) -> Conversion:
         count = self._extract()
@@ -182,10 +202,13 @@ class _Job:
         for index in range(count):
             analyzer.observe(self._extracted(index))
         stats = analyzer.finalize()
+        # A cleaned page depends on every page of the document, through the
+        # statistics: if any page reads differently, all are cleaned again.
+        cleaning = f"{_CLEANING};{stats.digest()}"
         removed: Counter[str] = Counter()
         parts: list[str] = []
         for index in range(count):
-            page = self._cleaned(index, stats)
+            page = self._cleaned(index, stats, cleaning)
             removed.update(block.removed_by for block in page.blocks if block.removed_by)
             text = render(page.blocks)
             if text:
@@ -202,57 +225,77 @@ class _Job:
     def _extract(self) -> int:
         """Pass 1: put every page in the page store; return the page count."""
         if self._kind is InputKind.IMAGE:
-            if self._cache.get(CacheLevel.EXTRACTION, self._key(0)) is None:
-                self._store(CacheLevel.EXTRACTION, extract_page(self._data, self._ocr()))
+            if self._get(CacheLevel.EXTRACTION, self._key(0)) is None:
+                self._keep(extract_page(self._data, self._ocr()))
             return 1
-        # Pages cached by an earlier run of this job are not read again.
+        # Pages cached by an earlier run are neither laid out nor read with
+        # OCR again: the extractor starts at the first missing one and skips
+        # the cached ones after it.
         start = 0
-        while self._cache.get(CacheLevel.EXTRACTION, self._key(start)) is not None:
+        while self._get(CacheLevel.EXTRACTION, self._key(start)) is not None:
             start += 1
         count = start
-        for page in extract_pdf(self._data, ocr=self._ocr, start=start):
-            # A page the worker could not read may read fine next time.
-            self._store(CacheLevel.EXTRACTION, page, cache=not is_failed_page(page))
-            count = page.index + 1
+
+        def cached(index: int) -> bool:
+            nonlocal count
+            count = max(count, index + 1)
+            return self._get(CacheLevel.EXTRACTION, self._key(index)) is not None
+
+        for page in extract_pdf(self._data, ocr=self._ocr, start=start, skip=cached):
+            self._keep(page)
+            count = max(count, page.index + 1)
         return count
 
-    def _extracted(self, index: int) -> Page:
-        return self._load(CacheLevel.EXTRACTION, self._key(index), index)
+    def _keep(self, page: Page) -> None:
+        """Store an extracted page, or keep it in memory if it cannot or must not be cached."""
+        if self._kind is InputKind.PDF and is_failed_page(page):
+            # A page the worker could not read may read fine next time.
+            self._failed.add(page.index)
+            self._spilled[page.index] = page
+        elif not self._put(CacheLevel.EXTRACTION, self._key(page.index), page):
+            self._spilled[page.index] = page
 
-    def _cleaned(self, index: int, stats: EdgeStats) -> Page:
+    def _extracted(self, index: int) -> Page:
+        spilled = self._spilled.get(index)
+        if spilled is not None:
+            return spilled
+        page = self._get(CacheLevel.EXTRACTION, self._key(index))
+        if page is None:
+            # Stored moments ago, yet gone: another process cleared the cache
+            # or the entry was damaged. Read this page again, once.
+            _log.warning("page missing from the page store; extracting it again")
+            page = self._reextract(index)
+            if self._kind is InputKind.PDF and is_failed_page(page):
+                self._failed.add(index)
+            # Kept in memory: a cache that just lost it may lose it again.
+            self._spilled[index] = page
+        return page
+
+    def _cleaned(self, index: int, stats: EdgeStats, cleaning: str) -> Page:
         """Pass 3: one page cleaned with the document's statistics, from the cache if there."""
-        key = output_key(extraction=self._key(index), cleaning=_CLEANING)
-        cached = self._cache.get(CacheLevel.OUTPUT, key)
-        if cached is not None:
-            return cached
+        key = output_key(extraction=self._key(index), cleaning=cleaning)
+        # A failed page is never cached, nor what was cleaned from it.
+        failed = index in self._failed
+        if not failed:
+            cached = self._get(CacheLevel.OUTPUT, key)
+            if cached is not None:
+                return cached
         page = self._extracted(index)
         for cleaner in CLEANERS:
             page = apply_decisions(page, cleaner.propose(page, stats), cleaner=cleaner.name)
-        self._store(CacheLevel.OUTPUT, page)
+        if not failed:
+            # Not kept in memory if refused: pass 3 never reads it back.
+            self._put(CacheLevel.OUTPUT, key, page)
         return page
 
     def _key(self, index: int) -> bytes:
         return extraction_key(source_sha256=self._sha256, page_index=index, engine=self._engine)
 
-    def _store(self, level: CacheLevel, page: Page, *, cache: bool = True) -> None:
-        if level is CacheLevel.EXTRACTION:
-            key = self._key(page.index)
-        else:
-            key = output_key(extraction=self._key(page.index), cleaning=_CLEANING)
-        if not (cache and self._cache.put(level, key, page)):
-            self._spilled[(level, page.index)] = page
+    def _get(self, level: CacheLevel, key: bytes) -> Page | None:
+        return None if self._cache is None else self._cache.get(level, key)
 
-    def _load(self, level: CacheLevel, key: bytes, index: int) -> Page:
-        spilled = self._spilled.get((level, index))
-        if spilled is not None:
-            return spilled
-        page = self._cache.get(level, key)
-        if page is None:
-            # Stored moments ago, yet gone: another process cleared the cache
-            # or the entry was damaged. Read this page again.
-            _log.warning("page missing from the page store; extracting it again")
-            page = self._reextract(index)
-        return page
+    def _put(self, level: CacheLevel, key: bytes, page: Page) -> bool:
+        return self._cache is not None and self._cache.put(level, key, page)
 
     def _reextract(self, index: int) -> Page:
         if self._kind is InputKind.IMAGE:

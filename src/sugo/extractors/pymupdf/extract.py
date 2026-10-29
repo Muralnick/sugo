@@ -129,6 +129,7 @@ def extract_pdf(
     open_timeout: float = PDF_OPEN_TIMEOUT_S,
     page_timeout: float = PDF_PAGE_TIMEOUT_S,
     start: int = 0,
+    skip: Callable[[int], bool] | None = None,
 ) -> Iterator[Page]:
     """Yield the pages of a PDF in order, from page ``start``.
 
@@ -136,6 +137,9 @@ def extract_pdf(
         data: The PDF file's bytes.
         start: First page to read, to resume a job whose earlier pages are
             cached. The whole document is still checked before any page.
+        skip: Called with each page index from ``start``; pages it accepts
+            (already cached) are received from the worker but neither laid
+            out nor read with OCR, and not yielded.
         ocr: Called at most once, at the first scanned page, to get an OCR engine.
         worker: Command that starts the worker; tests replace it.
         open_timeout: Seconds allowed to open and check the document.
@@ -153,7 +157,7 @@ def extract_pdf(
         raise PdfUnsupportedError(problem)
     if start < 0:
         raise ValueError("start must not be negative")
-    return _pages(data, _LazyOcr(ocr), worker, open_timeout, page_timeout, start)
+    return _pages(data, _LazyOcr(ocr), worker, open_timeout, page_timeout, start, skip)
 
 
 def is_failed_page(page: Page) -> bool:
@@ -172,6 +176,7 @@ def _pages(
     open_timeout: float,
     page_timeout: float,
     start: int,
+    skip: Callable[[int], bool] | None,
 ) -> Iterator[Page]:
     boxes: tuple[PageBox, ...] | None = None
     first = start
@@ -187,7 +192,10 @@ def _pages(
                 raise PdfExtractionError("the PDF worker failed to open the document") from None
             try:
                 for index in range(first, len(boxes)):
-                    yield _page(worker, index, boxes[index], ocr, page_timeout)
+                    if skip is not None and skip(index):
+                        _skip_page(worker, index, page_timeout)
+                    else:
+                        yield _page(worker, index, boxes[index], ocr, page_timeout)
                     first = index + 1
             except _WorkerError:
                 restarts += 1
@@ -198,8 +206,10 @@ def _pages(
                 failed = first
             else:
                 continue
-        # Outside the "with": the stalled worker is gone before the page is reported.
-        yield _failed_page(failed, boxes[failed])
+        # Outside the "with": the stalled worker is gone before the page is
+        # reported. A page the caller already has is not replaced by a failure.
+        if skip is None or not skip(failed):
+            yield _failed_page(failed, boxes[failed])
         first = failed + 1
 
 
@@ -210,6 +220,15 @@ def _open(worker: "_Worker", timeout: float, known: tuple[PageBox, ...] | None) 
     if not isinstance(message, Opened) or (known is not None and message.pages != known):
         raise _WorkerError
     return message
+
+
+def _skip_page(worker: "_Worker", index: int, timeout: float) -> None:
+    """Receive a page the caller already has, checking it as strictly as any other."""
+    message = worker.message(timeout)
+    if not isinstance(message, NativePage | ScanPage | PageFailed) or message.index != index:
+        raise _WorkerError
+    if isinstance(message, ScanPage) and len(worker.frame(timeout)) != message.pixel_bytes:
+        raise _WorkerError
 
 
 def _page(worker: "_Worker", index: int, box: PageBox, ocr: "_LazyOcr", timeout: float) -> Page:

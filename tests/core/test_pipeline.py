@@ -1,6 +1,5 @@
 """Tests for the multi-pass pipeline: routing, cleaning order, cache, resume and fallbacks."""
 
-import sys
 from collections.abc import Callable, Iterator
 from io import BytesIO
 from pathlib import Path
@@ -19,8 +18,9 @@ from sugo.core.pipeline import (
     detect_kind,
 )
 from sugo.extractors.image.ocr_engine import OcrEngine, bundled_models
-from sugo.extractors.pymupdf.extract import extract_pdf
-from sugo.storage.page_cache import CacheLevel, PageCache
+from sugo.extractors.pymupdf.extract import _failed_page, extract_pdf
+from sugo.extractors.pymupdf.protocol import PageBox
+from sugo.storage.page_cache import CacheLevel, CacheUnavailableError, PageCache
 
 CLAUSE = "The supplier is liable for all damages caused by delays."
 
@@ -59,10 +59,13 @@ def cache(tmp_path: Path) -> Iterator[PageCache]:
 class CountingExtractor:
     """Wraps the real PDF extractor, recording each call's start and pages."""
 
-    def __init__(self, stop_after: int | None = None) -> None:
+    def __init__(
+        self, stop_after: int | None = None, fail: frozenset[int] | set[int] = frozenset()
+    ) -> None:
         self.starts: list[int] = []
         self.pages = 0
         self._stop_after = stop_after
+        self._fail = fail
 
     def __call__(self, data: bytes, **options: object) -> Iterator[Page]:
         self.starts.append(int(str(options.get("start", 0))))
@@ -70,6 +73,10 @@ class CountingExtractor:
             if self._stop_after is not None and self.pages == self._stop_after:
                 raise KeyboardInterrupt  # The job is interrupted.
             self.pages += 1
+            if page.index in self._fail:
+                # What the extractor yields for a page the worker could not read.
+                box = PageBox(width=page.width, height=page.height, rotation=0)
+                page = _failed_page(page.index, box)
             yield page
 
 
@@ -132,24 +139,29 @@ def test_interrupted_job_resumes_where_it_stopped(
     assert (resumed.starts, resumed.pages) == ([2], 2)
 
 
-def test_failed_pages_are_not_cached(cache: PageCache, monkeypatch: pytest.MonkeyPatch) -> None:
-    worker = (
-        "import sys\n"
-        "from sugo.extractors.pymupdf import protocol as p\n"
-        "out = sys.stdout.buffer\n"
-        "box = p.PageBox(width=100.0, height=100.0, rotation=0)\n"
-        "p.write_message(out, p.Opened(pages=(box,)))\n"
-        "p.write_message(out, p.PageFailed(index=0))\n"
-    )
+def test_failed_pages_are_retried_on_the_next_run(
+    cache: PageCache, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data = report(4)
+    monkeypatch.setattr(pipeline, "extract_pdf", CountingExtractor(fail={1}))
+    first = convert(data, cache=cache)
+    assert first.markdown.count("[illegible]") == 1
+    # The other pages are cached; the failed one, and its cleaned form, are not.
+    retry = CountingExtractor()
+    monkeypatch.setattr(pipeline, "extract_pdf", retry)
+    assert convert(data, cache=cache).markdown == EXPECTED
+    # Only the failed page is read again; the cached pages after it are skipped.
+    assert (retry.starts, retry.pages) == ([1], 1)
 
-    def failing(data: bytes, **options: object) -> Iterator[Page]:
-        return extract_pdf(data, worker=(sys.executable, "-I", "-c", worker), **options)  # type: ignore[arg-type]
 
-    monkeypatch.setattr(pipeline, "extract_pdf", failing)
-    result = convert(report(1), cache=cache)
-    assert result.markdown == "[illegible]"
-    # Retried on the next run: the failure may have been a busy machine.
-    assert cache.stats().entries == 1  # Only the cleaned page, never the failed extraction.
+def test_ephemeral_store_unavailable_keeps_pages_in_memory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unavailable() -> PageCache:
+        raise CacheUnavailableError("disk full")
+
+    monkeypatch.setattr(PageCache, "ephemeral", unavailable)
+    assert convert(report(4)).markdown == EXPECTED
 
 
 def test_pages_the_cache_refuses_are_kept_in_memory(
@@ -169,7 +181,11 @@ def test_page_lost_from_the_store_is_extracted_again(
         return None if level is CacheLevel.EXTRACTION else real_get(level, key)
 
     monkeypatch.setattr(cache, "get", forgetful)
+    lost = CountingExtractor()
+    monkeypatch.setattr(pipeline, "extract_pdf", lost)
     assert convert(report(4), cache=cache).markdown == EXPECTED
+    # One full extraction, then each lost page read again once, not once per pass.
+    assert lost.starts == [0, 0, 1, 2, 3]
 
 
 def test_engines_have_distinct_identities() -> None:

@@ -212,3 +212,15 @@ def test_failed_pages_are_recognised() -> None:
     failed, read = extract_pdf(pdf("a", "b"), worker=worker)
     assert is_failed_page(failed)
     assert not is_failed_page(read)
+
+
+def test_pages_the_caller_has_are_skipped() -> None:
+    pages = extract_pdf(pdf("First", "Second", "Third"), skip=lambda index: index == 1)
+    assert [(p.index, render(p.blocks)) for p in pages] == [(0, "First"), (2, "Third")]
+
+
+def test_skipped_page_that_crashes_the_worker_is_not_reported_failed() -> None:
+    # The caller already has the page; a failure must not replace it.
+    worker = fake_worker("opened(2)\nif first == 0: sys.exit(1)\nnative(1, 'x')\n")
+    pages = list(extract_pdf(pdf("a", "b"), worker=worker, skip=lambda index: index == 0))
+    assert [p.index for p in pages] == [1]
