@@ -168,6 +168,20 @@ class TestLayout:
         )
         assert out == "- first\n  second\n\nleft: hello"
 
+    def test_tab_cannot_open_structure_inside_a_list_item(self) -> None:
+        out = render([block(BlockType.LIST_ITEM, "item\n\t- nested\n\t# head")])
+        assert out == "- item\n      - nested\n      # head"
+
+    def test_indented_text_after_a_blank_line_is_not_code(self) -> None:
+        assert render([block(BlockType.PARAGRAPH, "para\n\n    code?")]) == "para\n\ncode?"
+        assert render([block(BlockType.LIST_ITEM, "a\n \n    b")]) == "- a\n\n  b"
+
+    def test_code_cannot_pretend_to_be_illegible(self) -> None:
+        assert render([block(BlockType.CODE, "[illegible]")]) == "```\n\\[illegible]\n```"
+
+    def test_code_ending_with_a_newline_gets_no_empty_line(self) -> None:
+        assert render([block(BlockType.CODE, "x = 1\n")]) == "```\nx = 1\n```"
+
 
 _TEXT_TYPES = [
     t for t in BlockType if t not in (BlockType.TABLE, BlockType.CODE, BlockType.HEADING)

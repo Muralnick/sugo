@@ -29,9 +29,6 @@ from sugo.serializers.escape import escape_line_start, escape_marker
 
 Grid = list[list[str]]
 
-# Every line boundary str.splitlines() knows: a lone "\r" or U+2028 inside a
-# cell would otherwise break the row in two for some readers.
-_LINE_BREAK = re.compile(r"\r\n|[\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029]")
 # Backslashes ending a cell or before a "|" would escape the pipe after them
 # and merge two cells; doubled, they stay literal.
 _PIPE_BACKSLASHES = re.compile(r"\\+(?=\||$)")
@@ -54,7 +51,9 @@ def render_table(table: Table, counter: Callable[[str], int] = count_tokens) -> 
 def _grid(table: Table) -> Grid:
     grid = [[""] * table.n_cols for _ in range(table.n_rows)]
     for cell in table.cells:
-        text = escape_marker(_LINE_BREAK.sub("<br>", cell.text.strip()))
+        # Every line boundary, a lone "\r" or U+2028 too: any of them would break
+        # the row in two for some readers.
+        text = escape_marker("<br>".join(cell.text.strip().splitlines()))
         for row in range(cell.row, cell.row + cell.row_span):
             for col in range(cell.col, cell.col + cell.col_span):
                 grid[row][col] = text

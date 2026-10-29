@@ -135,3 +135,6 @@ MARKDOWN_CONTINUATION_INDENT: Final = 2
 # A line indented by up to three spaces can still open Markdown structure
 # (heading, list, quote); four or more make an indented code block instead.
 MARKDOWN_MAX_STRUCTURE_INDENT: Final = 3
+
+# CommonMark expands a tab in indentation to the next multiple of four columns.
+MARKDOWN_TAB_STOP: Final = 4

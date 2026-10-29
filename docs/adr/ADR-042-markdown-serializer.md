@@ -20,13 +20,13 @@ Roadmap step 4 renders IR blocks as the Markdown Sugo hands to LLMs. This text i
 | Heading | `#` × level (1 when unknown), non-blank lines joined with a space |
 | List item | `- text` |
 | Chat message | `left: text` or `right: text`, the neutral side (ADR-040); without a side, plain text set apart by blank lines |
-| Code | Fenced block, text unchanged; the fence is longer than any backtick run inside |
+| Code | Fenced block, text unchanged but for an escaped literal `[illegible]` and no trailing newlines; the fence is longer than any backtick run inside |
 | Table | Cheapest faithful format, below |
 | Any other type, not removed | Its text; only cleaners decide what is dropped |
 | Empty or whitespace-only text | Nothing |
 
-- Blocks are separated by a blank line; consecutive list items and consecutive chat messages with a side by one newline. Blank lines around a block's text and the indentation of its first line are dropped: a leading blank line would leave a prefix empty, and an indented first line would continue the list item above or become code. Further lines of a list item or chat message are indented by two spaces, so a line reading `right: I agree` inside a left bubble cannot pass for a new message.
-- **Minimal escaping:** a backslash is added only where text would open structure: at the start of a line (`# > | : = + * - _` backticks, tildes, `1.` and `1)`, and the speaker labels `left:`/`right:` as `left\:`), before a closing `#` sequence of a heading or a heading made only of `#`, and before `[illegible]` written in the document (backslashes already before it are doubled, so they stay literal). Ordinary text gets no extra tokens. Raw HTML is not escaped: the output is read by LLMs, and a port that renders it for people must sanitise it.
+- Blocks are separated by a blank line; consecutive list items and consecutive chat messages with a side by one newline. Blank lines around a block's text are dropped and blank lines inside it are left empty (no indent). The indentation of each line that starts a paragraph (the first line, or one after a blank line) is dropped: a leading blank line would leave a prefix empty, and an indented paragraph would continue the list item above or become code. Further lines of a list item or chat message are indented by two spaces, so a line reading `right: I agree` inside a left bubble cannot pass for a new message.
+- **Minimal escaping:** a backslash is added only where text would open structure: at the start of a line (`# > | : = + * - _` backticks, tildes, `1.` and `1)`, and the speaker labels `left:`/`right:` as `left\:`, the latter at any indentation; tabs in indentation become spaces, so the width checked is the one Markdown reads), before a closing `#` sequence of a heading or a heading made only of `#`, and before `[illegible]` written in the document (backslashes already before it are doubled, so they stay literal). Ordinary text gets no extra tokens. Raw HTML is not escaped: the output is read by LLMs, and a port that renders it for people must sanitise it.
 - **Tables:** two candidates, measured with o200k_base; the cheaper one wins and ties go to the first.
   1. *Compact table:* `Name|Age` / `-|-` / `Anna|30`, no padding and no outer pipes. Outer pipes are added when a row starts or ends with an empty cell, which would otherwise be lost, and for one-column tables. Tables without header rows have no delimiter row. `|` inside a cell becomes `\|`; backslashes ending a cell or before a `|` are doubled; in a row of dash-only cells (`-`, `:-:`) with outer pipes the first dash is escaped, so the row cannot pass for a delimiter row.
   2. *Row sentences:* `Name: Anna; City: Rome` per row, empty cells omitted. Only when the table has a header with unique, non-empty labels, and no label or cell contains characters that would make it ambiguous (`:` in labels, `;` anywhere, a trailing `\`). A row with no values makes this format unavailable.
@@ -55,5 +55,5 @@ Corpus numbers come with step 8.
 ## Consequences
 
 - Consumers must handle two table representations; both are documented here and will be listed in the user documentation with the exporters (step 6).
-- The first-line indentation of a text block is lost; it carried no content, and keeping it could turn a paragraph into code or into part of a list item.
+- The indentation of a paragraph's first line, and tabs in indentation, are lost; it carried no content, and keeping it could turn a paragraph into code or into part of a list item.
 - Line recomposition (joining OCR lines, hyphens) is left to the language packs; until then, paragraph lines are kept as extracted.

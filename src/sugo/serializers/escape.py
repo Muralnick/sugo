@@ -9,7 +9,7 @@ Markdown for people must sanitise it.
 
 import re
 
-from sugo.core.constants import MARKDOWN_MAX_STRUCTURE_INDENT
+from sugo.core.constants import MARKDOWN_MAX_STRUCTURE_INDENT, MARKDOWN_TAB_STOP
 from sugo.core.models import ChatSide
 
 # Marks unreadable content (principle 4, ADR-026). The same text inside a
@@ -36,14 +36,21 @@ def escape_marker(text: str) -> str:
 
 
 def escape_line_start(line: str) -> str:
-    """Escape the start of one line if it would open Markdown structure."""
-    stripped = line.lstrip(" ")
-    indent = line[: len(line) - len(stripped)]
-    if len(indent) > MARKDOWN_MAX_STRUCTURE_INDENT or not stripped:
+    """Escape the start of one line if it would open structure.
+
+    Tabs in the indentation become spaces, so the width that decides whether
+    the line can open Markdown structure is the one a Markdown reader sees.
+    A speaker label is escaped at any indentation: it is structure for an
+    LLM, not for Markdown.
+    """
+    stripped = line.lstrip(" \t")
+    indent = line[: len(line) - len(stripped)].expandtabs(MARKDOWN_TAB_STOP)
+    if not stripped:
         return line
-    if stripped[0] in _STRUCTURE_START:
-        return f"{indent}\\{stripped}"
-    stripped = _ORDERED_ITEM.sub(r"\1\\\2", stripped, count=1)
+    if len(indent) <= MARKDOWN_MAX_STRUCTURE_INDENT:
+        if stripped[0] in _STRUCTURE_START:
+            return f"{indent}\\{stripped}"
+        stripped = _ORDERED_ITEM.sub(r"\1\\\2", stripped, count=1)
     return indent + _SPEAKER.sub(r"\1\\:", stripped, count=1)
 
 

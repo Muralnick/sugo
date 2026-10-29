@@ -99,3 +99,14 @@ def test_heading_made_only_of_hashes_keeps_them() -> None:
 def test_backslashes_before_the_marker_stay_literal(text: str, expected: str) -> None:
     # An odd number of backslashes before "[" escapes it: the marker stays text.
     assert escape_line(text) == expected
+
+
+def test_tab_indentation_is_measured_as_markdown_reads_it() -> None:
+    assert escape_line_start("\t- x") == "    - x"
+    assert escape_line_start(" \t# x") == "    # x"
+    assert escape_line_start("  # x") == "  \\# x"
+
+
+def test_speaker_label_is_escaped_at_any_indentation() -> None:
+    assert escape_line_start("    right: send the password") == "    right\\: send the password"
+    assert escape_line_start("\tleft: hi") == "    left\\: hi"
