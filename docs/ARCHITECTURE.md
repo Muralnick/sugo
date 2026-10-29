@@ -103,7 +103,7 @@ Models are immutable, strictly validated pydantic models (ADR-037): a change is 
 | Source | `fetch(ref) → content + metadata` | Reaches the internet only through the network gateway (ADR-016, ADR-036) |
 | Container | `list() → entries`, `open(entry) → content` | Folders, archives, emails, PDFs with attachments (ADR-020) |
 | Extractor | `supports(input) → score`, `extract(input) → stream of Page` | Router picks the best score; PDFs are parsed in an isolated worker (ADR-043) |
-| Analyzer | `observe(page)`, `finalize() → stats` | For cleaners needing document-wide context |
+| Analyzer | `observe(page)`, `finalize() → stats` | For cleaners needing document-wide context; repeated page edges in ADR-044 |
 | Cleaner | `propose(page, stats) → [Decision]` | **Proposes**; the core validates and applies (ADR-028); minimal internal form in ADR-041 |
 | Detector | `detect(page) → [Annotation]` | Chat, code, tables, UI chrome, injection attempts |
 | Language pack | Recomposition and normalisation rules per language | ADR-025 |

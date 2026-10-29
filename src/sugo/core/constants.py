@@ -199,3 +199,40 @@ PDF_OCR_MAX_PIXELS: Final = 20_000_000
 PDF_HEADING_MIN_SIZE_RATIO: Final = 1.2
 # ...and it has at most this many lines: a large-print paragraph is not a heading.
 PDF_HEADING_MAX_LINES: Final = 3
+
+# --- Headers, footers and page numbers (roadmap step 5b, ADR-044) ------------
+# Conservative on purpose: a running header left in costs a few tokens, a
+# clause removed by mistake breaks principle 3 (THREAT_MODEL C). Initial
+# values, to be calibrated on the benchmark corpus (step 8).
+
+# Share of the page height at the top and bottom where running headers,
+# footers and page numbers live. A4 margins are about 70 pt of 842 (8%).
+PAGE_EDGE_BAND: Final = 0.1
+
+# Most blocks per page and band the analyzer considers. Real pages have one
+# to three; the cap bounds memory on hostile pages with thousands of blocks.
+MAX_EDGE_BLOCKS_PER_BAND: Final = 8
+
+# Text repeated on fewer pages than this is never treated as a running
+# header or footer: two matches can be chance, three rarely are.
+REPEAT_MIN_PAGES: Final = 3
+
+# ...and the repeats must cover at least this share of the pages between the
+# first and the last one. A header printed on every other page (left and
+# right pages differ) covers 50%; a heading that happens to recur at the top
+# of three pages far apart covers almost nothing.
+REPEAT_MIN_DENSITY: Final = 0.4
+
+# Repeated edge text with at least this many words is substantive: it may be
+# a clause, not boilerplate, so its first copy is kept (THREAT_MODEL C).
+# "Payment is due within 30 days" has 6 words; "Confidential" or "Annual
+# Report 2026" are clearly boilerplate.
+SUBSTANTIVE_MIN_WORDS: Final = 6
+
+# Longest edge text read as a page number, e.g. "Page 1234 of 5000" or
+# "- xii -". Longer text is a sentence, never a page number.
+PAGE_NUMBER_MAX_CHARS: Final = 30
+
+# Digit runs longer than this are never page numbers (MAX_PDF_PAGES has four
+# digits) and are compared as text, not converted to integers.
+PAGE_NUMBER_MAX_DIGITS: Final = 6
