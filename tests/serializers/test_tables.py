@@ -104,3 +104,24 @@ def test_cheapest_format_wins() -> None:
 def test_illegible_marker_in_a_cell_is_escaped() -> None:
     t = table([["a", "b"], ["[illegible]", "y"]], header_rows=1)
     assert "\\[illegible]" in render_table(t)
+
+
+class TestCellEncoding:
+    def test_every_kind_of_line_break_becomes_br(self) -> None:
+        t = table([["a\rb", "c\u2028d", "e\r\nf"]])
+        assert render_table(t, flat) == "a<br>b|c<br>d|e<br>f"
+
+    def test_whitespace_only_edge_cell_keeps_its_column(self) -> None:
+        assert render_table(table([[" ", "x"], ["y", "z"]]), flat) == "||x|\n|y|z|"
+
+    def test_trailing_backslash_cannot_merge_cells(self) -> None:
+        assert render_table(table([["a\\", "b"]]), flat) == "a\\\\|b"
+        assert render_table(table([["a", "b\\|c"]]), flat) == "a|b\\\\\\|c"
+
+    def test_dash_row_cannot_become_a_delimiter_row(self) -> None:
+        t = table([["", "x"], ["-", ":-"]])
+        assert render_table(t, flat) == "||x|\n|\\-|:-|"
+
+    def test_value_ending_with_backslash_skips_row_sentences(self) -> None:
+        t = table([["Path", "Owner"], ["C:\\", "root"]], header_rows=1)
+        assert render_table(t, length) == "Path|Owner\n-|-\nC:\\\\|root"

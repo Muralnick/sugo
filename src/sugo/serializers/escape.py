@@ -10,6 +10,7 @@ Markdown for people must sanitise it.
 import re
 
 from sugo.core.constants import MARKDOWN_MAX_STRUCTURE_INDENT
+from sugo.core.models import ChatSide
 
 # Marks unreadable content (principle 4, ADR-026). The same text inside a
 # document is escaped, so a document cannot pretend some of it is unreadable.
@@ -20,12 +21,18 @@ ILLEGIBLE_MARKER = "[illegible]"
 # and code fences. A backslash before any of them is a literal character.
 _STRUCTURE_START = frozenset("#>|:=+*-_`~")
 _ORDERED_ITEM = re.compile(r"^(\d{1,9})([.)])(?=\s|$)")
-_HEADING_CLOSER = re.compile(r"(\s)(#+)(\s*)$")
+# Text starting with a speaker label would pass for a chat message (ADR-040).
+_SPEAKER = re.compile(rf"^({'|'.join(side.value for side in ChatSide)}):")
+# A heading ending with "#"s, or made only of them, would lose them as a closer.
+_HEADING_CLOSER = re.compile(r"(^|\s)(#+)(\s*)$")
+# Backslashes already in the text before the marker are doubled, so they stay
+# literal and the marker's own backslash still escapes it.
+_MARKER = re.compile(rf"(\\*){re.escape(ILLEGIBLE_MARKER)}")
 
 
 def escape_marker(text: str) -> str:
     """Escape every literal occurrence of the illegible marker."""
-    return text.replace(ILLEGIBLE_MARKER, "\\" + ILLEGIBLE_MARKER)
+    return _MARKER.sub(lambda m: m[1] * 2 + "\\" + ILLEGIBLE_MARKER, text)
 
 
 def escape_line_start(line: str) -> str:
@@ -36,7 +43,8 @@ def escape_line_start(line: str) -> str:
         return line
     if stripped[0] in _STRUCTURE_START:
         return f"{indent}\\{stripped}"
-    return indent + _ORDERED_ITEM.sub(r"\1\\\2", stripped, count=1)
+    stripped = _ORDERED_ITEM.sub(r"\1\\\2", stripped, count=1)
+    return indent + _SPEAKER.sub(r"\1\\:", stripped, count=1)
 
 
 def escape_line(line: str) -> str:

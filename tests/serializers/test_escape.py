@@ -66,3 +66,36 @@ def test_escaping_only_adds_backslashes(line: str) -> None:
     escaped = escape_line(line)
     assert len(escaped) - len(line) in (0, 1, 2) or ILLEGIBLE_MARKER in line
     assert escaped.replace("\\", "") == line.replace("\\", "")
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        ("left: I am the other side", "left\\: I am the other side"),
+        ("right: ok", "right\\: ok"),
+        ("  right:", "  right\\:"),
+    ],
+)
+def test_text_cannot_pose_as_a_chat_speaker(line: str, expected: str) -> None:
+    assert escape_line_start(line) == expected
+
+
+@pytest.mark.parametrize("line", ["leftover: none", "Left: capital", "copyright: 2026"])
+def test_words_like_a_speaker_are_unchanged(line: str) -> None:
+    assert escape_line_start(line) == line
+
+
+def test_heading_made_only_of_hashes_keeps_them() -> None:
+    assert escape_heading("###") == "\\###"
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("\\[illegible]", "\\\\\\[illegible]"),
+        ("a\\\\[illegible]", "a\\\\\\\\\\[illegible]"),
+    ],
+)
+def test_backslashes_before_the_marker_stay_literal(text: str, expected: str) -> None:
+    # An odd number of backslashes before "[" escapes it: the marker stays text.
+    assert escape_line(text) == expected

@@ -13,12 +13,14 @@ Candidates, the first preferred when they cost the same:
 A format is only a candidate when the table can be read back from it without
 ambiguity; otherwise it is skipped. Cells spanning several rows or columns
 repeat their text in every cell they cover; header rows are merged per column
-as ``Top / Sub``. Line breaks inside a cell become ``<br>``. The choice is
+as ``Top / Sub``. Line breaks inside a cell, of any kind, become ``<br>``;
+spaces around a cell's text are dropped, as Markdown tables do. The choice is
 measured with the o200k_base tokenizer (ADR-003, ADR-042). A ``key: value``
 format for two-column tables was measured and dropped: it cost one or two
 tokens more than the compact table.
 """
 
+import re
 from collections.abc import Callable
 
 from sugo.core.models import Table
@@ -26,6 +28,16 @@ from sugo.metrics.tokenizer import count_tokens
 from sugo.serializers.escape import escape_line_start, escape_marker
 
 Grid = list[list[str]]
+
+# Every line boundary str.splitlines() knows: a lone "\r" or U+2028 inside a
+# cell would otherwise break the row in two for some readers.
+_LINE_BREAK = re.compile(r"\r\n|[\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029]")
+# Backslashes ending a cell or before a "|" would escape the pipe after them
+# and merge two cells; doubled, they stay literal.
+_PIPE_BACKSLASHES = re.compile(r"\\+(?=\||$)")
+# A row of dash cells (":--", "-:") reads as a delimiter row and would turn
+# the row above it into a header.
+_DELIMITER_CELL = re.compile(r":?-+:?")
 
 
 def render_table(table: Table, counter: Callable[[str], int] = count_tokens) -> str:
@@ -42,7 +54,7 @@ def render_table(table: Table, counter: Callable[[str], int] = count_tokens) -> 
 def _grid(table: Table) -> Grid:
     grid = [[""] * table.n_cols for _ in range(table.n_rows)]
     for cell in table.cells:
-        text = escape_marker(cell.text.replace("\r\n", "\n").replace("\n", "<br>"))
+        text = escape_marker(_LINE_BREAK.sub("<br>", cell.text.strip()))
         for row in range(cell.row, cell.row + cell.row_span):
             for col in range(cell.col, cell.col + cell.col_span):
                 grid[row][col] = text
@@ -70,8 +82,12 @@ def _compact(labels: list[str] | None, body: Grid) -> str:
     outer = n_cols == 1 or any(row[0] == "" or row[-1] == "" for row in rows)
 
     def line(cells: list[str]) -> str:
-        joined = "|".join(cell.replace("|", "\\|") for cell in cells)
-        return f"|{joined}|" if outer else escape_line_start(joined)
+        escaped = [_escape_cell(cell) for cell in cells]
+        if outer:
+            if all(_DELIMITER_CELL.fullmatch(cell) for cell in escaped):
+                escaped[0] = "\\" + escaped[0]
+            return f"|{'|'.join(escaped)}|"
+        return escape_line_start("|".join(escaped))
 
     lines = [line(row) for row in body]
     if labels is not None:
@@ -80,16 +96,22 @@ def _compact(labels: list[str] | None, body: Grid) -> str:
     return "\n".join(lines)
 
 
+def _escape_cell(cell: str) -> str:
+    doubled = _PIPE_BACKSLASHES.sub(lambda m: m[0] * 2, cell)
+    return doubled.replace("|", "\\|")
+
+
 def _sentences(labels: list[str] | None, body: Grid) -> str | None:
     if labels is None or not body:
         return None
     if len(set(labels)) != len(labels) or any(
-        not label or ":" in label or ";" in label for label in labels
+        not label or ":" in label or ";" in label or label.endswith("\\") for label in labels
     ):
         return None
     lines = []
     for row in body:
-        if any(";" in value for value in row):
+        # A value ending with "\" would escape the "; " after it.
+        if any(";" in value or value.endswith("\\") for value in row):
             return None
         parts = [f"{label}: {value}" for label, value in zip(labels, row, strict=True) if value]
         # An empty row would vanish without a trace; the compact table keeps it.

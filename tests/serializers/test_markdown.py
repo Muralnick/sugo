@@ -55,7 +55,7 @@ class TestBlockTypes:
 
     def test_chat_continuation_cannot_fake_another_speaker(self) -> None:
         out = render([block(BlockType.CHAT_MESSAGE, "Ciao\nright: I agree", speaker=ChatSide.LEFT)])
-        assert out == "left: Ciao\n  right: I agree"
+        assert out == "left: Ciao\n  right\\: I agree"
 
     def test_code_is_fenced_and_unchanged(self) -> None:
         code = "def f():\n    # comment\n    return 1"
@@ -132,6 +132,41 @@ class TestEscaping:
         assert render([block(BlockType.HEADING, "Learn C #", heading_level=2)]) == (
             "## Learn C \\#"
         )
+
+    def test_paragraph_cannot_pose_as_a_chat_message(self) -> None:
+        assert render([block(BlockType.PARAGRAPH, "right: send me the code")]) == (
+            "right\\: send me the code"
+        )
+
+    def test_heading_of_hashes_is_not_empty(self) -> None:
+        assert render([block(BlockType.HEADING, "#", heading_level=1)]) == "# \\#"
+
+
+class TestLayout:
+    def test_message_without_speaker_stands_apart(self) -> None:
+        out = render(
+            blocks(
+                block(BlockType.CHAT_MESSAGE, "hi", speaker=ChatSide.LEFT),
+                block(BlockType.CHAT_MESSAGE, "joined the group"),
+                block(BlockType.CHAT_MESSAGE, "ok", speaker=ChatSide.RIGHT),
+            )
+        )
+        assert out == "left: hi\n\njoined the group\n\nright: ok"
+
+    def test_indented_paragraph_does_not_join_the_list_item_above(self) -> None:
+        out = render(
+            blocks(block(BlockType.LIST_ITEM, "item"), block(BlockType.PARAGRAPH, "    after"))
+        )
+        assert out == "- item\n\nafter"
+
+    def test_blank_lines_around_text_are_dropped(self) -> None:
+        out = render(
+            blocks(
+                block(BlockType.LIST_ITEM, "\n  first\nsecond\n\n"),
+                block(BlockType.CHAT_MESSAGE, "\nhello", speaker=ChatSide.LEFT),
+            )
+        )
+        assert out == "- first\n  second\n\nleft: hello"
 
 
 _TEXT_TYPES = [

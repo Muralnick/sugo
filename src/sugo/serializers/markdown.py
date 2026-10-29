@@ -2,7 +2,7 @@
 
 Blocks are rendered in the order given, which is their reading order, and
 separated by a blank line; consecutive list items and consecutive chat
-messages by a single newline. Removed blocks are left out: they stay in the IR
+messages with a speaker by a single newline. Removed blocks are left out: they stay in the IR
 with their reason (principle 3). Blocks that are not removed are always
 rendered, whatever their type, so only cleaners decide what is dropped.
 
@@ -13,6 +13,9 @@ rendered, whatever their type, so only cleaners decide what is dropped.
 - tables: the cheapest faithful format (``sugo.serializers.tables``);
 - illegible blocks: ``[illegible]``, never a guess (principle 4, ADR-026);
 - anything else: the text, lines kept as they are.
+
+Blank lines around a block's text and the indentation of its first line are
+dropped: they would merge the block into the one above or make it code.
 
 Document text is escaped only where it would create structure
 (``sugo.serializers.escape``).
@@ -27,6 +30,8 @@ from sugo.serializers.escape import ILLEGIBLE_MARKER, escape_heading, escape_lin
 from sugo.serializers.tables import render_table
 
 # Runs of these blocks are one list or one conversation: no blank line inside.
+# A chat message without a speaker has no prefix to set it apart, so it is
+# kept out of such runs (``_run_type``).
 _TIGHT = frozenset({BlockType.LIST_ITEM, BlockType.CHAT_MESSAGE})
 _BACKTICKS = re.compile(r"`+")
 
@@ -41,11 +46,21 @@ def render(blocks: Iterable[Block]) -> str:
         rendered = _render_block(block)
         if rendered is None:
             continue
+        run_type = _run_type(block)
         if parts:
-            parts.append("\n" if block.type is previous and block.type in _TIGHT else "\n\n")
+            parts.append("\n" if run_type is not None and run_type is previous else "\n\n")
         parts.append(rendered)
-        previous = block.type
+        previous = run_type
     return "".join(parts)
+
+
+def _run_type(block: Block) -> BlockType | None:
+    """The type whose consecutive blocks are joined by one newline, if any."""
+    if block.type not in _TIGHT:
+        return None
+    if block.type is BlockType.CHAT_MESSAGE and block.speaker is None:
+        return None
+    return block.type
 
 
 def _render_block(block: Block) -> str | None:
@@ -59,9 +74,24 @@ def _render_block(block: Block) -> str | None:
     if block.type is BlockType.CODE:
         return _fenced(block.text)
     if block.type is BlockType.HEADING:
-        text = " ".join(line.strip() for line in block.text.splitlines())
+        text = " ".join(line.strip() for line in block.text.splitlines() if line.strip())
         return f"{'#' * (block.heading_level or 1)} {escape_heading(text)}"
-    return _prefixed(block, [escape_line(line) for line in block.text.splitlines()])
+    return _prefixed(block, [escape_line(line) for line in _text_lines(block.text)])
+
+
+def _text_lines(text: str) -> list[str]:
+    """Lines of non-blank text, without blank lines around them or first-line indentation.
+
+    A leading blank line would leave a list or speaker prefix empty, and an
+    indented first line would continue the list item above or become code.
+    """
+    lines = text.splitlines()
+    while not lines[0].strip():
+        del lines[0]
+    while not lines[-1].strip():
+        del lines[-1]
+    lines[0] = lines[0].lstrip()
+    return lines
 
 
 def _prefixed(block: Block, lines: list[str]) -> str:
