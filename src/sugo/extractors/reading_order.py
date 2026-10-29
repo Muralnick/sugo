@@ -9,6 +9,8 @@ Works on anything with a normalised ``bbox``: OCR lines from images, text
 lines from PDFs.
 """
 
+import statistics
+from collections.abc import Callable, Iterable
 from typing import Protocol
 
 from sugo.core.constants import LAYOUT_COLUMN_GAP, LAYOUT_PARAGRAPH_GAP, LAYOUT_SAME_ROW_OVERLAP
@@ -47,6 +49,35 @@ def text_rows[T: Boxed](items: list[T]) -> list[list[T]]:
         else:
             result.append([item])
     return [sorted(row, key=lambda item: (item.bbox.x0, item.bbox.y0)) for row in result]
+
+
+def union(boxes: Iterable[BBox]) -> BBox:
+    """The smallest box holding all the given boxes."""
+    boxes = list(boxes)
+    return BBox(
+        x0=min(box.x0 for box in boxes),
+        y0=min(box.y0 for box in boxes),
+        x1=max(box.x1 for box in boxes),
+        y1=max(box.y1 for box in boxes),
+    )
+
+
+def indented[T: Boxed](rows: list[list[T]], text: Callable[[T], str]) -> str:
+    """Rows of code with indentation rebuilt from each row's left edge.
+
+    OCR drops leading spaces and PDFs place indented code by position, so the
+    offset from the leftmost row, in median character widths, becomes spaces.
+    Leading spaces the first piece of a row already has are kept on top.
+    """
+    widths = [(i.bbox.x1 - i.bbox.x0) / len(text(i)) for row in rows for i in row if text(i)]
+    char_width = statistics.median(widths) if widths else 0.0
+    left = min(row[0].bbox.x0 for row in rows)
+    result = []
+    for row in rows:
+        indent = round((row[0].bbox.x0 - left) / char_width) if char_width > 0 else 0
+        pieces = [text(row[0]), *(text(item).strip() for item in row[1:])]
+        result.append(" " * indent + " ".join(pieces))
+    return "\n".join(result)
 
 
 def _split[T: Boxed](items: list[T], min_gap: float, *, vertical: bool) -> list[list[T]]:

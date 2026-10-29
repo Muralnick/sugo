@@ -22,10 +22,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 
-from sugo.core.models import BBox, Block, BlockFlag, BlockType, Page, PageOrigin
+from sugo.core.models import Block, BlockFlag, BlockType, Page, PageOrigin
 from sugo.extractors.image.detectors import Detection, detect, is_ui_chrome, plain_text
 from sugo.extractors.image.ocr_engine import OcrLine
-from sugo.extractors.reading_order import text_rows, xy_cut
+from sugo.extractors.reading_order import text_rows, union, xy_cut
 
 Group = list[OcrLine]
 
@@ -138,12 +138,7 @@ def _make_block(
         text=detection.text,
         # The weakest line decides how far the block can be trusted.
         confidence=min(line.confidence for line in members),
-        bbox=BBox(
-            x0=min(line.bbox.x0 for line in members),
-            y0=min(line.bbox.y0 for line in members),
-            x1=max(line.bbox.x1 for line in members),
-            y1=max(line.bbox.y1 for line in members),
-        ),
+        bbox=union(line.bbox for line in members),
         reading_order=order,
         speaker=detection.speaker,
         origin_engine=origin_engine,

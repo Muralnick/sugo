@@ -152,3 +152,33 @@ def test_every_word_survives(specs: list[tuple[str, float, bool]]) -> None:
     words = sorted(w for spec in specs for w in spec[0].replace("•", " ").split())
     out = sorted(w for b in build_blocks(lines) for w in b.text.replace("•", " ").split())
     assert out == words
+
+
+def test_large_print_paragraph_is_not_a_heading_even_at_a_heading_size() -> None:
+    lines = [line("Chapter one", 0.05, size=16)]
+    lines += [line(f"Large print row {i}", 0.12 + i * 0.022, size=16) for i in range(6)]
+    # The body size is the one carrying most characters: here 11 pt.
+    lines += [
+        line(f"Body text row {i}, long enough to outweigh the rest.", 0.3 + i * 0.015)
+        for i in range(8)
+    ]
+    out = kinds(lines)
+    assert out[0] == ("heading", 1, "Chapter one")
+    assert out[1][:2] == ("paragraph", None)
+
+
+def test_sizes_differing_by_rounding_share_a_heading_level() -> None:
+    out = kinds(
+        [
+            line("Title", 0.05, size=18),
+            line("Section A", 0.10, size=14.0),
+            line("Body text of section A, long enough to be the body.", 0.13),
+            line("Section B", 0.20, size=13.98),
+            line("Body text of section B, long enough to be the body.", 0.23),
+        ]
+    )
+    assert [(kind, level) for kind, level, _ in out if kind == "heading"] == [
+        ("heading", 1),
+        ("heading", 2),
+        ("heading", 2),
+    ]

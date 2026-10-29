@@ -6,6 +6,8 @@ from collections.abc import Callable
 import pymupdf
 import pytest
 
+from sugo.core.constants import PDF_OCR_MAX_PIXELS
+from sugo.extractors.pymupdf import worker
 from sugo.extractors.pymupdf.protocol import Message, NativePage, Opened, Refused, ScanPage
 from sugo.extractors.pymupdf.worker import run
 
@@ -130,3 +132,78 @@ def test_scan_is_rendered_with_its_text_layer_hidden(
     assert pixels is not None
     assert len(pixels) == scan.pixel_bytes
     assert [(line.text, line.hidden) for line in scan.hidden_lines] == [("invisible layer", True)]
+
+
+def test_content_stream_claiming_to_be_an_image_is_still_checked(raw_pdf: RawPdf) -> None:
+    # "/Subtype /Image" is written by the attacker; MuPDF runs /Contents anyway.
+    content = b"q BI /W 1 /H 1 /CS /G /BPC 8 /F /Br ID x EI Q"
+    data = raw_pdf(b"/Filter /FlateDecode /Subtype /Image", content=zlib.compress(content))
+    (refusal,) = messages(data)
+    assert isinstance(refusal, Refused)
+    assert refusal.code == "PDF_UNSUPPORTED"
+
+
+def test_restarted_worker_skips_the_stream_check(raw_pdf: RawPdf) -> None:
+    # The first worker checked the same bytes; restarts must not pay for it again.
+    content = b"q BI /W 1 /H 1 /CS /G /BPC 8 /F /Br ID x EI Q"
+    data = raw_pdf(b"/Filter /FlateDecode", content=zlib.compress(content))
+    assert isinstance(messages(data, first_page=1)[0], Opened)
+
+
+def test_hidden_space_does_not_carry_a_hidden_word_into_visible_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def span(text: str, x: float, *, hidden: bool) -> worker._Span:
+        return worker._Span(text, (x, 10.0, x + 30, 20.0), 11.0, False, False, hidden)
+
+    spans = [span("Hello", 10, hidden=False), span(" ", 40, hidden=True)]
+    spans.append(span("INJECT", 45, hidden=True))
+    monkeypatch.setattr(worker, "_span", lambda raw, *_: raw)
+    lines = worker._split_line({"spans": spans}, pymupdf.Rect(0, 0, 200, 200), None, 1.0)  # type: ignore[arg-type]
+    assert [(line.text, line.hidden) for line in lines] == [("Hello", False), ("INJECT", True)]
+
+
+def test_page_failing_in_any_way_is_reported_and_reading_continues(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document = pymupdf.open()
+    for number in range(3):
+        document.new_page().insert_text((72, 72), f"page {number}")
+    read_page = worker._read_page
+
+    def fail_on_page_1(page: pymupdf.Page, index: int) -> object:
+        if index == 1:
+            raise TypeError("unexpected MuPDF failure")
+        return read_page(page, index)
+
+    monkeypatch.setattr(worker, "_read_page", fail_on_page_1)
+    out = messages(document.tobytes())
+    assert [m.kind for m in out] == ["opened", "native", "page_failed", "native"]
+
+
+def test_page_that_fails_to_load_keeps_the_document_readable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document = pymupdf.open()
+    for _ in range(2):
+        document.new_page(width=300, height=400)
+    box = worker._box
+    calls = iter([True, False])
+    monkeypatch.setattr(worker, "_box", lambda page: box(page) if next(calls) else 1 / 0)
+    opened = messages(document.tobytes())[0]
+    assert isinstance(opened, Opened)
+    assert [(b.width, b.height) for b in opened.pages] == [(300.0, 400.0), (300.0, 400.0)]
+
+
+def test_corrupt_stream_does_not_stop_the_document(raw_pdf: RawPdf) -> None:
+    # MuPDF decodes what it can; the check sees what the interpreter would see.
+    data = raw_pdf(b"/Filter /FlateDecode", content=b"not zlib data at all")
+    assert [m.kind for m in messages(data)] == ["opened", "native"]
+
+
+@pytest.mark.parametrize("size", [(595.0, 842.0), (1350.0, 1920.0), (14400.0, 14400.0)])
+def test_scan_render_always_fits_the_pixel_limit(size: tuple[float, float]) -> None:
+    document = pymupdf.open()
+    page = document.new_page(width=size[0], height=size[1])
+    pixmap = page.get_pixmap(dpi=worker._ocr_dpi(*size), alpha=False)
+    assert pixmap.width * pixmap.height <= PDF_OCR_MAX_PIXELS

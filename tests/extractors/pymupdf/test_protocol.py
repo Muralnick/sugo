@@ -86,3 +86,9 @@ def test_scan_beyond_the_pixel_limit_is_refused() -> None:
     )
     with pytest.raises(ProtocolError, match="pixel limit"):
         parse_message(payload)
+
+
+def test_line_of_only_spaces_is_refused() -> None:
+    # Layout reads the first visible character; a compromised worker must not crash it.
+    with pytest.raises(ValueError, match="pattern"):
+        NativeLine(text="   ", bbox=None, font_size=11, bold=False, monospace=False, hidden=False)

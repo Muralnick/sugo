@@ -181,3 +181,9 @@ def test_native_pdf_never_loads_the_ocr_engine() -> None:
         raise AssertionError("OCR engine loaded for a native page")
 
     assert len(list(extract_pdf(pdf("native"), ocr=refuse))) == 1
+
+
+def test_mupdf_printing_errors_cannot_corrupt_the_frames(raw_pdf: RawPdf) -> None:
+    # A corrupt stream makes MuPDF print to stdout; the worker's frames use a private copy.
+    data = raw_pdf(b"/Filter /FlateDecode", content=b"not zlib data at all")
+    assert [p.index for p in extract_pdf(data)] == [0]

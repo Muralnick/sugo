@@ -4,6 +4,8 @@ Started by ``sugo.extractors.pymupdf.extract`` as
 ``python -I -m sugo.extractors.pymupdf.worker FIRST_PAGE``; reads the PDF bytes
 from stdin and writes frames (``sugo.extractors.pymupdf.protocol``) to stdout.
 Its stderr is discarded by the parent: MuPDF warnings can quote the document.
+Frames go to a private copy of stdout, and file descriptor 1 itself to the
+null device, so nothing MuPDF prints can corrupt or forge a frame.
 
 Before parsing anything the worker limits itself: no core dumps (they would
 write document text to disk, ADR-031) and, on Linux and macOS, a cap on its
@@ -24,6 +26,8 @@ is drawn around it (white on white, text under an opaque shape).
 """
 
 import contextlib
+import math
+import os
 import sys
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -46,7 +50,7 @@ from sugo.core.constants import (
     PDF_WORKER_MEMORY_BYTES,
 )
 from sugo.core.models import BBox
-from sugo.extractors.pymupdf.guard import names_brotli
+from sugo.extractors.pymupdf.guard import BROTLI_REFUSAL, names_brotli
 from sugo.extractors.pymupdf.protocol import (
     Message,
     NativeLine,
@@ -71,6 +75,7 @@ _FONT_MONOSPACED = 8
 _FONT_BOLD = 16
 # Points per inch: PDF user space is 1/72 inch.
 _POINTS_PER_INCH = 72
+_LETTER = PageBox(width=612.0, height=792.0, rotation=0)
 _ROTATIONS: dict[int, Rotation] = {0: 0, 90: 90, 180: 180, 270: 270}
 _TEXT_FLAGS = pymupdf.TEXT_PRESERVE_WHITESPACE | pymupdf.TEXT_PRESERVE_LIGATURES
 
@@ -82,7 +87,24 @@ def main() -> None:
     pymupdf.TOOLS.mupdf_display_warnings(False)
     first_page = int(sys.argv[1])
     data = sys.stdin.buffer.read(MAX_PDF_FILE_BYTES + 1)
-    write_all(sys.stdout.buffer, run(data, first_page))
+    with _private_stdout() as out:
+        write_all(out, run(data, first_page))
+
+
+@contextlib.contextmanager
+def _private_stdout() -> Iterator[IO[bytes]]:
+    """A private copy of stdout for frames; file descriptor 1 goes to the null device.
+
+    MuPDF's C code may print to stdout (it does on decoding errors). Nothing
+    it prints can then corrupt or forge a frame.
+    """
+    sys.stdout.flush()
+    out = os.fdopen(os.dup(1), "wb")
+    null = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(null, 1)
+    os.close(null)
+    with out:
+        yield out
 
 
 def run(data: bytes, first_page: int) -> Iterator[tuple[Message, bytes | None]]:
@@ -96,17 +118,19 @@ def run(data: bytes, first_page: int) -> Iterator[tuple[Message, bytes | None]]:
         yield Refused(code="PDF_INVALID", message="the file is not a readable PDF"), None
         return
     with document:
-        refusal = _check(document)
+        # A restarted worker reads the same bytes, already checked by the first.
+        refusal = _check(document, streams=first_page == 0)
         if refusal is not None:
             yield refusal, None
             return
-        boxes = tuple(_box(document[index]) for index in range(document.page_count))
-        yield Opened(pages=boxes), None
+        yield Opened(pages=_boxes(document)), None
         for index in range(first_page, document.page_count):
             try:
-                yield _read_page(document[index], index)
-            except (RuntimeError, ValueError):
-                yield PageFailed(index=index), None
+                result = _read_page(document[index], index)
+            # Whatever MuPDF or a malformed page raises, only this page fails.
+            except Exception:  # noqa: BLE001
+                result = PageFailed(index=index), None
+            yield result
 
 
 def _limit_resources() -> None:
@@ -121,33 +145,52 @@ def _limit_resources() -> None:
         resource.setrlimit(resource.RLIMIT_AS, (PDF_WORKER_MEMORY_BYTES, PDF_WORKER_MEMORY_BYTES))
 
 
-def _check(document: pymupdf.Document) -> Refused | None:
+def _check(document: pymupdf.Document, *, streams: bool) -> Refused | None:
     if document.needs_pass:
         return Refused(code="PDF_ENCRYPTED", message="the PDF is protected by a password")
     if document.page_count > MAX_PDF_PAGES:
         return Refused(code="PDF_TOO_LARGE", message=f"the PDF has more than {MAX_PDF_PAGES} pages")
-    if _inline_brotli(document):
-        return Refused(
-            code="PDF_UNSUPPORTED",
-            message="the PDF uses Brotli compression, refused until MuPDF fixes CVE-2026-111497",
-        )
+    if streams:
+        return _stream_problem(document)
     return None
 
 
-def _inline_brotli(document: pymupdf.Document) -> bool:
-    """Whether a decoded content stream holds an inline image compressed with Brotli.
+def _stream_problem(document: pymupdf.Document) -> Refused | None:
+    """Refuse a document with an inline image compressed with Brotli.
 
-    Image streams are skipped: the parent checked their filters on the raw
-    bytes, and decoding them here would only cost time.
+    Every stream is decoded and searched, images included: ``/Subtype`` is
+    written by the attacker, and a page's content stream may claim to be an
+    image. A stream that cannot be decoded cannot be checked, so the document
+    is refused rather than parsed unchecked (temporary, ADR-043).
     """
     for xref in range(1, document.xref_length()):
-        if not document.xref_is_stream(xref):
-            continue
-        if document.xref_get_key(xref, "Subtype") == ("name", "/Image"):
-            continue
-        if names_brotli(document.xref_stream(xref) or b""):
-            return True
-    return False
+        try:
+            if not document.xref_is_stream(xref):
+                continue
+            decoded = document.xref_stream(xref) or b""
+        except Exception:  # noqa: BLE001  (any MuPDF failure means "unchecked")
+            return Refused(
+                code="PDF_UNSUPPORTED",
+                message="a stream of the PDF cannot be decoded, so it cannot be checked",
+            )
+        if names_brotli(decoded):
+            return Refused(
+                code="PDF_UNSUPPORTED",
+                message=BROTLI_REFUSAL,
+            )
+    return None
+
+
+def _boxes(document: pymupdf.Document) -> tuple[PageBox, ...]:
+    """Every page's box. A page that fails to load gets the box of the page
+    before it (US Letter for the first); reading it will fail and mark it."""
+    boxes: list[PageBox] = []
+    for index in range(document.page_count):
+        try:
+            boxes.append(_box(document[index]))
+        except Exception:  # noqa: BLE001  (one broken page must not end the document)
+            boxes.append(boxes[-1] if boxes else _LETTER)
+    return tuple(boxes)
 
 
 @dataclass(frozen=True)
@@ -201,15 +244,24 @@ def _pixels(pixmap: pymupdf.Pixmap) -> Pixels:
 def _split_line(
     line: dict[str, Any], rect: pymupdf.Rect, rendered: Pixels, scale: float
 ) -> list[NativeLine]:
-    """Split a MuPDF line into runs of visible and hidden spans."""
+    """Split a MuPDF line into runs of visible and hidden spans.
+
+    A run's visibility is that of its first span with text. Spaces join the
+    run they are in whatever their own visibility, but never decide it: a
+    hidden space must not carry the hidden word after it into visible text.
+    """
     runs: list[list[_Span]] = []
+    hidden: list[bool | None] = []  # per run; None while it holds only spaces
     for raw in line["spans"]:
         span = _span(raw, rect, rendered, scale)
-        # Spaces take the visibility of the run they are in.
-        if runs and (not span.text.strip() or runs[-1][-1].hidden == span.hidden):
+        blank = not span.text.strip()
+        if runs and (blank or hidden[-1] is None or hidden[-1] == span.hidden):
             runs[-1].append(span)
+            if hidden[-1] is None and not blank:
+                hidden[-1] = span.hidden
         else:
             runs.append([span])
+            hidden.append(None if blank else span.hidden)
     return [native for run in runs if (native := _native_line(run, rect)) is not None]
 
 
@@ -312,13 +364,11 @@ def _image_coverage(page: pymupdf.Page, rect: pymupdf.Rect) -> float:
 
 
 def _scan(page: pymupdf.Page, index: int, hidden: list[NativeLine]) -> tuple[Message, bytes | None]:
-    rect = page.rect
-    dpi = float(PDF_OCR_DPI)
-    pixels_at_dpi = rect.width * rect.height * (dpi / _POINTS_PER_INCH) ** 2
-    if pixels_at_dpi > PDF_OCR_MAX_PIXELS:
-        # Lower the resolution of very large pages instead of refusing them.
-        dpi *= (PDF_OCR_MAX_PIXELS / pixels_at_dpi) ** 0.5
-    pixmap = page.get_pixmap(dpi=max(1, int(dpi)), alpha=False, colorspace=pymupdf.csRGB)
+    pixmap = page.get_pixmap(
+        dpi=_ocr_dpi(float(page.rect.width), float(page.rect.height)),
+        alpha=False,
+        colorspace=pymupdf.csRGB,
+    )
     message = ScanPage(
         index=index,
         pixel_width=pixmap.width,
@@ -326,6 +376,24 @@ def _scan(page: pymupdf.Page, index: int, hidden: list[NativeLine]) -> tuple[Mes
         hidden_lines=tuple(hidden),
     )
     return message, _pixels(pixmap).tobytes()
+
+
+def _ocr_dpi(page_width: float, page_height: float) -> int:
+    """``PDF_OCR_DPI``, lowered for very large pages so the render fits the pixel limit.
+
+    MuPDF rounds each side up, so one extra pixel per side is counted.
+    """
+
+    def pixels(dpi: int) -> int:
+        zoom = dpi / _POINTS_PER_INCH
+        return (math.ceil(page_width * zoom) + 1) * (math.ceil(page_height * zoom) + 1)
+
+    dpi = PDF_OCR_DPI
+    if pixels(dpi) > PDF_OCR_MAX_PIXELS:
+        dpi = int(dpi * (PDF_OCR_MAX_PIXELS / pixels(dpi)) ** 0.5)
+    while dpi > 1 and pixels(dpi) > PDF_OCR_MAX_PIXELS:
+        dpi -= 1
+    return max(1, dpi)
 
 
 def write_all(out: IO[bytes], messages: Iterator[tuple[Message, bytes | None]]) -> None:

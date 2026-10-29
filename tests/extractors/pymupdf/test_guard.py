@@ -1,5 +1,6 @@
 """Tests for the Brotli guard: every way of naming Brotli is refused, real PDFs pass."""
 
+import random
 import time
 from collections.abc import Callable
 
@@ -70,3 +71,18 @@ def test_hostile_bytes_are_scanned_in_linear_time(hostile: bytes) -> None:
     start = time.perf_counter()
     raw_problem(b"%PDF-1.7\n" + hostile)
     assert time.perf_counter() - start < 2.0
+
+
+def test_short_abbreviation_in_binary_data_is_not_brotli() -> None:
+    # "/Br" alone occurs by chance in compressed data; only after a filter key it counts.
+    noise = b"\x8f/Br \x00\x13#2fBr]\xfe/Brx /Br(" * 1000
+    assert raw_problem(b"%PDF-1.7\n" + noise) is None
+    assert not names_brotli(noise)
+    assert names_brotli(b"/F /Br ")
+    assert names_brotli(b"/Filter[/AHx/Br]")
+
+
+def test_random_binary_data_is_not_refused() -> None:
+    # A large compressed file must not be refused by chance (review of PR #13).
+    data = random.Random(43).randbytes(16 * 1024 * 1024)  # noqa: S311  (test data)
+    assert raw_problem(b"%PDF-1.7\n" + data) is None

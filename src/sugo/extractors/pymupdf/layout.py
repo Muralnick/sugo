@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from sugo.core.constants import MAX_HEADING_LEVEL, PDF_HEADING_MAX_LINES, PDF_HEADING_MIN_SIZE_RATIO
 from sugo.core.models import BBox, Block, BlockFlag, BlockType, Style
 from sugo.extractors.pymupdf.protocol import NativeLine
-from sugo.extractors.reading_order import text_rows, xy_cut
+from sugo.extractors.reading_order import indented, text_rows, union, xy_cut
 
 ENGINE_NAME = "pymupdf"
 
@@ -63,7 +63,7 @@ class _Paragraph:
         return all(placed.line.monospace for placed in self.lines)
 
 
-def build_blocks(lines: Sequence[NativeLine], *, first_id: int = 0) -> tuple[Block, ...]:
+def build_blocks(lines: Sequence[NativeLine]) -> tuple[Block, ...]:
     """Typed blocks in reading order, then the page's hidden text as one block."""
     visible = [
         _Placed(line, line.bbox) for line in lines if not line.hidden and line.bbox is not None
@@ -76,10 +76,10 @@ def build_blocks(lines: Sequence[NativeLine], *, first_id: int = 0) -> tuple[Blo
         typed = _typed(paragraph, levels)
         if typed is not None:
             block_type, text = typed
-            level = levels.get(paragraph.font_size)
-            blocks.append(_block(first_id + len(blocks), block_type, paragraph, text, level))
+            level = levels.get(paragraph) if block_type is BlockType.HEADING else None
+            blocks.append(_block(len(blocks), block_type, paragraph, text, level))
     if hidden:
-        blocks.append(hidden_block(hidden, first_id + len(blocks)))
+        blocks.append(hidden_block(hidden, len(blocks)))
     return tuple(blocks)
 
 
@@ -95,7 +95,7 @@ def hidden_block(lines: Sequence[NativeLine], order: int) -> Block:
         id=f"b{order}",
         type=BlockType.PARAGRAPH,
         text="\n".join(line.text.strip() for line in ordered),
-        bbox=_union(placed) if placed else None,
+        bbox=union(p.bbox for p in placed) if placed else None,
         reading_order=order,
         origin_engine=ENGINE_NAME,
         flags=(BlockFlag.HIDDEN,),
@@ -127,7 +127,7 @@ def _paragraphs(lines: list[_Placed]) -> list[_Paragraph]:
     return result
 
 
-def _typed(paragraph: _Paragraph, levels: dict[float, int]) -> tuple[BlockType, str] | None:
+def _typed(paragraph: _Paragraph, levels: dict[_Paragraph, int]) -> tuple[BlockType, str] | None:
     """The paragraph's block type and text, or None for a lone bullet."""
     if paragraph.monospace:
         return BlockType.CODE, _code_text(paragraph)
@@ -135,7 +135,7 @@ def _typed(paragraph: _Paragraph, levels: dict[float, int]) -> tuple[BlockType, 
     if text[0] in _BULLETS:
         item = text[1:].strip()
         return (BlockType.LIST_ITEM, item) if item else None
-    if paragraph.font_size in levels:
+    if paragraph in levels:
         return BlockType.HEADING, text
     return BlockType.PARAGRAPH, text
 
@@ -147,20 +147,8 @@ def _rows_text(paragraph: _Paragraph) -> list[str]:
 
 
 def _code_text(paragraph: _Paragraph) -> str:
-    """Rows of monospaced text, indented by their offset from the leftmost row."""
-    rows = text_rows(list(paragraph.lines))
-    # In a monospaced font every character, spaces included, has the same width.
-    char_width = statistics.median(
-        (p.bbox.x1 - p.bbox.x0) / len(p.line.text) for p in paragraph.lines
-    )
-    left = min(row[0].bbox.x0 for row in rows)
-    lines = []
-    for row in rows:
-        indent = round((row[0].bbox.x0 - left) / char_width) if char_width > 0 else 0
-        # The first piece keeps its own leading spaces: they are indentation too.
-        pieces = [row[0].line.text, *(p.line.text.strip() for p in row[1:])]
-        lines.append(" " * indent + " ".join(pieces))
-    return "\n".join(lines)
+    """Monospaced rows, indented by their offset from the leftmost row."""
+    return indented(text_rows(list(paragraph.lines)), lambda placed: placed.line.text)
 
 
 def _body_size(lines: list[_Placed]) -> float:
@@ -172,20 +160,31 @@ def _body_size(lines: list[_Placed]) -> float:
     return max(weights, key=lambda size: (weights[size], -size)) if weights else 0.0
 
 
-def _heading_levels(paragraphs: list[_Paragraph], body: float) -> dict[float, int]:
-    """Heading level per font size: the largest is 1, capped at Markdown's 6."""
-    sizes = sorted(
-        {
-            p.font_size
-            for p in paragraphs
-            if body > 0
-            and p.font_size >= body * PDF_HEADING_MIN_SIZE_RATIO
-            and len(_rows_text(p)) <= PDF_HEADING_MAX_LINES
-            and not p.monospace
-        },
-        reverse=True,
-    )
-    return {size: min(rank + 1, MAX_HEADING_LEVEL) for rank, size in enumerate(sizes)}
+def _heading_levels(paragraphs: list[_Paragraph], body: float) -> dict[_Paragraph, int]:
+    """Heading level of each paragraph that is a heading.
+
+    A heading is short, not code, and at least ``PDF_HEADING_MIN_SIZE_RATIO``
+    times the body size. Sizes within ``_SAME_SIZE_RATIO`` of each other are
+    one level, as PDF writers shift sizes by fractions of a point; the largest
+    group is level 1, capped at Markdown's 6.
+    """
+    headings = [
+        p
+        for p in paragraphs
+        if body > 0
+        and p.font_size >= body * PDF_HEADING_MIN_SIZE_RATIO
+        and len(_rows_text(p)) <= PDF_HEADING_MAX_LINES
+        and not p.monospace
+    ]
+    level_of: dict[float, int] = {}
+    level = 0
+    previous = 0.0
+    for size in sorted({p.font_size for p in headings}, reverse=True):
+        if not level or previous > size * _SAME_SIZE_RATIO:
+            level += 1
+        level_of[size] = min(level, MAX_HEADING_LEVEL)
+        previous = size
+    return {p: level_of[p.font_size] for p in headings}
 
 
 def _same_style(a: NativeLine, b: NativeLine) -> bool:
@@ -206,7 +205,7 @@ def _block(
         id=f"b{order}",
         type=block_type,
         text=text,
-        bbox=_union(list(paragraph.lines)),
+        bbox=union(p.bbox for p in paragraph.lines),
         style=Style(
             font_size=main.font_size,
             bold=all(line.bold for line in lines),
@@ -215,15 +214,6 @@ def _block(
         heading_level=heading_level if block_type is BlockType.HEADING else None,
         reading_order=order,
         origin_engine=ENGINE_NAME,
-    )
-
-
-def _union(lines: list[_Placed]) -> BBox:
-    return BBox(
-        x0=min(p.bbox.x0 for p in lines),
-        y0=min(p.bbox.y0 for p in lines),
-        x1=max(p.bbox.x1 for p in lines),
-        y1=max(p.bbox.y1 for p in lines),
     )
 
 

@@ -200,7 +200,12 @@ def _page(worker: "_Worker", index: int, box: PageBox, ocr: "_LazyOcr", timeout:
     if isinstance(message, PageFailed):
         return _failed_page(index, box)
     if isinstance(message, NativePage):
-        return _page_of(index, box, PageOrigin.NATIVE, build_blocks(message.lines))
+        try:
+            blocks = build_blocks(message.lines)
+        except (ValueError, IndexError):
+            # Validated data that still breaks the layout came from a broken worker.
+            raise _WorkerError from None
+        return _page_of(index, box, PageOrigin.NATIVE, blocks)
     pixels = worker.frame(timeout)
     if len(pixels) != message.pixel_bytes:
         raise _WorkerError

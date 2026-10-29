@@ -39,7 +39,8 @@ class NativeLine(_Model):
     Leading spaces are kept, for code indentation; trailing ones are not.
     """
 
-    text: NonEmptyStr
+    # At least one visible character: layout reads the first one.
+    text: Annotated[str, Field(pattern=r"\S")]
     # None for text entirely outside the page, which has no position on it.
     bbox: BBox | None
     font_size: Points
