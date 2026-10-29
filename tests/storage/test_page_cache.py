@@ -273,7 +273,8 @@ def test_default_cache_honours_the_environment_override(
 
 def test_default_cache_dir_is_per_user_without_override(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(CACHE_DIR_ENV, raising=False)
-    assert cache_dir().name == "sugo"
+    # platformdirs ends the path in "sugo" on Linux and macOS, in "sugo\Cache" on Windows.
+    assert "sugo" in cache_dir().parts
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX permissions")
