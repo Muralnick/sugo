@@ -46,7 +46,7 @@ Method: assets → attackers → trust boundaries → threats per surface → mi
 
 | Threat | Mitigation |
 |---|---|
-| Exploits in native parsers (MuPDF, Pillow, ONNX Runtime) | Isolated workers, limits, timeouts, sandbox, updated libraries |
+| Exploits in native parsers (MuPDF, Pillow, ONNX Runtime) | Isolated workers, limits, timeouts, sandbox, updated libraries. MuPDF already runs in its own process, answering in validated JSON, never pickle, with a memory cap, no core dumps and per-page timeouts; PDFs reaching its vulnerable Brotli decoder are refused (ADR-043) |
 | Decompression bombs (zip, huge images, PDF streams) | Limits on real decompressed bytes; image file size and pixel count checked from the header before decoding, Pillow bomb warning made fatal (ADR-039) |
 | Zip slip, symlinks, special files | Hashed names; special entries rejected |
 | **XXE** in Office, FatturaPA, PEC (all XML) | `defusedxml`, external entities disabled |
@@ -58,7 +58,7 @@ Method: assets → attackers → trust boundaries → threats per surface → mi
 
 | Mitigation | Detail |
 |---|---|
-| Invisible text removal | White-on-white, tiny fonts, off-page text, PDF text layers not matching the rendered page |
+| Invisible text removal | White-on-white, tiny fonts, off-page text, text under opaque shapes, invisible render modes: flagged `hidden` by the PDF extractor and removed with a reason; the text layer of a scanned page is never trusted, the page is read with OCR (ADR-043) |
 | Deceptive characters | Zero-width characters, bidi overrides ("Trojan Source"), homoglyphs removed or flagged (also saves tokens) |
 | Suspicious instruction detector | Imperative phrases addressed to an AI are **flagged**, not removed (principle 3) |
 | MCP delimiting | Content wrapped and labelled as document data, not instructions |

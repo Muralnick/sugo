@@ -76,6 +76,10 @@ class BlockFlag(StrEnum):
     ILLEGIBLE = "illegible"
     SUSPICIOUS_INSTRUCTION = "suspicious_instruction"
     LOW_AGREEMENT = "low_agreement"
+    # Text a reader cannot see on the rendered page: white on white, microscopic,
+    # off the page or drawn invisible. Kept apart so a cleaner can remove it with
+    # a reason; a classic way to slip instructions to an LLM (ADR-043).
+    HIDDEN = "hidden"
 
 
 class BBox(_Model):

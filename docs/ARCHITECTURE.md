@@ -87,7 +87,7 @@ Block
 ├── heading_level, reading_order
 ├── table: cell grid with spans and header rows (type = table)
 ├── speaker: left | right (type = chat_message; neutral side, ADR-040)
-├── origin_engine, flags (illegible, suspicious_instruction, low_agreement, …)
+├── origin_engine, flags (illegible, suspicious_instruction, low_agreement, hidden, …)
 ├── time_range: reserved for audio/video
 └── removed, removed_by, reason
 ```
@@ -102,7 +102,7 @@ Models are immutable, strictly validated pydantic models (ADR-037): a change is 
 |---|---|---|
 | Source | `fetch(ref) → content + metadata` | Reaches the internet only through the network gateway (ADR-016, ADR-036) |
 | Container | `list() → entries`, `open(entry) → content` | Folders, archives, emails, PDFs with attachments (ADR-020) |
-| Extractor | `supports(input) → score`, `extract(input) → stream of Page` | Router picks the best score |
+| Extractor | `supports(input) → score`, `extract(input) → stream of Page` | Router picks the best score; PDFs are parsed in an isolated worker (ADR-043) |
 | Analyzer | `observe(page)`, `finalize() → stats` | For cleaners needing document-wide context |
 | Cleaner | `propose(page, stats) → [Decision]` | **Proposes**; the core validates and applies (ADR-028); minimal internal form in ADR-041 |
 | Detector | `detect(page) → [Annotation]` | Chat, code, tables, UI chrome, injection attempts |
@@ -637,6 +637,7 @@ Versioning: SemVer; 0.x may change contracts with notice; 1.0 when contracts are
 |---|---|
 | PP-OCRv6 availability in RapidOCR packages (else convert to ONNX) | Verified: `rapidocr` 3.10.0 bundles PP-OCRv6 *small* (ADR-039) |
 | Deskew and perspective correction of document photos | Deferred: separate pull request after the layout module (2c) |
+| PyMuPDF 2.x adoption: 1.28.2 used while step 5a is written; move to 2.0 (or 2.0.x with MuPDF ≥ 1.28.6) after 2026-11-02, check its new dependencies and that its layout module never downloads models (ADR-043) | **Blocks merging step 5a** |
 | OCR speed on the reference machine: dense phone screenshot ~7.4 s warm with the bundled small models vs < 2 s target; tiny models ~2.1 s but no Japanese (`benchmarks/ocr_speed.py`, ADR-039) | Decision pending |
 | PaddleOCR-VL on macOS | To verify |
 | Exact options to redirect Docling, RapidOCR and Hugging Face caches | To verify |

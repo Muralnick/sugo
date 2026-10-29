@@ -17,7 +17,6 @@ All rules are deliberately conservative; see the thresholds in
 """
 
 import re
-import statistics
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -32,6 +31,7 @@ from sugo.core.constants import (
 )
 from sugo.core.models import BlockType, ChatSide
 from sugo.extractors.image.ocr_engine import OcrLine
+from sugo.extractors.reading_order import indented
 
 Rows = Sequence[Sequence[OcrLine]]
 
@@ -124,19 +124,6 @@ def _code_or_paragraph(rows: Rows) -> Detection:
     # Two rows at least: a one-row heading such as "For these reasons:" must not
     # become code. A lone command on one row stays text, the cautious choice.
     if signals >= CODE_MIN_SIGNAL_ROWS and signals >= CODE_MIN_SIGNAL_SHARE * len(texts):
-        return Detection(BlockType.CODE, _indented(rows))
+        code = indented([list(row) for row in rows], lambda line: line.text)
+        return Detection(BlockType.CODE, code)
     return Detection(BlockType.PARAGRAPH, plain_text(rows))
-
-
-def _indented(rows: Rows) -> str:
-    """Rebuild leading spaces from each row's left edge (OCR drops indentation)."""
-    widths = [
-        (line.bbox.x1 - line.bbox.x0) / len(line.text) for row in rows for line in row if line.text
-    ]
-    char_width = statistics.median(widths) if widths else 0.0
-    left = min(row[0].bbox.x0 for row in rows)
-    result = []
-    for row in rows:
-        indent = round((row[0].bbox.x0 - left) / char_width) if char_width > 0 else 0
-        result.append(" " * indent + " ".join(line.text for line in row))
-    return "\n".join(result)

@@ -138,3 +138,64 @@ MARKDOWN_MAX_STRUCTURE_INDENT: Final = 3
 
 # CommonMark expands a tab in indentation to the next multiple of four columns.
 MARKDOWN_TAB_STOP: Final = 4
+
+# --- PDF extractor (roadmap step 5a, ADR-043) --------------------------------
+
+# Largest PDF file read into memory. Scanned books reach a few hundred MB, but
+# v0.1 targets native documents; bigger files are refused before parsing.
+MAX_PDF_FILE_BYTES: Final = 200 * 1024 * 1024
+
+# Most pages read from one PDF. A long book has about 1 000 pages; a file
+# declaring far more is a mistake or an attack on time and memory.
+MAX_PDF_PAGES: Final = 5_000
+
+# Address space of the PDF worker process (Linux and macOS). MuPDF needs a few
+# hundred MB on large pages; a hostile file that asks for more is stopped by
+# the operating system instead of slowing the whole machine (ADR-018).
+PDF_WORKER_MEMORY_BYTES: Final = 1536 * 1024 * 1024
+
+# Seconds the worker may take to open and check a document, and to return one
+# page. Native pages take milliseconds; a page that takes longer is hostile or
+# broken, and the worker is killed (ARCHITECTURE §4, error handling).
+PDF_OPEN_TIMEOUT_S: Final = 60.0
+PDF_PAGE_TIMEOUT_S: Final = 30.0
+
+# Times the worker is restarted after a page kills or stalls it. Each failed
+# page is marked illegible; beyond this many the document is refused, since
+# the file is evidently built to crash the parser.
+PDF_MAX_WORKER_RESTARTS: Final = 3
+
+# Largest message the worker may send: a page rendered for OCR at the limits
+# below, plus room for its header. Anything bigger is a broken worker.
+PDF_MAX_MESSAGE_BYTES: Final = 64 * 1024 * 1024
+
+# Resolution used to check whether text is visible: 72 DPI renders an A4 page
+# in a few milliseconds and keeps 6 pt text a few pixels high.
+PDF_VISIBILITY_DPI: Final = 72
+
+# Text smaller than this many points cannot be read on a printed page; it is
+# a classic way to hide instructions from people but not from LLMs.
+PDF_MIN_VISIBLE_FONT_SIZE: Final = 2.0
+
+# Colour distance (0-255, largest channel difference) under which text is
+# considered the same colour as the page behind it: white on white, or text
+# under an opaque shape. Anti-aliased small text still differs by 60 or more.
+PDF_MIN_TEXT_CONTRAST: Final = 32
+
+# Pages are read with OCR when images cover at least this share of the page
+# and less than this many characters of visible text exist: a scan, possibly
+# with a stamp or page number in native text.
+PDF_SCAN_MIN_IMAGE_COVERAGE: Final = 0.5
+PDF_SCAN_MAX_VISIBLE_CHARS: Final = 20
+
+# Resolution used to render scanned pages for OCR (ADR-018 adaptive DPI: an
+# A4 page at 200 DPI is about 12 MB), lowered when a page is large so the
+# image never exceeds the pixel limit below.
+PDF_OCR_DPI: Final = 200
+PDF_OCR_MAX_PIXELS: Final = 20_000_000
+
+# A text block is a heading when its font is at least this many times the
+# page's body text size. Initial value, to be calibrated (step 8).
+PDF_HEADING_MIN_SIZE_RATIO: Final = 1.2
+# ...and it has at most this many lines: a large-print paragraph is not a heading.
+PDF_HEADING_MAX_LINES: Final = 3
