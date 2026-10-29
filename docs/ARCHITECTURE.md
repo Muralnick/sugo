@@ -223,7 +223,7 @@ Safeguards: OCR/VLM **cross-check** with agreement score, low-agreement blocks f
 | Logs | `~/.local/state/sugo/` | Rotated structured logs |
 | Runtime | `$XDG_RUNTIME_DIR/sugo/` | Engine socket, cleared at logout |
 
-Equivalent paths on Windows and macOS via `platformdirs`; every path overridable (`SUGO_CACHE_DIR`, `SUGO_DATA_DIR`) for Docker volumes.
+Equivalent paths on Windows and macOS via `platformdirs`; every path overridable (`SUGO_CACHE_DIR`, `SUGO_DATA_DIR`) for Docker volumes. Cache format, keys and limits: ADR-045.
 
 - **Two-level per-page cache**: extraction (page hash + engine + model revision) and cleaning/output (extraction key + cleaning-config hash + Sugo version). Changing compression reuses OCR; a new manual edition reprocesses only changed pages.
 - **Checkpoint = cache**: an interrupted job resumes because completed pages are cache hits.

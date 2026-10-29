@@ -138,3 +138,26 @@ MARKDOWN_MAX_STRUCTURE_INDENT: Final = 3
 
 # CommonMark expands a tab in indentation to the next multiple of four columns.
 MARKDOWN_TAB_STOP: Final = 4
+
+# --- Page cache (roadmap step 5c, ADR-045) -----------------------------------
+
+# Default size limit of the page cache; least recently used pages go first.
+# A 300-page book takes about 2 MB of compressed page records, so 2 GB keeps
+# hundreds of books, while staying small next to the models (ADR-019).
+CACHE_MAX_BYTES: Final = 2 * 1024 * 1024 * 1024
+
+# When the limit is passed, eviction goes down to this share of it, so the
+# next few pages do not each trigger another eviction.
+CACHE_EVICT_TO_SHARE: Final = 0.9
+
+# Pages are not cached when less free disk space than this would remain: the
+# cache is optional, and filling the disk would break the user's other work.
+CACHE_MIN_FREE_BYTES: Final = 512 * 1024 * 1024
+
+# Largest decompressed page record read back from the cache, the same bound
+# as a PDF worker frame. A bigger record is corrupt or forged and is dropped.
+CACHE_MAX_RECORD_BYTES: Final = 64 * 1024 * 1024
+
+# Seconds a process waits for another one writing to the same cache, e.g.
+# two CLI commands run at once, before giving up on that cache operation.
+CACHE_BUSY_TIMEOUT_S: Final = 5.0
