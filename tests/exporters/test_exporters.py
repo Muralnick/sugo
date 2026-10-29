@@ -110,3 +110,12 @@ def test_published_schema_matches_the_model() -> None:
     # Regenerate with: uv run python -c "import json; from sugo.core.chunks import
     # chunk_json_schema; print(json.dumps(chunk_json_schema(), indent=2, ensure_ascii=False))"
     assert json.loads(SCHEMA_FILE.read_text()) == chunk_json_schema()
+
+
+def test_front_matter_keeps_emoji_and_escapes_what_yaml_forbids() -> None:
+    title = "emoji \U0001f600 line" + chr(0x2028) + "sep \x85 \x7f end"
+    rendered = front_matter({"title": title})
+    line = rendered.splitlines()[1]
+    assert "\U0001f600" in line
+    assert "\\ud83d" not in line
+    assert line.endswith('"emoji \U0001f600 line\\u2028sep \\u0085 \\u007f end"')

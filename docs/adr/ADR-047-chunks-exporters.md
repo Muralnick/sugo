@@ -38,17 +38,18 @@ Roadmap step 6 turns a converted document into what RAG pipelines load: chunks w
 
 `sugo.chunkers.sections.SectionChunker` streams cleaned pages (pass 4, run alongside pass 3 so each page is read once), default 512 tokens, minimum 32:
 
-- a heading closes the chunk before it, unless that chunk holds only headings;
-- a block that does not fit starts a new chunk; tables are never split, even past the limit;
-- a longer paragraph is split at sentence ends (Latin and CJK punctuation), code at line ends (each piece stays fenced), then between words, and only as a last resort inside a word;
-- removed blocks are left out exactly as in the Markdown; illegible blocks stay as `[illegible]`. A property test checks on random text that every character of the Markdown reaches the chunks, in order, and that no chunk passes the limit.
+- a heading closes the chunk before it, unless that chunk holds only headings that the new one does not close (a heading at the same level or above ends the previous heading's empty section, so a chunk's heading path names every heading in it);
+- **a heading always travels with the text after it:** when the first block of a section does not fit beside its headings, that block is split so its first piece does (headings taking more than half the limit form their own chunk);
+- a block that does not fit starts a new chunk; tables are never split, even past the limit, and stay with their section's headings;
+- a longer paragraph is split after sentence ends followed by a space (so "3.14" is not cut), after CJK sentence punctuation or after line breaks; code after line breaks (each piece stays fenced); then between words, and only as a last resort inside a word. **Pieces are exact slices of the text**, spaces and line breaks included, except at their two ends. After the first piece of a list item the rest is plain text, so one bullet never becomes several; chat messages keep their speaker on every piece;
+- removed blocks are left out exactly as in the Markdown; illegible blocks stay as `[illegible]`. Property tests check on random text that every character of the Markdown reaches the chunks, in order, that split pieces are exact slices separated only by whitespace, and that no chunk passes the limit.
 - Token counts are estimated from the blocks and counted exactly near the limit; the recorded `tokens` is always exact.
 
 `convert(..., source=..., max_chunk_tokens=...)` returns the chunks with the Markdown; no chunks unless asked.
 
 ### Exporters
 
-- `write_markdown(path, markdown, metadata=None)`: optional YAML front matter, off by default (it costs tokens on every read); values are written as JSON strings, valid YAML scalars that document text cannot break out of.
+- `write_markdown(path, markdown, metadata=None)`: optional YAML front matter, off by default (it costs tokens on every read); values are double-quoted scalars: JSON escapes for quotes, backslashes and controls, plus `\uXXXX` escapes for what YAML forbids or reads as line breaks (C1 controls, U+2028, U+2029, U+FFFE, U+FFFF); emoji and other text are written as they are, since YAML has no surrogate-pair escapes; a lone surrogate becomes U+FFFD.
 - `write_jsonl(path, chunks)`: one record per line; besides JSON's own escapes, U+0085, U+2028 and U+2029 are escaped, since some readers (Python's `str.splitlines`) treat them as line ends.
 - Both write **atomically** (temporary file in the same folder, flushed, renamed): a crash or a full disk leaves the previous output intact. New files are created owner-only (0600), like everything Sugo writes with document text.
 - Import-linter contracts keep chunkers and exporters away from extractors, cleaners, caches and networks.

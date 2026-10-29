@@ -195,3 +195,80 @@ def test_no_text_is_lost_and_no_chunk_is_too_big(texts: list[str], max_tokens: i
         return "".join(words(text)).replace("\\", "")
 
     assert letters(" ".join(c.text for c in chunks)) == letters(render(blocks))
+
+
+def test_long_word_before_others_is_cut_within_the_limit() -> None:
+    chunks = chunk([page(0, para("p", "x" * 600 + " b c d"))], max_tokens=40)
+    assert all(c.tokens <= 40 for c in chunks)
+    assert "".join(c.text for c in chunks).replace(" ", "") == "x" * 600 + "bcd"
+
+
+def test_split_keeps_cjk_text_exactly() -> None:
+    text = "这是第一句话。" * 60
+    chunks = chunk([page(0, para("p", text))], max_tokens=40)
+    assert len(chunks) > 1
+    assert "".join(c.text for c in chunks) == text
+
+
+def test_split_keeps_line_breaks() -> None:
+    text = "\n".join(f"Address line {n}, Street {n}" for n in range(40))
+    chunks = chunk([page(0, para("p", text))], max_tokens=40)
+    assert len(chunks) > 1
+    assert "\n".join(c.text for c in chunks) == text
+
+
+def test_heading_stays_with_a_long_first_paragraph() -> None:
+    long = " ".join(f"Sentence {n} of the opening paragraph." for n in range(40))
+    chunks = chunk([page(0, heading("h", "Introduction"), para("p", long))], max_tokens=64)
+    assert chunks[0].text.startswith("# Introduction\n\nSentence 0")
+    assert all(c.tokens <= 64 for c in chunks)
+    assert not any(c.text == "# Introduction" for c in chunks)
+
+
+def test_heading_stays_with_a_paragraph_that_fits_only_alone() -> None:
+    sentence = "Words that fill the chunk almost to the limit. " * 5
+    chunks = chunk(
+        [page(0, heading("h", "Title of the section"), para("p", sentence))], max_tokens=60
+    )
+    assert chunks[0].text.startswith("# Title of the section\n\nWords")
+    assert all(c.tokens <= 60 for c in chunks)
+
+
+def test_split_list_item_stays_one_item() -> None:
+    item = Block(
+        id="l",
+        type=BlockType.LIST_ITEM,
+        text=" ".join(f"Point {n} of a very long bullet." for n in range(30)),
+        origin_engine="t",
+    )
+    chunks = chunk([page(0, item)], max_tokens=40)
+    assert len(chunks) > 1
+    assert [c.text.startswith("- ") for c in chunks] == [True] + [False] * (len(chunks) - 1)
+
+
+def test_heading_path_names_every_heading_in_the_chunk() -> None:
+    chunks = chunk([page(0, heading("a", "A", 2), heading("b", "B", 1), para("p", "Text."))])
+    assert [(c.text, c.heading_path) for c in chunks] == [
+        ("## A", ("A",)),
+        ("# B\n\nText.", ("B",)),
+    ]
+
+
+_PLAIN = st.text(
+    alphabet=st.sampled_from([*"abcdefgh ,.!?\n", "这", "。"]), min_size=1, max_size=600
+)
+
+
+@settings(max_examples=40, deadline=None)
+@given(_PLAIN.filter(lambda text: text.strip() != ""), st.integers(min_value=32, max_value=80))
+def test_pieces_are_exact_slices_of_the_paragraph(text: str, max_tokens: int) -> None:
+    chunks = chunk([page(0, para("p", text))], max_tokens=max_tokens)
+    rendered = render([para("p", text)])
+    position = 0
+    for c in chunks:
+        found = rendered.index(c.text, position)
+        # Only whitespace is dropped, and only between pieces.
+        assert rendered[position:found].strip() == ""
+        position = found + len(c.text)
+    assert rendered[position:].strip() == ""
+    assert all(c.tokens <= max_tokens for c in chunks)
