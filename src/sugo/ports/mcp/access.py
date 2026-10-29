@@ -1,16 +1,21 @@
 """Which files an agent may read: inside an allowed root, never an excluded one.
 
 An agent can be tricked by the documents it reads into asking for
-``~/.ssh/id_ed25519`` (THREAT_MODEL D). Every path is therefore resolved,
-symbolic links included, and checked against the roots the user gave to
-``sugo mcp --root`` **before** Sugo even looks whether the file exists, so
-an agent cannot probe the rest of the disk. Files and folders that hold keys
+``~/.ssh/id_ed25519`` (THREAT_MODEL D). Every path is checked against the
+roots the user gave to ``sugo mcp --root`` twice: first by its text alone,
+before any file access, then resolved with its symbolic links. Sugo never
+touches a path outside the roots, not even to see whether it exists: on
+Windows, opening ``\\\\host\\share`` would send the user's credentials to
+that host (security review of ADR-049). UNC, device and stream paths are
+refused outright. Files and folders that hold keys
 and passwords are refused everywhere, whatever the roots (principle 7).
 """
 
 import fnmatch
+import os
+import re
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from sugo.core.constants import (
     MCP_EXCLUDED_DIRS,
@@ -19,6 +24,8 @@ from sugo.core.constants import (
     MCP_MAX_PATH_CHARS,
 )
 from sugo.ports.errors import ExitCode, PortError
+
+_DRIVE_LETTER = re.compile(r"[A-Za-z]:")
 
 
 @dataclass(frozen=True)
@@ -59,13 +66,19 @@ class Roots:
         Raises:
             PortError: PATH_NOT_ALLOWED, PATH_EXCLUDED or FILE_UNREADABLE.
         """
-        if not raw or len(raw) > MCP_MAX_PATH_CHARS or "\x00" in raw:
+        if not raw or len(raw) > MCP_MAX_PATH_CHARS or "\x00" in raw or _unusual_windows(raw):
             raise _not_allowed()
         given = Path(raw)
         candidates = [given] if given.is_absolute() else [root / given for root in self._roots]
         inside = False
         for candidate in candidates:
-            # Not strict: whether the file exists is only checked inside a root.
+            # First by text alone: resolving touches the file system, and on
+            # Windows opening a network path sends the user's credentials.
+            lexical = Path(os.path.normpath(os.path.abspath(candidate)))
+            if not any(lexical.is_relative_to(root) for root in self._roots):
+                continue
+            # Then for real, links included. Not strict: whether the file
+            # exists is only checked inside a root.
             resolved = candidate.resolve(strict=False)
             root = next((root for root in self._roots if resolved.is_relative_to(root)), None)
             if root is None:
@@ -94,6 +107,21 @@ class Roots:
                 exit_code=ExitCode.ERROR,
             )
         raise _not_allowed()
+
+
+def _unusual_windows(raw: str) -> bool:
+    """True for Windows path forms an agent never needs, refused before any file access.
+
+    UNC and device paths (``\\\\host\\share``, ``//host/share``, ``\\\\?\\``,
+    ``\\\\.\\``) would open a network or device connection; a colon after the
+    drive names an alternate data stream.
+    """
+    if os.name != "nt":
+        return False
+    path = PureWindowsPath(raw)
+    if path.drive and not _DRIVE_LETTER.fullmatch(path.drive):
+        return True
+    return ":" in raw[len(path.drive) :]
 
 
 def _not_allowed() -> PortError:

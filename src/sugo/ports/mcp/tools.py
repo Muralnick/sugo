@@ -182,7 +182,10 @@ class ToolRunner:
             "parts": len(pages),
             "next_cursor": None if next_cursor is None else next_cursor.encode(),
         }
-        return [json.dumps(metadata), wrap(pages[index], conversion.source_sha256)]
+        return [
+            json.dumps(metadata),
+            wrap(pages[index], conversion.source_sha256, json_lines=chunks),
+        ]
 
     def _estimate_savings(self, arguments: EstimateSavings) -> list[str]:
         from sugo.core.estimate import estimate_json, estimate_savings

@@ -102,3 +102,59 @@ def test_relative_paths_are_tried_in_every_root(tmp_path: Path) -> None:
     second.mkdir()
     (second / "b.png").write_bytes(b"\x89PNG")
     assert Roots([first, second]).check("b.png").path == (second / "b.png").resolve()
+
+
+def test_paths_outside_the_roots_never_touch_the_file_system(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    resolved: list[Path] = []
+    original = Path.resolve
+
+    def recording(self: Path, strict: bool = False) -> Path:
+        resolved.append(self)
+        return original(self, strict=strict)
+
+    monkeypatch.setattr(Path, "resolve", recording)
+    roots = Roots([root])
+    resolved.clear()
+    assert code(roots, str(root.parent / "outside.pdf")) == "PATH_NOT_ALLOWED"
+    assert code(roots, "../outside.pdf") == "PATH_NOT_ALLOWED"
+    assert resolved == []
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows path forms")
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "\\\\192.0.2.1\\share\\x.pdf",
+        "//192.0.2.1/share/x.pdf",
+        "\\\\attacker.example@SSL@443\\dav\\x.pdf",
+        "\\\\?\\UNC\\192.0.2.1\\share\\x.pdf",
+        "\\\\.\\pipe\\sugo",
+        "\\\\?\\C:\\x.pdf",
+        # Rooted without a drive: taken on the root's drive, outside the root.
+        "\\192.0.2.1\\share\\x.pdf",
+        "contracts/a.pdf::$DATA",
+        "contracts/a.pdf:hidden",
+    ],
+)
+def test_network_device_and_stream_paths_are_refused_before_any_access(
+    root: Path, monkeypatch: pytest.MonkeyPatch, raw: str
+) -> None:
+    roots = Roots([root])
+    # Resolving opens the path; os.path.abspath only rewrites the text.
+    touched: list[object] = []
+    original_resolve = Path.resolve
+
+    def resolve(self: Path, strict: bool = False) -> Path:
+        touched.append(self)
+        return original_resolve(self, strict=strict)
+
+    monkeypatch.setattr(Path, "resolve", resolve)
+    try:
+        roots.check(raw)
+    except PortError as error:
+        refused = error.code
+    monkeypatch.undo()
+    assert refused == "PATH_NOT_ALLOWED"
+    assert touched == []
