@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from sugo.ports.cli.errors import CliError
+from sugo.ports.errors import PortError
 from sugo.ports.mcp.access import Roots, is_excluded
 
 
@@ -19,7 +19,7 @@ def root(tmp_path: Path) -> Path:
 
 
 def code(roots: Roots, raw: str) -> str:
-    with pytest.raises(CliError) as caught:
+    with pytest.raises(PortError) as caught:
         roots.check(raw)
     return caught.value.code
 

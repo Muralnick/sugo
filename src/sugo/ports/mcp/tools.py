@@ -5,6 +5,7 @@ schemas are generated from the same models (ARCHITECTURE §12). Tools only
 read: they never write, install, download or delete (principle 10).
 """
 
+import hashlib
 import json
 from collections.abc import Callable
 from typing import Annotated, Any, Literal
@@ -22,7 +23,8 @@ from sugo.core.constants import (
 )
 from sugo.core.pipeline import convert, read_input
 from sugo.metrics.providers import list_providers
-from sugo.ports.cli.errors import unreadable
+from sugo.metrics.tokenizer import count_tokens
+from sugo.ports.errors import unreadable
 from sugo.ports.mcp.access import Allowed, Roots
 from sugo.ports.mcp.pages import Cursor, invalid_cursor, paginate_lines, paginate_text, wrap
 from sugo.storage.page_cache import PageCache
@@ -131,7 +133,7 @@ class ToolRunner:
         """Run one tool; return its text contents.
 
         Raises:
-            CliError: For failures the agent can act on.
+            PortError: For failures the agent can act on.
             InvalidArgumentsError: For arguments that name nothing known.
         """
         return self._handlers[name](arguments)
@@ -146,22 +148,28 @@ class ToolRunner:
             source=allowed.source,
             max_chunk_tokens=CHUNK_MAX_TOKENS if chunks else None,
         )
-        budget = arguments.max_tokens - MCP_WRAPPER_TOKENS
+        # The metadata repeats the source, so a long path takes from the text.
+        budget = arguments.max_tokens - MCP_WRAPPER_TOKENS - count_tokens(allowed.source)
+        if budget < MCP_MIN_TOKENS // 2:
+            raise InvalidArgumentsError("the path is too long for this max_tokens; raise it")
         if chunks:
             from sugo.exporters.jsonl import jsonl_lines
 
-            pages = paginate_lines(jsonl_lines(conversion.chunks), budget)
+            content = "".join(jsonl_lines(conversion.chunks))
+            pages = paginate_lines(content.splitlines(keepends=True), budget)
         else:
-            pages = paginate_text(conversion.markdown, budget)
+            content = conversion.markdown
+            pages = paginate_text(content, budget)
+        digest = hashlib.sha256(content.encode("utf-8", "surrogatepass")).hexdigest()
         index = 0
         if cursor is not None:
-            expected = (conversion.source_sha256, arguments.output, arguments.max_tokens)
-            found = (cursor.source_sha256, cursor.output, cursor.max_tokens)
+            expected = (digest, arguments.output, arguments.max_tokens)
+            found = (cursor.content_sha256, cursor.output, cursor.max_tokens)
             if found != expected or cursor.page >= len(pages):
                 raise invalid_cursor()
             index = cursor.page
         next_cursor = (
-            Cursor(conversion.source_sha256, arguments.output, arguments.max_tokens, index + 1)
+            Cursor(digest, arguments.output, arguments.max_tokens, index + 1)
             if index + 1 < len(pages)
             else None
         )

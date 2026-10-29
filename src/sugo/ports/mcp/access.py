@@ -18,7 +18,7 @@ from sugo.core.constants import (
     MCP_EXCLUDED_PATTERNS,
     MCP_MAX_PATH_CHARS,
 )
-from sugo.ports.cli.errors import CliError, ExitCode
+from sugo.ports.errors import ExitCode, PortError
 
 
 @dataclass(frozen=True)
@@ -57,7 +57,7 @@ class Roots:
         A relative path is taken from each root in turn.
 
         Raises:
-            CliError: PATH_NOT_ALLOWED, PATH_EXCLUDED or FILE_UNREADABLE.
+            PortError: PATH_NOT_ALLOWED, PATH_EXCLUDED or FILE_UNREADABLE.
         """
         if not raw or len(raw) > MCP_MAX_PATH_CHARS or "\x00" in raw:
             raise _not_allowed()
@@ -72,7 +72,7 @@ class Roots:
                 continue
             inside = True
             if is_excluded(resolved):
-                raise CliError(
+                raise PortError(
                     code="PATH_EXCLUDED",
                     message="This file is in a location Sugo never reads for agents.",
                     exit_code=ExitCode.SECURITY,
@@ -81,14 +81,14 @@ class Roots:
             if not resolved.is_file():
                 if len(candidates) > 1 and not resolved.exists():
                     continue
-                raise CliError(
+                raise PortError(
                     code="FILE_UNREADABLE",
                     message="No such file, or not a regular file.",
                     exit_code=ExitCode.ERROR,
                 )
             return Allowed(path=resolved, source=resolved.relative_to(root).as_posix())
         if inside:
-            raise CliError(
+            raise PortError(
                 code="FILE_UNREADABLE",
                 message="No such file in the allowed roots.",
                 exit_code=ExitCode.ERROR,
@@ -96,8 +96,8 @@ class Roots:
         raise _not_allowed()
 
 
-def _not_allowed() -> CliError:
-    return CliError(
+def _not_allowed() -> PortError:
+    return PortError(
         code="PATH_NOT_ALLOWED",
         message="This path is outside the folders Sugo was allowed to read.",
         exit_code=ExitCode.SECURITY,

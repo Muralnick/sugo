@@ -1,6 +1,8 @@
 """Tests for the MCP server: protocol messages, both tools, paging and refusals."""
 
+import dataclasses
 import json
+import os
 import subprocess
 import sys
 from io import BytesIO
@@ -11,8 +13,11 @@ import pymupdf
 import pytest
 from typer.testing import CliRunner
 
+from sugo.core import pipeline
+from sugo.metrics.tokenizer import count_tokens
 from sugo.ports.cli import app as cli
 from sugo.ports.mcp import server as mcp_server
+from sugo.ports.mcp import tools
 from sugo.ports.mcp.access import Roots
 from sugo.ports.mcp.server import Server, run
 from sugo.ports.mcp.tools import ToolRunner
@@ -232,9 +237,48 @@ def test_real_process_speaks_only_protocol_on_stdout(root: Path, tmp_path: Path)
         capture_output=True,
         timeout=120,
         check=False,
-        env={**__import__("os").environ, CACHE_DIR_ENV: str(tmp_path / "cache2")},
+        env={**os.environ, CACHE_DIR_ENV: str(tmp_path / "cache2")},
     )
     assert completed.returncode == 0, completed.stderr.decode(errors="replace")
     responses = [json.loads(line) for line in completed.stdout.splitlines()]
     assert [response["id"] for response in responses] == [1, 2]
     assert responses[1]["result"]["isError"] is False
+
+
+def test_client_that_goes_away_ends_the_server_quietly(root: Path) -> None:
+    class Closed(BytesIO):
+        def write(self, data: object) -> int:
+            raise BrokenPipeError(32, "Broken pipe")
+
+    server = Server(ToolRunner(Roots([root]), cache=None))
+    run(server, BytesIO(b'{"jsonrpc": "2.0", "id": 1, "method": "ping"}\n'), Closed())
+
+
+def test_cursor_is_refused_when_the_rendering_changes(
+    server: Server, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = call(server, "convert_document", path="book.pdf", max_tokens=1_024)["result"]
+    cursor = json.loads(first["content"][0]["text"])["next_cursor"]
+    # Same file, but Sugo now renders it differently (an upgrade, new settings).
+    original = pipeline.convert
+
+    def rendered_differently(*args: Any, **kwargs: Any) -> Any:
+        conversion = original(*args, **kwargs)
+        return dataclasses.replace(conversion, markdown=conversion.markdown + "\n\nNew text.")
+
+    monkeypatch.setattr(tools, "convert", rendered_differently)
+    second = call(server, "convert_document", path="book.pdf", max_tokens=1_024, cursor=cursor)
+    error = json.loads(second["result"]["content"][0]["text"])["error"]
+    assert error["code"] == "CURSOR_INVALID"
+
+
+def test_long_paths_leave_the_response_within_budget(tmp_path: Path) -> None:
+    deep = tmp_path / "root"
+    folder = deep / "/".join(["a-rather-long-folder-name"] * 40)
+    folder.mkdir(parents=True)
+    (folder / "book.pdf").write_bytes(book(2))
+    started = Server(ToolRunner(Roots([deep]), cache=None))
+    started.handle(request("initialize", {}))
+    relative = (folder / "book.pdf").relative_to(deep).as_posix()
+    result = call(started, "convert_document", path=relative, max_tokens=1_024)["result"]
+    assert sum(count_tokens(item["text"]) for item in result["content"]) <= 1_024

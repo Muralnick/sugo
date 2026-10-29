@@ -23,7 +23,7 @@ from typing import IO, Any
 from pydantic import ValidationError
 
 from sugo.core.constants import MCP_MAX_MESSAGE_BYTES
-from sugo.ports.cli.errors import CliError, from_exception
+from sugo.ports.errors import PortError, from_exception
 from sugo.ports.mcp.access import Roots
 from sugo.ports.mcp.tools import TOOLS, InvalidArgumentsError, ToolRunner, tool_list
 from sugo.storage.page_cache import PageCache
@@ -104,7 +104,7 @@ class Server:
         except InvalidArgumentsError as error:
             return _error(request_id, INVALID_PARAMS, str(error))
         except Exception as error:  # noqa: BLE001 - the server outlives a failing tool
-            failure = error if isinstance(error, CliError) else from_exception(error)
+            failure = error if isinstance(error, PortError) else from_exception(error)
             if failure is None:
                 # A bug: logged for the user, without the message, which could
                 # in principle carry text from the document.
@@ -161,8 +161,12 @@ def run(server: Server, reader: IO[bytes], writer: IO[bytes]) -> None:
                 else:
                     response = server.handle(message)
         if response is not None:
-            writer.write(json.dumps(response, ensure_ascii=False).encode("utf-8") + b"\n")
-            writer.flush()
+            try:
+                writer.write(json.dumps(response, ensure_ascii=False).encode("utf-8") + b"\n")
+                writer.flush()
+            except BrokenPipeError:
+                # The client went away: nobody is left to answer.
+                return
 
 
 def _lines(reader: IO[bytes]) -> Iterator[bytes | None]:

@@ -26,9 +26,9 @@ from typer.core import TyperGroup
 
 from sugo.core.constants import CHUNK_MAX_TOKENS, CHUNK_MIN_TOKENS
 from sugo.ports.cli.doctor import Status, missing_lite_packages, run_checks
-from sugo.ports.cli.errors import (
-    CliError,
+from sugo.ports.errors import (
     ExitCode,
+    PortError,
     from_exception,
     level_missing,
     unreadable,
@@ -152,7 +152,7 @@ def convert_command(
         if output is not None:
             _make_folder(output)
         documents: list[dict[str, Any]] = []
-        errors: list[CliError] = []
+        errors: list[PortError] = []
         partial = False
         with _page_cache(enabled=not no_cache) as cache:
             for path in files:
@@ -230,7 +230,7 @@ def _write_outputs(
         if rest:
             write_jsonl(rest[0], conversion.chunks)
     except OSError as error:
-        raise CliError(
+        raise PortError(
             code="OUTPUT_UNWRITABLE",
             message=error.strerror or "the output could not be written",
             exit_code=ExitCode.ERROR,
@@ -450,8 +450,8 @@ def _require_lite() -> None:
         raise level_missing(missing)
 
 
-def _as_cli_error(error: Exception) -> CliError | None:
-    return error if isinstance(error, CliError) else from_exception(error)
+def _as_cli_error(error: Exception) -> PortError | None:
+    return error if isinstance(error, PortError) else from_exception(error)
 
 
 @contextmanager
@@ -505,7 +505,7 @@ def _make_folder(output: Path) -> None:
     try:
         output.mkdir(parents=True, exist_ok=True)
     except OSError as error:
-        raise CliError(
+        raise PortError(
             code="OUTPUT_UNWRITABLE",
             message=error.strerror or "the output folder could not be created",
             exit_code=ExitCode.ERROR,
@@ -513,7 +513,7 @@ def _make_folder(output: Path) -> None:
         ) from error
 
 
-def _finish(total: int, errors: list[CliError], *, partial: bool) -> None:
+def _finish(total: int, errors: list[PortError], *, partial: bool) -> None:
     """Exit with the code for the whole run: one broken file never hides the others."""
     if not errors:
         if partial:
@@ -549,7 +549,7 @@ def _document_json(
     return document
 
 
-def _failed_json(source: str, error: CliError) -> dict[str, Any]:
+def _failed_json(source: str, error: PortError) -> dict[str, Any]:
     return {"source": source, "status": "error", "error": error.as_json()}
 
 
@@ -561,7 +561,7 @@ def _say_converted(source: str, conversion: "Conversion", written: list[str] | N
         _stderr.print(Text(f"{source}: pages {pages} could not be read", style="yellow"))
 
 
-def _say_error(error: CliError, source: str | None = None) -> None:
+def _say_error(error: PortError, source: str | None = None) -> None:
     line = Text()
     if source is not None:
         line.append(f"{source}: ")

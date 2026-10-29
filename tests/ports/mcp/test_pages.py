@@ -5,7 +5,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from sugo.metrics.tokenizer import count_tokens
-from sugo.ports.cli.errors import CliError
+from sugo.ports.errors import PortError
 from sugo.ports.mcp.pages import Cursor, paginate_lines, paginate_text, wrap
 
 SHA = "ab" * 32
@@ -54,7 +54,7 @@ def test_cursor_round_trip_and_refusals() -> None:
     cursor = Cursor(SHA, "markdown", 8_000, 3)
     assert Cursor.decode(cursor.encode()) == cursor
     for bad in ("", "!!!", "x" * 600, Cursor(SHA, "markdown", 8_000, 0).encode(), "WzEsMl0"):
-        with pytest.raises(CliError) as caught:
+        with pytest.raises(PortError) as caught:
             Cursor.decode(bad)
         assert caught.value.code == "CURSOR_INVALID"
 

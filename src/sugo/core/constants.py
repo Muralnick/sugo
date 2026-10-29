@@ -317,11 +317,6 @@ MCP_MAX_MESSAGE_BYTES: Final = 1_000_000
 MCP_MAX_PATH_CHARS: Final = 4_096
 MCP_MAX_CURSOR_CHARS: Final = 512
 
-# Most characters one token can stand for in o200k_base on ordinary text; it
-# bounds the text measured when fitting a response page, so fitting stays
-# fast on long documents. A page that hits it is simply shorter.
-MCP_MAX_CHARS_PER_TOKEN: Final = 32
-
 # Hex digits of the content hash that labels a response's document wrapper.
 MCP_WRAPPER_ID_HEX_DIGITS: Final = 12
 
