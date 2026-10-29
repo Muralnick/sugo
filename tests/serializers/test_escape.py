@@ -4,6 +4,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
+from sugo.core.constants import MARKDOWN_TAB_STOP
 from sugo.serializers.escape import (
     ILLEGIBLE_MARKER,
     escape_heading,
@@ -62,10 +63,15 @@ def test_heading_closing_hashes_are_kept_as_text() -> None:
 
 @given(st.text(alphabet=st.characters(exclude_categories=["Cs"]), max_size=40))
 def test_escaping_only_adds_backslashes(line: str) -> None:
-    # Nothing is lost or rewritten: removing the added backslashes gives the text back.
+    # Nothing is lost or rewritten: removing the added backslashes gives the
+    # text back. Tabs in the indentation become spaces, as ADR-042 decides, so
+    # the width Markdown reads is the width that was checked.
+    stripped = line.lstrip(" \t")
+    indent = line[: len(line) - len(stripped)]
+    expected = (indent.expandtabs(MARKDOWN_TAB_STOP) if stripped else indent) + stripped
     escaped = escape_line(line)
-    assert len(escaped) - len(line) in (0, 1, 2) or ILLEGIBLE_MARKER in line
-    assert escaped.replace("\\", "") == line.replace("\\", "")
+    assert len(escaped) - len(expected) in (0, 1, 2) or ILLEGIBLE_MARKER in line
+    assert escaped.replace("\\", "") == expected.replace("\\", "")
 
 
 @pytest.mark.parametrize(
