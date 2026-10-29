@@ -65,6 +65,8 @@ def test_inline_image_abbreviation_is_recognised() -> None:
         b"/Filter " + b"% x\n" * 50_000,
         b"/Filter [" + b"1 " * 100_000,
     ],
+    # Short IDs: pytest stores the test ID in an environment variable, capped on Windows.
+    ids=["percent-signs", "nested-arrays", "comment-lines", "long-array"],
 )
 def test_hostile_bytes_are_scanned_in_linear_time(hostile: bytes) -> None:
     # Regular expressions that backtrack could be stalled for hours by such input.
