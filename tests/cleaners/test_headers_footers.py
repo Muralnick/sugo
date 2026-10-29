@@ -39,10 +39,10 @@ def clean(pages: list[Page]) -> list[Page]:
     """The step 5 cleaning order: hidden text, page numbers, then headers and footers."""
     stats = analyze(pages)
     out = []
+    cleaners = (HiddenTextCleaner(), PageNumberCleaner(), HeaderFooterCleaner())
     for p in pages:
-        hidden = HiddenTextCleaner()
-        p = apply_decisions(p, hidden.propose(p), cleaner=hidden.name)
-        for cleaner in (PageNumberCleaner(), HeaderFooterCleaner()):
+        # Every cleaner takes the same arguments (ARCHITECTURE §4).
+        for cleaner in cleaners:
             p = apply_decisions(p, cleaner.propose(p, stats), cleaner=cleaner.name)
         out.append(p)
     return out

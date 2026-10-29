@@ -2,8 +2,15 @@
 
 import pytest
 
-from sugo.analyzers.edges import Band, EdgeAnalyzer, EdgeStats, NumberSystem, edge_texts
-from sugo.core.constants import MAX_EDGE_BLOCKS_PER_BAND
+from sugo.analyzers.edges import (
+    Band,
+    EdgeAnalyzer,
+    EdgeStats,
+    NumberRule,
+    NumberSystem,
+    edge_texts,
+)
+from sugo.core.constants import MAX_EDGE_BLOCKS_PER_BAND, MAX_EDGE_TEXT_CHARS
 from sugo.core.models import BBox, Block, BlockFlag, BlockType, Page, PageOrigin
 
 TOP = BBox(x0=0.1, y0=0.03, x1=0.9, y1=0.06)
@@ -53,6 +60,8 @@ def test_edge_texts_reads_only_visible_text_blocks_in_the_bands() -> None:
         block("suspicious", "Footer", BOTTOM, BlockFlag.SUSPICIOUS_INSTRUCTION),
         block("removed", "Footer").mark_removed("other", "r"),
         block("code", "x = 1", kind=BlockType.CODE),
+        block("heading", "Part II", TOP, kind=BlockType.HEADING),
+        block("long", "word " * MAX_EDGE_TEXT_CHARS),
     )
     assert [(t.block_id, t.band) for t in edge_texts(p)] == [
         ("top", Band.TOP),
@@ -119,7 +128,10 @@ def test_numbers_following_the_page_index_are_repeated() -> None:
     stats = analyze(*pages)
     assert all(repeated(stats, p) == ["f"] for p in pages)
     (edge,) = stats.repeated.values()
-    assert edge.numbers == ("2026", 1)
+    assert edge.numbers == (
+        NumberRule(constant=2026),
+        NumberRule(offset=1),
+    )
 
 
 def test_numbers_neither_constant_nor_following_pages_are_not_repeated() -> None:
@@ -175,7 +187,7 @@ def test_substantive_text_is_marked_with_its_first_page() -> None:
         ("iiii", None),
         ("Chapter 7", None),
         ("7 apples", None),
-        ("1" * 5000, None),
+        ("1" * MAX_EDGE_TEXT_CHARS, None),
         ("Page " + "9" * 20, None),
     ],
 )
@@ -225,3 +237,55 @@ def test_observing_a_page_twice_is_refused() -> None:
     analyzer.observe(page(0))
     with pytest.raises(ValueError, match="observed twice"):
         analyzer.observe(page(0))
+
+
+def test_headings_at_the_top_of_pages_are_never_edge_text() -> None:
+    # Part numerals and numbered headings, one per page, look like page
+    # numbers and running headers; headings are content and stay.
+    pages = [
+        page(
+            i,
+            block("h", label, TOP, kind=BlockType.HEADING),
+            block("x", f"Exercise {i + 1}", TOP, kind=BlockType.HEADING),
+        )
+        for i, label in enumerate(["I", "II", "III"])
+    ]
+    stats = analyze(*pages)
+    assert (stats.repeated, stats.page_numbers) == ({}, frozenset())
+
+
+def test_hash_signs_and_digits_never_share_a_pattern() -> None:
+    # Masking digits with "#" once made these one pattern with different
+    # counts of numbers, and finalize() crashed.
+    pages = [page(i, block("f", text)) for i, text in enumerate(["Ref # 1", "Ref 1 1", "Ref # #"])]
+    assert analyze(*pages).repeated == {}
+
+
+def test_statistics_hold_no_long_digit_strings() -> None:
+    account = "Account 123456789012"
+    stats = analyze(*(page(i, block("f", account)) for i in range(3)))
+    (edge,) = stats.repeated.values()
+    (rule,) = edge.numbers
+    assert isinstance(rule.constant, bytes)
+    assert b"123456789012" not in rule.constant
+    assert repeated(stats, page(3, block("f", account))) == ["f"]
+    assert repeated(stats, page(3, block("f", "Account 123456789013"))) == []
+
+
+@pytest.mark.parametrize(
+    "clause",
+    [
+        "供应商对延误造成的所有损失承担责任",  # Chinese liability clause
+        "ผู้ขายต้องรับผิดชอบต่อความเสียหายทั้งหมดที่เกิดจากความล่าช้า",  # Thai, no spaces
+        "The\u3164buyer\u3164waives\u3164all\u3164refund\u3164rights\u3164forever",
+    ],
+)
+def test_clauses_without_spaces_are_substantive(clause: str) -> None:
+    stats = analyze(*(page(i, block("c", clause)) for i in range(3)))
+    assert [e.substantive for e in stats.repeated.values()] == [True]
+
+
+def test_substantive_text_with_changing_numbers_is_not_repeated() -> None:
+    # Later copies would not be identical to the kept one: their figures differ.
+    texts = [f"Late fee in month {i + 1} is {i + 2} percent of the price" for i in range(4)]
+    assert analyze(*(page(i, block("f", text)) for i, text in enumerate(texts))).repeated == {}

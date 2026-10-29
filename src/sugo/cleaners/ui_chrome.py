@@ -19,8 +19,12 @@ class UiChromeCleaner:
 
     name: ClassVar[str] = "ui_chrome"
 
-    def propose(self, page: Page) -> list[Decision]:
-        """Return one removal decision per UI chrome block not yet removed."""
+    def propose(self, page: Page, stats: object = None) -> list[Decision]:
+        """Return one removal decision per UI chrome block not yet removed.
+
+        ``stats`` is part of the cleaner contract and unused here: this
+        cleaner needs no document-wide context.
+        """
         return [
             Decision(block_id=block.id, reason=REASON)
             for block in page.blocks

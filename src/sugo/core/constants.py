@@ -228,6 +228,14 @@ REPEAT_MIN_DENSITY: Final = 0.4
 # "Payment is due within 30 days" has 6 words; "Confidential" or "Annual
 # Report 2026" are clearly boilerplate.
 SUBSTANTIVE_MIN_WORDS: Final = 6
+# ...or this many visible characters, for scripts written without spaces
+# (Thai, Khmer) and text spaced with characters that only look blank. A
+# 6-word English clause has about 30.
+SUBSTANTIVE_MIN_CHARS: Final = 40
+
+# Longest block read as page furniture. Running headers and footers are a
+# line or two; longer text is a paragraph and stays.
+MAX_EDGE_TEXT_CHARS: Final = 300
 
 # Longest edge text read as a page number, e.g. "Page 1234 of 5000" or
 # "- xii -". Longer text is a sentence, never a page number.
