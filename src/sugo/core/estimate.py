@@ -10,9 +10,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from sugo.core.pipeline import Conversion, InputKind
-from sugo.extractors.image.loader import decode_image
-from sugo.metrics.baselines import ImageSavings, Savings
-from sugo.metrics.providers import ImageRejectedError, VerificationStatus, load_provider
+from sugo.extractors.image.loader import image_size
+from sugo.metrics.baselines import ImageSavings, Savings, image_savings
+from sugo.metrics.providers import ImageRejectedError, load_provider
 from sugo.metrics.tokenizer import count_tokens
 
 
@@ -42,7 +42,7 @@ def estimate_savings(
 
     Raises:
         ValueError: If the raw tokens were not counted or a provider is unknown.
-        sugo.extractors.image.loader.ImageLoadError: If the image cannot be decoded.
+        sugo.extractors.image.loader.ImageLoadError: If the image header cannot be read.
     """
     if conversion.raw_tokens is None:
         raise ValueError("the conversion did not count its raw tokens")
@@ -51,22 +51,13 @@ def estimate_savings(
     images: list[ImageSavings] = []
     rejected: list[str] = []
     if conversion.kind is InputKind.IMAGE:
-        image = decode_image(data)
+        # The header is enough: the pixels were already decoded by the conversion.
+        width, height = image_size(data)
         for provider in formulas:
             try:
-                image_tokens = provider.estimate(image.width, image.height)
+                images.append(image_savings(width, height, conversion.markdown, provider))
             except ImageRejectedError:
                 rejected.append(provider.provider)
-                continue
-            images.append(
-                ImageSavings(
-                    baseline_tokens=image_tokens,
-                    result_tokens=markdown_tokens,
-                    provider=provider.provider,
-                    tier=provider.default_tier,
-                    formula_verified=provider.source.status is VerificationStatus.VERIFIED,
-                )
-            )
     return SavingsEstimate(
         kind=conversion.kind,
         pages=conversion.pages,

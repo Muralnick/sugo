@@ -1,5 +1,7 @@
 """Tests for the CLI's parts: error mapping, clipboard reading and doctor checks."""
 
+from io import BytesIO
+
 import pytest
 from PIL import Image
 
@@ -8,7 +10,7 @@ from sugo.extractors.image.loader import ImageTooLargeError
 from sugo.extractors.image.ocr_engine import ModelIntegrityError
 from sugo.extractors.pymupdf.extract import PdfEncryptedError, PdfTooLargeError
 from sugo.ports.cli import clipboard, doctor
-from sugo.ports.cli.errors import CliError, ExitCode, from_exception
+from sugo.ports.cli.errors import CliError, ExitCode, from_exception, unreadable
 
 
 @pytest.mark.parametrize(
@@ -29,11 +31,14 @@ def test_known_errors_get_a_code_and_exit_code(
     assert (mapped.code, mapped.exit_code, mapped.message) == (code, exit_code, "x")
 
 
-def test_os_errors_do_not_repeat_the_path() -> None:
-    error = FileNotFoundError(2, "No such file or directory", "secret/name.pdf")
-    mapped = from_exception(error)
-    assert mapped is not None
+def test_unreadable_input_does_not_repeat_the_path() -> None:
+    mapped = unreadable(FileNotFoundError(2, "No such file or directory", "secret/name.pdf"))
     assert (mapped.code, mapped.message) == ("FILE_UNREADABLE", "No such file or directory")
+
+
+def test_os_errors_are_not_mapped_outside_reading() -> None:
+    # A broken stdout pipe must not be reported as an unreadable input.
+    assert from_exception(BrokenPipeError(32, "Broken pipe")) is None
 
 
 def test_other_errors_are_not_mapped() -> None:
@@ -71,6 +76,21 @@ def test_unreadable_clipboard_is_reported(monkeypatch: pytest.MonkeyPatch) -> No
 def test_huge_clipboard_image_is_refused_before_encoding(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(clipboard, "MAX_IMAGE_PIXELS", 31)
     monkeypatch.setattr("PIL.ImageGrab.grabclipboard", lambda: Image.new("RGB", (8, 4)))
+    with pytest.raises(ImageTooLargeError):
+        clipboard.read_clipboard_image()
+
+
+def test_cmyk_clipboard_image_becomes_rgb_png(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("PIL.ImageGrab.grabclipboard", lambda: Image.new("CMYK", (8, 4)))
+    with Image.open(BytesIO(clipboard.read_clipboard_image())) as image:
+        assert (image.format, image.mode) == ("PNG", "RGB")
+
+
+def test_clipboard_bomb_is_refused_as_too_large(monkeypatch: pytest.MonkeyPatch) -> None:
+    def bomb() -> None:
+        raise Image.DecompressionBombError("too many pixels")
+
+    monkeypatch.setattr("PIL.ImageGrab.grabclipboard", bomb)
     with pytest.raises(ImageTooLargeError):
         clipboard.read_clipboard_image()
 

@@ -14,6 +14,8 @@ from sugo.core.constants import MAX_IMAGE_PIXELS
 from sugo.extractors.image.loader import ImageTooLargeError
 from sugo.ports.cli.errors import CliError, ExitCode
 
+_PNG_MODES = frozenset({"1", "L", "LA", "P", "RGB", "RGBA", "I;16"})
+
 
 def read_clipboard_image() -> bytes:
     """Return the clipboard image as PNG bytes.
@@ -24,6 +26,9 @@ def read_clipboard_image() -> bytes:
     """
     try:
         content = ImageGrab.grabclipboard()
+    except Image.DecompressionBombError as error:
+        # Pillow decodes the clipboard itself, so its own bomb guard can fire first.
+        raise ImageTooLargeError(f"image exceeds {MAX_IMAGE_PIXELS} pixels") from error
     except (OSError, NotImplementedError) as error:
         raise CliError(
             code="CLIPBOARD_UNAVAILABLE",
@@ -43,6 +48,8 @@ def read_clipboard_image() -> bytes:
         # Checked before re-encoding, which would need memory for the whole image.
         if content.width * content.height > MAX_IMAGE_PIXELS:
             raise ImageTooLargeError(f"image exceeds {MAX_IMAGE_PIXELS} pixels")
+        # PNG cannot store every mode a clipboard can hold, e.g. CMYK.
+        image = content if content.mode in _PNG_MODES else content.convert("RGB")
         buffer = BytesIO()
-        content.save(buffer, format="PNG")
+        image.save(buffer, format="PNG")
     return buffer.getvalue()

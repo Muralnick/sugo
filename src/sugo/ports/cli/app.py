@@ -26,7 +26,13 @@ from typer.core import TyperGroup
 
 from sugo.core.constants import CHUNK_MAX_TOKENS, CHUNK_MIN_TOKENS
 from sugo.ports.cli.doctor import Status, missing_lite_packages, run_checks
-from sugo.ports.cli.errors import CliError, ExitCode, from_exception, level_missing
+from sugo.ports.cli.errors import (
+    CliError,
+    ExitCode,
+    from_exception,
+    level_missing,
+    unreadable,
+)
 
 if TYPE_CHECKING:
     from sugo.core.estimate import SavingsEstimate
@@ -96,9 +102,9 @@ def _root(
 def convert_command(
     files: Annotated[
         list[Path],
-        typer.Argument(
-            exists=True, dir_okay=False, readable=True, help="PDF, PNG, JPEG or WEBP files."
-        ),
+        # Not exists=True: a missing file is reported with the others, not as a
+        # usage error that would stop the whole batch.
+        typer.Argument(dir_okay=False, help="PDF, PNG, JPEG or WEBP files."),
     ],
     output: Annotated[
         Path | None,
@@ -133,6 +139,11 @@ def convert_command(
         raise typer.BadParameter("--max-tokens needs --chunks", param_hint="'--max-tokens'")
     if output is None and len(files) > 1:
         raise typer.BadParameter("several files need an output folder", param_hint="'-o'")
+    if front_matter and output is None and (chunks or json_output):
+        # Only a Markdown file or Markdown on stdout can carry front matter.
+        raise typer.BadParameter(
+            "front matter goes only into Markdown output", param_hint="'--front-matter'"
+        )
     targets = None if output is None else _targets(files, output, chunks=chunks)
     chunk_tokens = (max_tokens or CHUNK_MAX_TOKENS) if chunks else None
     with _failures(json_output):
@@ -158,7 +169,9 @@ def convert_command(
                         else _write_outputs(conversion, targets[path], front_matter=front_matter)
                     )
                 except Exception as error:
-                    failure = _as_cli_error(error)
+                    # Only reading raises OSError here: writing raises OUTPUT_UNWRITABLE.
+                    failure = unreadable(error) if isinstance(error, OSError) else None
+                    failure = failure or _as_cli_error(error)
                     if failure is None:
                         raise
                     errors.append(failure)
@@ -287,7 +300,10 @@ def stats_command(
             _page_cache(enabled=True) as cache,
             _progress(f"Converting {source}", quiet=json_output),
         ):
-            data = pipeline.read_input(file)
+            try:
+                data = pipeline.read_input(file)
+            except OSError as error:
+                raise unreadable(error) from error
             conversion = pipeline.convert(data, cache=cache, source=source, count_raw_tokens=True)
         estimate = estimate_savings(data, conversion, providers)
         if json_output:

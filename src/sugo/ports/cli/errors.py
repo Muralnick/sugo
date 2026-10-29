@@ -87,11 +87,14 @@ def from_exception(error: Exception) -> CliError | None:
             exit_code=ExitCode.SECURITY,
             hint="Reinstall Sugo; a bundled file was altered or damaged.",
         )
-    if isinstance(error, OSError):
-        # strerror only: the full message repeats the path, given separately.
-        return CliError(
-            code="FILE_UNREADABLE",
-            message=error.strerror or "the file could not be read",
-            exit_code=ExitCode.ERROR,
-        )
     return None
+
+
+def unreadable(error: OSError) -> CliError:
+    """The error for an input that cannot be read; only for reading, never for writing."""
+    # strerror only: the full message repeats the path, which the CLI shows separately.
+    return CliError(
+        code="FILE_UNREADABLE",
+        message=error.strerror or "the file could not be read",
+        exit_code=ExitCode.ERROR,
+    )

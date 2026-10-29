@@ -157,8 +157,9 @@ def test_only_failure_exits_with_its_own_code() -> None:
         ["report.pdf", "notes.txt"],  # Several files need -o.
         ["report.pdf", "--max-tokens", "64"],  # Needs --chunks.
         ["report.pdf", "--chunks", "--max-tokens", "8"],  # Below the minimum.
-        ["missing.pdf"],
         ["."],  # Folders are not inputs in v0.1.
+        ["report.pdf", "--chunks", "--front-matter"],  # Front matter needs Markdown.
+        ["report.pdf", "--json", "--front-matter"],
     ],
 )
 def test_usage_errors_exit_with_2(args: list[str]) -> None:
@@ -173,6 +174,15 @@ def test_outputs_never_collide_nor_overwrite_inputs(workdir: Path) -> None:
     (workdir / "paper.md").write_bytes(report())
     assert run("paper.md", "-o", ".").exit_code == ExitCode.USAGE
     assert (workdir / "paper.md").read_bytes().startswith(b"%PDF")
+
+
+def test_missing_file_is_reported_without_stopping_the_others(workdir: Path) -> None:
+    alone = run("missing.pdf")
+    assert alone.exit_code == ExitCode.ERROR
+    assert "missing.pdf: error FILE_UNREADABLE" in alone.stderr
+    batch = run("missing.pdf", "report.pdf", "-o", "out")
+    assert batch.exit_code == ExitCode.PARTIAL
+    assert (workdir / "out" / "report.md").exists()
 
 
 @pytest.mark.usefixtures("workdir")
