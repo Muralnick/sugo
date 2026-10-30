@@ -82,6 +82,10 @@ def test_version_and_help() -> None:
         assert command in help_text
     # Completion would edit the user's shell profile.
     assert "--install-completion" not in help_text
+    # The usage line names the argument, not Typer's internal placeholder.
+    convert_help = run("convert", "--help").stdout
+    assert "FILE..." in convert_help
+    assert "{files}" not in convert_help
 
 
 @pytest.mark.usefixtures("workdir")
