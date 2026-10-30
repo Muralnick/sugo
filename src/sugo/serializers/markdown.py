@@ -27,7 +27,13 @@ from collections.abc import Iterable
 
 from sugo.core.constants import MARKDOWN_CONTINUATION_INDENT, MARKDOWN_MIN_FENCE
 from sugo.core.models import Block, BlockFlag, BlockType
-from sugo.serializers.escape import ILLEGIBLE_MARKER, escape_heading, escape_line, escape_marker
+from sugo.serializers.escape import (
+    ILLEGIBLE_MARKER,
+    drop_controls,
+    escape_heading,
+    escape_line,
+    escape_marker,
+)
 from sugo.serializers.tables import render_table
 
 _BACKTICKS = re.compile(r"`+")
@@ -60,14 +66,16 @@ def _render_block(block: Block) -> str | None:
         return _prefixed(block, [ILLEGIBLE_MARKER])
     if block.type is BlockType.TABLE and block.table is not None:
         return render_table(block.table)
-    if not block.text.strip():
+    # First of all: escaping must see the text as it will be printed.
+    text = drop_controls(block.text)
+    if not text.strip():
         return None
     if block.type is BlockType.CODE:
-        return _fenced(block.text)
+        return _fenced(text)
     if block.type is BlockType.HEADING:
-        text = " ".join(line.strip() for line in block.text.splitlines() if line.strip())
-        return f"{'#' * (block.heading_level or 1)} {escape_heading(text)}"
-    return _prefixed(block, [escape_line(line) for line in _text_lines(block.text)])
+        heading = " ".join(line.strip() for line in text.splitlines() if line.strip())
+        return f"{'#' * (block.heading_level or 1)} {escape_heading(heading)}"
+    return _prefixed(block, [escape_line(line) for line in _text_lines(text)])
 
 
 def _text_lines(text: str) -> list[str]:

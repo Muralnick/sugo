@@ -16,11 +16,13 @@ from sugo.core.pipeline import (
     convert,
     convert_file,
     detect_kind,
+    read_input,
 )
 from sugo.exporters.jsonl import write_jsonl
 from sugo.extractors.image.ocr_engine import OcrEngine, bundled_models
 from sugo.extractors.pymupdf.extract import _failed_page, extract_pdf
 from sugo.extractors.pymupdf.protocol import PageBox
+from sugo.metrics.tokenizer import count_tokens
 from sugo.storage.page_cache import CacheLevel, CacheUnavailableError, PageCache
 
 CLAUSE = "The supplier is liable for all damages caused by delays."
@@ -88,6 +90,29 @@ def test_pdf_report_becomes_clean_markdown() -> None:
     assert dict(result.removed) == {"headers_footers": 7, "page_numbers": 4}
 
 
+def test_raw_tokens_are_counted_only_when_asked(cache: PageCache) -> None:
+    data = report(4)
+    assert convert(data).raw_tokens is None
+    measured = convert(data, cache=cache, count_raw_tokens=True)
+    # The raw text keeps the running headers and page numbers the cleaners remove.
+    assert measured.raw_tokens is not None
+    assert measured.raw_tokens > count_tokens(measured.markdown)
+    # Measuring never changes the output, nor the settings digest.
+    assert measured.markdown == EXPECTED
+    assert measured.config_hash == convert(data).config_hash
+    # From the cache, the raw pages are read back and counted the same.
+    assert convert(data, cache=cache, count_raw_tokens=True).raw_tokens == measured.raw_tokens
+
+
+def test_input_is_read_up_to_one_byte_past_the_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(pipeline, "_MAX_INPUT_BYTES", 10)
+    path = tmp_path / "big.bin"
+    path.write_bytes(b"x" * 100)
+    assert read_input(path) == b"x" * 11
+
+
 def test_input_is_routed_by_content_not_name(tmp_path: Path) -> None:
     path = tmp_path / "looks-like.png"
     path.write_bytes(report(4))
@@ -147,10 +172,14 @@ def test_failed_pages_are_retried_on_the_next_run(
     monkeypatch.setattr(pipeline, "extract_pdf", CountingExtractor(fail={1}))
     first = convert(data, cache=cache)
     assert first.markdown.count("[illegible]") == 1
+    # Page numbers count from 1: the second page failed.
+    assert first.failed_pages == (2,)
     # The other pages are cached; the failed one, and its cleaned form, are not.
     retry = CountingExtractor()
     monkeypatch.setattr(pipeline, "extract_pdf", retry)
-    assert convert(data, cache=cache).markdown == EXPECTED
+    second = convert(data, cache=cache)
+    assert second.markdown == EXPECTED
+    assert second.failed_pages == ()
     # Only the failed page is read again; the cached pages after it are skipped.
     assert (retry.starts, retry.pages) == ([1], 1)
 

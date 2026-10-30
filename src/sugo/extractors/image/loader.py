@@ -24,7 +24,7 @@ from typing import ClassVar
 
 import numpy as np
 import numpy.typing as npt
-from PIL import Image, ImageOps
+from PIL import ExifTags, Image, ImageOps
 
 from sugo.core.constants import MAX_IMAGE_FILE_BYTES, MAX_IMAGE_PIXELS
 
@@ -33,6 +33,8 @@ RgbArray = npt.NDArray[np.uint8]
 # Bits dropped to turn a 16-bit sample into an 8-bit one.
 _SIXTEEN_TO_EIGHT_BITS = 8
 _WHITE = (255, 255, 255, 255)
+# EXIF orientations that turn the image by a quarter, swapping width and height.
+_QUARTER_TURNS = frozenset({5, 6, 7, 8})
 
 
 class ImageFormat(StrEnum):
@@ -149,6 +151,28 @@ def decode_image(data: bytes) -> LoadedImage:
     pixels = np.asarray(rgb, dtype=np.uint8).copy()
     pixels.setflags(write=False)
     return LoadedImage(pixels=pixels, format=image_format, sha256=hashlib.sha256(data).hexdigest())
+
+
+def image_size(data: bytes) -> tuple[int, int]:
+    """Width and height as displayed (EXIF orientation applied), read from the header only.
+
+    Raises:
+        UnsupportedImageError: If the format is not supported.
+        ImageLoadError: If the header is corrupt.
+    """
+    image_format = detect_format(data)
+    try:
+        with warnings.catch_warnings():
+            # Opening reads only the header, but Pillow's bomb guard still applies.
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(BytesIO(data), formats=[image_format.value]) as image:
+                width, height = image.size
+                orientation = image.getexif().get(ExifTags.Base.Orientation, 1)
+    except (Image.DecompressionBombError, Image.DecompressionBombWarning) as error:
+        raise ImageTooLargeError(f"image exceeds {MAX_IMAGE_PIXELS} pixels") from error
+    except (OSError, ValueError, SyntaxError) as error:
+        raise ImageLoadError("image data is corrupt or truncated") from error
+    return (height, width) if orientation in _QUARTER_TURNS else (width, height)
 
 
 def _to_rgb(image: Image.Image) -> Image.Image:
