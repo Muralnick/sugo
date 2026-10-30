@@ -195,6 +195,23 @@ forbidden_modules = [
     "sugo._internal.net",
 ]
 
+# Language packs are data and text rules for the text cleaners (ADR-050).
+[[tool.importlinter.contracts]]
+name = "Language packs are text rules only"
+type = "forbidden"
+source_modules = ["sugo.languages"]
+forbidden_modules = [
+    "sugo.core",
+    "sugo.extractors",
+    "sugo.cleaners",
+    "sugo.ports",
+    "sugo.storage",
+    "sugo.sources",
+    "sugo.models",
+    "sugo.setup",
+    "sugo._internal.net",
+]
+
 # Analyzers read IR pages and return statistics; cleaners use them (ADR-044).
 [[tool.importlinter.contracts]]
 name = "Analyzers work on the IR only"

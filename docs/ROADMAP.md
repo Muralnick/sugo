@@ -8,14 +8,16 @@ All twelve phases are complete (October 2026): requirements; pipeline and IR; in
 
 Goal: a small, finished, demonstrable release that already proves the value of the project.
 
+Scope updated on 2026-10-30 (maintainer decision): Office and XML documents move into v0.1 through a light reader, without Docling; Japanese and Chinese move after v0.1. A GitHub pre-release (`v0.1.0a1`) comes first, as soon as the stacked pull requests are merged.
+
 | In scope | Out of scope (later) |
 |---|---|
 | Level `lite` only | `normal`, `quality` |
-| Images and screenshots (PNG, JPEG, WEBP) and native PDFs | Office, EPUB, email, web, archives |
+| Images and screenshots (PNG, JPEG, WEBP), native PDFs, Office (DOCX, XLSX, PPTX) and XML through a light reader | Legacy Office formats, EPUB, email, web, archives; Docling (v0.2) |
 | Core IR, multi-pass pipeline, SQLite cache | Shared engine (v0.1 runs in standalone mode) |
 | Cleaners: headers/footers, page numbers, text normalisation, URL stripping, screenshot UI chrome | Book cleaners, cross-document boilerplate |
 | Detectors: chat and code screenshots | Tables beyond simple ones |
-| Language packs: Latin-script languages, Japanese, Chinese | Korean (separate OCR model) |
+| Language packs: Italian, Spanish, French, German, English (ADR-050) | Japanese, Chinese; Korean (separate OCR model); language detection |
 | Markdown and JSONL export, chunker | Hybrid image mode, optimizer |
 | Metrics with provider comparison (`sugo stats`) | Web UI, tray, watcher |
 | CLI one-shot commands, `sugo clip`, `sugo doctor` | Interactive shell, guided setup |
@@ -36,9 +38,11 @@ Goal: a small, finished, demonstrable release that already proves the value of t
 8. Benchmarks on the synthetic corpus and EUR-Lex samples; README numbers.
 9. Release v0.1 on PyPI.
 
+Added on 2026-10-30, between steps 7 and 9: the remaining v0.1 pieces (text cleaners, ADR-050; basic TOML configuration; Italian interface; Windows smoke tests), the GitHub pre-release, and the light Office and XML reader.
+
 ## After v0.1
 
-- v0.2: shared engine, interactive shell, Korean, `normal` level with Docling and Office.
+- v0.2: shared engine, interactive shell, Japanese, Chinese, Korean, `normal` level with Docling (complex Office layouts, legacy formats).
 - v0.3: containers (folders, archives, emails), plan-first, guided setup and work profiles.
 - v0.4: `quality` level with VLM and cross-check; GPU benchmarks.
 - v0.5: legal features (anonymization, audit, policies), `sugo-pack-italy`.

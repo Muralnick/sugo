@@ -9,7 +9,8 @@ import pytest
 from PIL import Image, ImageDraw, ImageFont
 
 from sugo.core import pipeline
-from sugo.core.models import Page
+from sugo.core.decisions import EditDecision
+from sugo.core.models import EditKind, Page
 from sugo.core.pipeline import (
     InputKind,
     InputUnsupportedError,
@@ -258,3 +259,74 @@ def test_output_is_reproducible(tmp_path: Path) -> None:
         result = convert(data, source="acme.pdf", max_chunk_tokens=64)
         write_jsonl(tmp_path / f"{name}.jsonl", result.chunks)
     assert (tmp_path / "a.jsonl").read_bytes() == (tmp_path / "b.jsonl").read_bytes()
+
+
+def text_report() -> bytes:
+    """Two pages of prose with a line-break hyphen and a tracking URL."""
+    document = pymupdf.open()
+    first = document.new_page()
+    first.insert_text((72, 100), "Good information matters.", fontsize=10)
+    first.insert_text((72, 112), "Details at https://a.it/p?id=7&utm_source=mail", fontsize=10)
+    second = document.new_page()
+    second.insert_text((72, 100), "More infor-", fontsize=10)
+    second.insert_text((72, 112), "mation here.", fontsize=10)
+    return document.tobytes()
+
+
+def test_text_cleaners_join_hyphens_and_strip_trackers() -> None:
+    result = convert(text_report(), languages=("en", "it"))
+    assert "https://a.it/p?id=7\n" in result.markdown + "\n"
+    assert "utm_source" not in result.markdown
+    assert "More information here" in result.markdown
+
+
+def test_edits_are_counted_per_cleaner() -> None:
+    result = convert(text_report())
+    assert result.edited == {"text_normalization": 1, "tracking_urls": 1}
+    assert result.removed == {}
+
+
+def test_a_refused_cleaner_is_skipped_not_fatal(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    class Broken:
+        name = "broken"
+
+        def propose(self, page: Page, stats: object) -> list[EditDecision]:
+            # Changes a letter: the core refuses it.
+            return [
+                EditDecision(
+                    block_id=block.id,
+                    start=0,
+                    end=1,
+                    replacement="X",
+                    kind=EditKind.NORMALIZE,
+                    reason="r",
+                )
+                for block in page.blocks
+                if block.text
+            ]
+
+    monkeypatch.setattr(pipeline, "CLEANERS", (*pipeline.CLEANERS, Broken()))
+    result = convert(text_report())
+    assert "Good information matters." in result.markdown
+    assert "cleaner broken skipped" in caplog.text
+    assert "Good" not in caplog.text
+
+
+def test_tracking_urls_can_be_kept() -> None:
+    result = convert(text_report(), strip_tracking_urls=False)
+    assert "utm_source=mail" in result.markdown
+
+
+def test_text_settings_change_the_config_hash() -> None:
+    data = text_report()
+    base = convert(data).config_hash
+    assert convert(data, languages=("it",)).config_hash != base
+    assert convert(data, strip_tracking_urls=False).config_hash != base
+    assert convert(data, languages=("en", "en")).config_hash == base
+
+
+def test_unknown_language_is_refused() -> None:
+    with pytest.raises(ValueError, match="no language pack"):
+        convert(text_report(), languages=("xx",))
