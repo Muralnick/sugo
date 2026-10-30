@@ -56,6 +56,7 @@ _KNOWN: dict[str, tuple[ExitCode, str | None]] = {
     "PDF_TOO_LARGE": (ExitCode.SECURITY, "Split the PDF into smaller files."),
     "PDF_UNSUPPORTED": (ExitCode.ERROR, None),
     "PDF_EXTRACTION_FAILED": (ExitCode.ERROR, "Try again; if it fails again, run: sugo doctor"),
+    "CONFIG_INVALID": (ExitCode.USAGE, "Fix the file or variable named above; run: sugo doctor"),
 }
 
 
