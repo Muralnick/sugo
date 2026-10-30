@@ -104,7 +104,7 @@ def convert_command(
         list[Path],
         # Not exists=True: a missing file is reported with the others, not as a
         # usage error that would stop the whole batch.
-        typer.Argument(dir_okay=False, help="PDF, PNG, JPEG or WEBP files."),
+        typer.Argument(dir_okay=False, metavar="FILE...", help="PDF, PNG, JPEG or WEBP files."),
     ],
     output: Annotated[
         Path | None,
