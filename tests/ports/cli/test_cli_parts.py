@@ -10,7 +10,7 @@ from sugo.extractors.image.loader import ImageTooLargeError
 from sugo.extractors.image.ocr_engine import ModelIntegrityError
 from sugo.extractors.pymupdf.extract import PdfEncryptedError, PdfTooLargeError
 from sugo.ports.cli import clipboard, doctor
-from sugo.ports.cli.errors import CliError, ExitCode, from_exception, unreadable
+from sugo.ports.errors import ExitCode, PortError, from_exception, unreadable
 
 
 @pytest.mark.parametrize(
@@ -58,7 +58,7 @@ def test_clipboard_without_an_image_is_refused(
     monkeypatch: pytest.MonkeyPatch, content: object
 ) -> None:
     monkeypatch.setattr("PIL.ImageGrab.grabclipboard", lambda: content)
-    with pytest.raises(CliError) as caught:
+    with pytest.raises(PortError) as caught:
         clipboard.read_clipboard_image()
     assert caught.value.code == "CLIPBOARD_NO_IMAGE"
 
@@ -68,7 +68,7 @@ def test_unreadable_clipboard_is_reported(monkeypatch: pytest.MonkeyPatch) -> No
         raise NotImplementedError("wl-paste or xclip is required")
 
     monkeypatch.setattr("PIL.ImageGrab.grabclipboard", unavailable)
-    with pytest.raises(CliError) as caught:
+    with pytest.raises(PortError) as caught:
         clipboard.read_clipboard_image()
     assert caught.value.code == "CLIPBOARD_UNAVAILABLE"
 

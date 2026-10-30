@@ -1,4 +1,4 @@
-"""Turn failures into the error model and exit codes of the CLI (ADR-022, ADR-048).
+"""The error model every port shares, and the CLI's exit codes (ADR-022, ADR-048, ADR-049).
 
 Every failure the user can act on becomes a stable code, a message, a hint
 and an exit code. The messages come from Sugo's own exceptions, which never
@@ -25,7 +25,7 @@ class ExitCode(IntEnum):
 
 # Not frozen: Python sets attributes on exceptions it raises (tracebacks, notes).
 @dataclass
-class CliError(Exception):
+class PortError(Exception):
     """A failure in the error model: stable code, message, hint, details."""
 
     code: str
@@ -59,9 +59,9 @@ _KNOWN: dict[str, tuple[ExitCode, str | None]] = {
 }
 
 
-def level_missing(packages: list[str]) -> CliError:
+def level_missing(packages: list[str]) -> PortError:
     """The error for a missing engine level, naming the absent packages."""
-    return CliError(
+    return PortError(
         code="LEVEL_MISSING",
         message="The lite level is not installed.",
         exit_code=ExitCode.MISSING,
@@ -70,18 +70,18 @@ def level_missing(packages: list[str]) -> CliError:
     )
 
 
-def from_exception(error: Exception) -> CliError | None:
+def from_exception(error: Exception) -> PortError | None:
     """Return the CLI error for an exception Sugo raises on purpose, else None."""
     code = getattr(type(error), "code", None)
     if isinstance(code, str) and code in _KNOWN:
         exit_code, hint = _KNOWN[code]
-        return CliError(code=code, message=str(error), exit_code=exit_code, hint=hint)
+        return PortError(code=code, message=str(error), exit_code=exit_code, hint=hint)
     # Imported here: the integrity errors live in the lite level's modules.
     from sugo.extractors.image.ocr_engine import ModelIntegrityError
     from sugo.metrics.tokenizer import VocabularyIntegrityError
 
     if isinstance(error, ModelIntegrityError | VocabularyIntegrityError):
-        return CliError(
+        return PortError(
             code="INTEGRITY_CHECK_FAILED",
             message=str(error),
             exit_code=ExitCode.SECURITY,
@@ -90,10 +90,10 @@ def from_exception(error: Exception) -> CliError | None:
     return None
 
 
-def unreadable(error: OSError) -> CliError:
+def unreadable(error: OSError) -> PortError:
     """The error for an input that cannot be read; only for reading, never for writing."""
     # strerror only: the full message repeats the path, which the CLI shows separately.
-    return CliError(
+    return PortError(
         code="FILE_UNREADABLE",
         message=error.strerror or "the file could not be read",
         exit_code=ExitCode.ERROR,

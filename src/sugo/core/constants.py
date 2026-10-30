@@ -295,3 +295,44 @@ CHUNK_MIN_TOKENS: Final = 32
 # Hex digits of the chunk and document ids: 128 bits, so collisions stay
 # negligible even across billions of chunks in one vector database.
 OUTPUT_ID_HEX_DIGITS: Final = 32
+
+# --- MCP server (roadmap step 7b, ADR-049) -------------------------------------
+
+# Tokens per tool response. 8 000 leaves room in an agent's context for its
+# own work; 20 000 stays below the 25 000-token output cap of common clients
+# (Claude Code); 1 024 always fits one 512-token chunk record and its fields.
+MCP_DEFAULT_TOKENS: Final = 8_000
+MCP_MIN_TOKENS: Final = 1_024
+MCP_MAX_TOKENS: Final = 20_000
+
+# Tokens reserved in each response for the wrapper and the metadata around the
+# document text, so the whole response stays within the budget.
+MCP_WRAPPER_TOKENS: Final = 200
+
+# Largest JSON-RPC message accepted on stdin. Tool arguments are a path and a
+# few options; anything near this size is malformed or hostile.
+MCP_MAX_MESSAGE_BYTES: Final = 1_000_000
+
+# Longest path and cursor accepted in tool arguments.
+MCP_MAX_PATH_CHARS: Final = 4_096
+MCP_MAX_CURSOR_CHARS: Final = 512
+
+# Hex digits of the content hash that labels a response's document wrapper.
+MCP_WRAPPER_ID_HEX_DIGITS: Final = 12
+
+# Never readable through MCP, whatever the allowed roots (principle 7,
+# THREAT_MODEL D): folders and files holding keys, tokens and passwords.
+# Compared case-insensitively with every component of the resolved path.
+MCP_EXCLUDED_DIRS: Final = frozenset(
+    {".ssh", ".gnupg", ".aws", ".azure", ".kube", ".docker", ".password-store", "keyrings"}
+)
+MCP_EXCLUDED_FILES: Final = frozenset({".netrc", ".pgpass", ".env"})
+MCP_EXCLUDED_PATTERNS: Final = (
+    "id_rsa*",
+    "id_dsa*",
+    "id_ecdsa*",
+    "id_ed25519*",
+    ".env.*",
+    "*.kdbx",
+    "*.pem",
+)

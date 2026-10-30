@@ -15,7 +15,7 @@ from sugo.core.pipeline import Conversion, InputKind
 from sugo.extractors.pymupdf.extract import PdfTooLargeError
 from sugo.ports.cli import app as cli
 from sugo.ports.cli import clipboard
-from sugo.ports.cli.errors import ExitCode
+from sugo.ports.errors import ExitCode
 from sugo.storage.paths import CACHE_DIR_ENV
 
 

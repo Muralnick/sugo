@@ -50,3 +50,4 @@
 | [046](ADR-046-pipeline.md) | Multi-pass conversion pipeline (standalone) | Accepted |
 | [047](ADR-047-chunks-exporters.md) | Chunker, JSONL schema v1 and exporters | Accepted |
 | [048](ADR-048-cli.md) | Command line: `sugo`, `stats`, `clip`, `doctor` | Accepted |
+| [049](ADR-049-mcp-server.md) | MCP server: `sugo mcp`, two tools, allowed roots | Accepted |
