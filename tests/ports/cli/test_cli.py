@@ -10,6 +10,7 @@ import pytest
 from PIL import Image
 from typer.testing import CliRunner, Result
 
+from sugo.config.settings import Settings
 from sugo.core import pipeline
 from sugo.core.pipeline import Conversion, InputKind
 from sugo.extractors.pymupdf.extract import PdfTooLargeError
@@ -329,6 +330,7 @@ def test_doctor_reports_every_check() -> None:
         "ocr models",
         "pymupdf",
         "tokenizer",
+        "config",
         "cache",
         "clipboard",
     }
@@ -356,3 +358,96 @@ def test_source_is_the_path_as_typed_normalised_never_absolute(workdir: Path) ->
     (workdir / "stats").write_bytes(report())
     converted_file = json.loads(run("./stats", "--json").stdout)["documents"][0]
     assert (converted_file["source"], converted_file["status"]) == ("stats", "ok")
+
+
+def tracked_report() -> bytes:
+    document = pymupdf.open()
+    page = document.new_page()
+    page.insert_text((72, 120), "See https://a.it/p?id=7&utm_source=mail now.", fontsize=10)
+    return document.tobytes()
+
+
+def test_configuration_file_changes_the_conversion(workdir: Path) -> None:
+    (workdir / "links.pdf").write_bytes(tracked_report())
+    assert "utm_source" not in run("links.pdf").stdout
+    (workdir / "sugo.toml").write_text("[cleaning]\nstrip_tracking_urls = false\n")
+    assert "utm_source=mail" in run("links.pdf").stdout
+
+
+def test_option_overrides_configured_chunk_size(workdir: Path) -> None:
+    def config_hash(*args: str) -> str:
+        return str(
+            json.loads(run("report.pdf", "--chunks", *args).stdout.splitlines()[0])["config_hash"]
+        )
+
+    default = config_hash()
+    (workdir / "sugo.toml").write_text("[chunking]\nmax_tokens = 40\n")
+    # The chunk size is part of the config hash every chunk records.
+    assert config_hash() == config_hash("--max-tokens", "40") != default
+    assert config_hash("--max-tokens", "512") == default
+
+
+def test_invalid_configuration_stops_with_usage_exit(workdir: Path) -> None:
+    (workdir / "sugo.toml").write_text('[storage]\ncache = "disk"\n')
+    result = run("report.pdf", "--json")
+    assert result.exit_code == ExitCode.USAGE
+    error = json.loads(result.stderr)["error"]
+    assert error["code"] == "CONFIG_INVALID"
+    assert "storage.cache" in error["message"]
+    assert result.stdout == ""
+
+
+def test_reserved_keys_warn_and_convert(workdir: Path) -> None:
+    (workdir / "sugo.toml").write_text("[privacy]\noffline = true\n")
+    result = run("report.pdf")
+    assert result.exit_code == ExitCode.OK
+    assert "not used in this version" in result.stderr
+
+
+def test_ephemeral_cache_leaves_nothing_on_disk(
+    workdir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SUGO_CACHE", "ephemeral")
+    assert run("report.pdf").exit_code == ExitCode.OK
+    assert not (tmp_path / "cache").exists()
+
+
+def test_mcp_ignores_project_file_and_environment(
+    workdir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sugo.ports.mcp import server
+
+    (workdir / "sugo.toml").write_text("[cleaning]\nstrip_tracking_urls = false\n")
+    monkeypatch.setenv("SUGO_LANGUAGES", "de")
+    monkeypatch.setenv("LANG", "it_IT.UTF-8")  # the locale does not choose either
+    seen: list[Settings] = []
+    monkeypatch.setattr(server, "serve", lambda roots, settings: seen.append(settings))
+    assert run("mcp", "--root", str(workdir)).exit_code == ExitCode.OK
+    assert [(s.languages, s.cleaning.strip_tracking_urls) for s in seen] == [(("en",), True)]
+
+
+def test_doctor_reports_an_invalid_configuration(workdir: Path) -> None:
+    (workdir / "sugo.toml").write_text("[clening]\n")
+    result = run("doctor", "--json")
+    checks = {check["name"]: check for check in json.loads(result.stdout)["checks"]}
+    assert checks["config"]["status"] == "error"
+    assert result.exit_code == ExitCode.ERROR
+
+
+def test_json_mode_keeps_stderr_parseable_with_warnings(workdir: Path) -> None:
+    (workdir / "sugo.toml").write_text("[privacy]\noffline = true\n")
+    result = run("missing.pdf", "--json")
+    assert result.exit_code == ExitCode.ERROR
+    assert "warning" not in result.stderr
+
+
+def test_configuration_errors_never_reach_the_terminal_as_escapes(workdir: Path) -> None:
+    (workdir / "sugo.toml").write_text('[general]\n"\\u001b]0;PWNED\\u0007" = 1\n')
+    result = run("report.pdf")
+    assert result.exit_code == ExitCode.USAGE
+    assert "\x1b" not in result.stderr
+    assert "\x07" not in result.stderr
+
+
+def test_too_large_chunk_size_is_refused(workdir: Path) -> None:
+    assert run("report.pdf", "--chunks", "--max-tokens", "100000").exit_code == ExitCode.USAGE

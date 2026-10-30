@@ -88,7 +88,7 @@ CLEANERS: tuple[Cleaner[EdgeStats], ...] = (
     HeaderFooterCleaner(),
 )
 
-# Until the configuration exists (ADR-051), text rules for English only.
+# For callers that pass no languages; the ports pass the configured ones (ADR-051).
 DEFAULT_LANGUAGES = ("en",)
 
 

@@ -292,6 +292,9 @@ CHUNK_MAX_TOKENS: Final = 512
 # Smallest chunk size accepted: below this, a heading and one sentence no
 # longer fit, and chunks lose their meaning.
 CHUNK_MIN_TOKENS: Final = 32
+# Largest chunk size accepted: the input limit of common embedding models
+# (8 191 tokens for OpenAI's); larger "chunks" would not be chunks for RAG.
+CHUNK_MAX_TOKENS_LIMIT: Final = 8_192
 
 # Hex digits of the chunk and document ids: 128 bits, so collisions stay
 # negligible even across billions of chunks in one vector database.

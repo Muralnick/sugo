@@ -13,6 +13,7 @@ import pymupdf
 import pytest
 from typer.testing import CliRunner
 
+from sugo.config.settings import Settings
 from sugo.core import pipeline
 from sugo.metrics.tokenizer import count_tokens
 from sugo.ports.cli import app as cli
@@ -51,7 +52,7 @@ def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 @pytest.fixture
 def server(root: Path) -> Server:
-    started = Server(ToolRunner(Roots([root]), cache=None))
+    started = Server(ToolRunner(Roots([root]), cache=None, settings=Settings()))
     started.handle(request("initialize", {"protocolVersion": "2025-06-18"}))
     return started
 
@@ -70,7 +71,7 @@ def call(server: Server, tool: str, **arguments: object) -> dict[str, Any]:
 
 
 def test_initialize_negotiates_the_version(root: Path) -> None:
-    fresh = Server(ToolRunner(Roots([root]), cache=None))
+    fresh = Server(ToolRunner(Roots([root]), cache=None, settings=Settings()))
     response = fresh.handle(request("initialize", {"protocolVersion": "2025-06-18"}))
     assert response is not None
     result = response["result"]
@@ -175,7 +176,7 @@ def test_unknown_providers_and_tools_are_refused(server: Server) -> None:
 
 
 def test_protocol_edges(root: Path) -> None:
-    fresh = Server(ToolRunner(Roots([root]), cache=None))
+    fresh = Server(ToolRunner(Roots([root]), cache=None, settings=Settings()))
     before = fresh.handle(request("tools/list"))
     assert before is not None
     assert before["error"]["code"] == mcp_server.INVALID_REQUEST
@@ -204,7 +205,7 @@ def test_stream_handles_bad_lines_and_keeps_going(
         json.dumps(request("ping", id_=7)),
     ]
     output = BytesIO()
-    server = Server(ToolRunner(Roots([root]), cache=None))
+    server = Server(ToolRunner(Roots([root]), cache=None, settings=Settings()))
     run(server, BytesIO(("\n".join(lines) + "\n").encode()), output)
     responses = [json.loads(line) for line in output.getvalue().splitlines()]
     assert [r.get("error", {}).get("code") for r in responses] == [
@@ -250,7 +251,7 @@ def test_client_that_goes_away_ends_the_server_quietly(root: Path) -> None:
         def write(self, data: object) -> int:
             raise BrokenPipeError(32, "Broken pipe")
 
-    server = Server(ToolRunner(Roots([root]), cache=None))
+    server = Server(ToolRunner(Roots([root]), cache=None, settings=Settings()))
     run(server, BytesIO(b'{"jsonrpc": "2.0", "id": 1, "method": "ping"}\n'), Closed())
 
 
@@ -277,7 +278,7 @@ def test_long_paths_leave_the_response_within_budget(tmp_path: Path) -> None:
     folder = deep / "/".join(["a-rather-long-folder-name"] * 40)
     folder.mkdir(parents=True)
     (folder / "book.pdf").write_bytes(book(2))
-    started = Server(ToolRunner(Roots([deep]), cache=None))
+    started = Server(ToolRunner(Roots([deep]), cache=None, settings=Settings()))
     started.handle(request("initialize", {}))
     relative = (folder / "book.pdf").relative_to(deep).as_posix()
     result = call(started, "convert_document", path=relative, max_tokens=1_024)["result"]
