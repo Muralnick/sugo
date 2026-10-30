@@ -18,23 +18,26 @@ import hashlib
 import json
 import logging
 from collections import Counter
-from collections.abc import Callable, Generator, Mapping
+from collections.abc import Callable, Generator, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from importlib.metadata import version
 from pathlib import Path
 from types import MappingProxyType
-from typing import ClassVar, Protocol
+from typing import ClassVar, Protocol, TypeVar
 
 from sugo.analyzers.edges import EdgeAnalyzer, EdgeStats
+from sugo.analyzers.lexicon import Lexicon, LexiconAnalyzer
 from sugo.chunkers.sections import SectionChunker
 from sugo.cleaners.headers_footers import HeaderFooterCleaner
 from sugo.cleaners.hidden_text import HiddenTextCleaner
 from sugo.cleaners.page_numbers import PageNumberCleaner
+from sugo.cleaners.text_normalization import TextNormalizationCleaner
+from sugo.cleaners.tracking_urls import TrackingUrlCleaner
 from sugo.cleaners.ui_chrome import UiChromeCleaner
 from sugo.core.chunks import Chunk
 from sugo.core.constants import CHUNK_MIN_TOKENS, MAX_IMAGE_FILE_BYTES, MAX_PDF_FILE_BYTES
-from sugo.core.decisions import Decision, apply_decisions
+from sugo.core.decisions import InvalidDecisionError, Proposal, apply_decisions
 from sugo.core.models import Page
 from sugo.extractors.image.extract import extract_page
 from sugo.extractors.image.loader import UnsupportedImageError, detect_format
@@ -63,26 +66,30 @@ _log = logging.getLogger(__name__)
 _MAX_INPUT_BYTES = max(MAX_PDF_FILE_BYTES, MAX_IMAGE_FILE_BYTES)
 
 
-class Cleaner(Protocol):
+_Stats = TypeVar("_Stats", contravariant=True)
+
+
+class Cleaner(Protocol[_Stats]):
     """What the pipeline needs from a cleaner (ARCHITECTURE §4)."""
 
     name: ClassVar[str]
 
-    def propose(self, page: Page, stats: EdgeStats) -> list[Decision]:
-        """Return the removals this cleaner proposes for the page."""
+    def propose(self, page: Page, stats: _Stats) -> Sequence[Proposal]:
+        """Return the removals and edits this cleaner proposes for the page."""
         ...
 
 
 # Order matters: hidden text goes first, so it never counts as content; page
 # numbers before running headers, which leave page-number text to them.
-CLEANERS: tuple[Cleaner, ...] = (
+CLEANERS: tuple[Cleaner[EdgeStats], ...] = (
     HiddenTextCleaner(),
     UiChromeCleaner(),
     PageNumberCleaner(),
     HeaderFooterCleaner(),
 )
-# Part of the output cache key: another cleaner set gives other pages.
-_CLEANING = ",".join(cleaner.name for cleaner in CLEANERS)
+
+# Until the configuration exists (ADR-051), text rules for English only.
+DEFAULT_LANGUAGES = ("en",)
 
 
 class InputKind(StrEnum):
@@ -121,6 +128,8 @@ class Conversion:
     # Tokens of the text before cleaning, the baseline of ADR-003; None
     # unless asked for (``count_raw_tokens``), as it renders every page twice.
     raw_tokens: int | None = None
+    # Text edits, per cleaner name (ADR-050); each one is recorded on its block.
+    edited: Mapping[str, int] = MappingProxyType({})
 
 
 def convert_file(
@@ -131,6 +140,8 @@ def convert_file(
     source: str | None = None,
     max_chunk_tokens: int | None = None,
     count_raw_tokens: bool = False,
+    languages: tuple[str, ...] = DEFAULT_LANGUAGES,
+    strip_tracking_urls: bool = True,
 ) -> Conversion:
     """Read a file and convert it; ``source`` defaults to the path as given.
 
@@ -147,6 +158,8 @@ def convert_file(
         source=path.as_posix() if source is None else source,
         max_chunk_tokens=max_chunk_tokens,
         count_raw_tokens=count_raw_tokens,
+        languages=languages,
+        strip_tracking_urls=strip_tracking_urls,
     )
 
 
@@ -169,6 +182,8 @@ def convert(
     source: str | None = None,
     max_chunk_tokens: int | None = None,
     count_raw_tokens: bool = False,
+    languages: tuple[str, ...] = DEFAULT_LANGUAGES,
+    strip_tracking_urls: bool = True,
 ) -> Conversion:
     """Convert a document's bytes into Markdown, and into chunks if asked.
 
@@ -180,8 +195,12 @@ def convert(
             gives the document its id, kept across new editions (ADR-047).
         max_chunk_tokens: Chunk size in tokens; None makes no chunks.
         count_raw_tokens: Also count the tokens of the uncleaned text.
+        languages: Languages whose text rules apply (ADR-025); others get
+            only the universal rules.
+        strip_tracking_urls: Delete tracking parameters from URLs.
 
     Raises:
+        ValueError: If a language has no pack, or ``max_chunk_tokens`` is too small.
         InputUnsupportedError: If the data is neither a PDF nor a supported image.
         sugo.extractors.pymupdf.extract.PdfError: If a PDF is refused.
         sugo.extractors.image.loader.ImageLoadError: If an image is refused.
@@ -190,7 +209,11 @@ def convert(
     if max_chunk_tokens is not None and max_chunk_tokens < CHUNK_MIN_TOKENS:
         raise ValueError(f"max_chunk_tokens must be at least {CHUNK_MIN_TOKENS}")
     options = _Options(
-        source=source, max_chunk_tokens=max_chunk_tokens, count_raw_tokens=count_raw_tokens
+        source=source,
+        max_chunk_tokens=max_chunk_tokens,
+        count_raw_tokens=count_raw_tokens,
+        text_cleaners=_text_cleaners(languages, strip_tracking_urls=strip_tracking_urls),
+        languages=tuple(sorted(set(languages))),
     )
     if cache is not None:
         return _Job(data, kind, cache, ocr, options).run()
@@ -222,15 +245,37 @@ def detect_kind(data: bytes) -> InputKind:
     return InputKind.IMAGE
 
 
+def _text_cleaners(
+    languages: tuple[str, ...], *, strip_tracking_urls: bool
+) -> tuple[Cleaner[Lexicon], ...]:
+    """The cleaners that edit text, after the ones that remove blocks (ADR-050).
+
+    Raises:
+        ValueError: If a language has no pack.
+    """
+    cleaners: list[Cleaner[Lexicon]] = [TextNormalizationCleaner(languages)]
+    if strip_tracking_urls:
+        cleaners.append(TrackingUrlCleaner())
+    return tuple(cleaners)
+
+
 @dataclass(frozen=True)
 class _Options:
     source: str | None
     max_chunk_tokens: int | None
     # Not part of the config hash: it measures the output, never changes it.
     count_raw_tokens: bool
+    text_cleaners: tuple[Cleaner[Lexicon], ...]
+    languages: tuple[str, ...]
+
+    def cleaning(self) -> str:
+        """The settings that change cleaned pages, part of their cache key."""
+        names = [cleaner.name for cleaner in CLEANERS]
+        names += [cleaner.name for cleaner in self.text_cleaners]
+        return f"{','.join(names)};languages={','.join(self.languages)}"
 
     def config_hash(self) -> str:
-        settings = {"cleaners": _CLEANING, "max_chunk_tokens": self.max_chunk_tokens}
+        settings = {"cleaners": self.cleaning(), "max_chunk_tokens": self.max_chunk_tokens}
         return hashlib.sha256(json.dumps(settings, sort_keys=True).encode()).hexdigest()
 
 
@@ -259,13 +304,15 @@ class _Job:
 
     def run(self) -> Conversion:
         count = self._extract()
-        analyzer = EdgeAnalyzer()
+        edges, words = EdgeAnalyzer(), LexiconAnalyzer()
         for index in range(count):
-            analyzer.observe(self._extracted(index))
-        stats = analyzer.finalize()
+            page = self._extracted(index)
+            edges.observe(page)
+            words.observe(page)
+        stats, lexicon = edges.finalize(), words.finalize()
         # A cleaned page depends on every page of the document, through the
         # statistics: if any page reads differently, all are cleaned again.
-        cleaning = f"{_CLEANING};{stats.digest()}"
+        cleaning = f"{self._options.cleaning()};{stats.digest()};{lexicon.digest()}"
         sugo_version = version("sugo")
         config_hash = self._options.config_hash()
         chunker = (
@@ -280,6 +327,7 @@ class _Job:
             )
         )
         removed: Counter[str] = Counter()
+        edited: Counter[str] = Counter()
         parts: list[str] = []
         raw_parts: list[str] | None = [] if self._options.count_raw_tokens else None
         chunks: list[Chunk] = []
@@ -288,8 +336,9 @@ class _Job:
                 raw_text = render(self._extracted(index).blocks)
                 if raw_text:
                     raw_parts.append(raw_text)
-            page = self._cleaned(index, stats, cleaning)
+            page = self._cleaned(index, stats, lexicon, cleaning)
             removed.update(block.removed_by for block in page.blocks if block.removed_by)
+            edited.update(edit.edited_by for block in page.blocks for edit in block.edits)
             text = render(page.blocks)
             if text:
                 parts.append(text)
@@ -312,6 +361,7 @@ class _Job:
             config_hash=config_hash,
             # Joined like the Markdown, so both counts measure the same layout.
             raw_tokens=None if raw_parts is None else count_tokens("\n\n".join(raw_parts)),
+            edited=MappingProxyType(dict(sorted(edited.items()))),
         )
 
     def _extract(self) -> int:
@@ -363,7 +413,7 @@ class _Job:
             self._spilled[index] = page
         return page
 
-    def _cleaned(self, index: int, stats: EdgeStats, cleaning: str) -> Page:
+    def _cleaned(self, index: int, stats: EdgeStats, lexicon: Lexicon, cleaning: str) -> Page:
         """Pass 3: one page cleaned with the document's statistics, from the cache if there."""
         key = output_key(extraction=self._key(index), cleaning=cleaning)
         # A failed page is never cached, nor what was cleaned from it.
@@ -374,7 +424,9 @@ class _Job:
                 return cached
         page = self._extracted(index)
         for cleaner in CLEANERS:
-            page = apply_decisions(page, cleaner.propose(page, stats), cleaner=cleaner.name)
+            page = _cleaned_by(page, cleaner, stats)
+        for text_cleaner in self._options.text_cleaners:
+            page = _cleaned_by(page, text_cleaner, lexicon)
         if not failed:
             # Not kept in memory if refused: pass 3 never reads it back.
             self._put(CacheLevel.OUTPUT, key, page)
@@ -399,6 +451,20 @@ class _Job:
             # Stops the worker instead of letting it read the remaining pages.
             if isinstance(pages, Generator):
                 pages.close()
+
+
+def _cleaned_by[S](page: Page, cleaner: Cleaner[S], stats: S) -> Page:
+    """One cleaner's decisions applied; if the core refuses them, the page as it was.
+
+    A refused proposal is a bug in the cleaner, not in the document: the
+    page goes on without that cleaner's changes, and the warning names the
+    cleaner only (principle 11).
+    """
+    try:
+        return apply_decisions(page, cleaner.propose(page, stats), cleaner=cleaner.name)
+    except InvalidDecisionError as error:
+        _log.warning("cleaner %s skipped on a page: %s", error.cleaner, error)
+        return page
 
 
 class _OnceOcr:
