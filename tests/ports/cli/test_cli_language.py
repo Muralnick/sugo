@@ -2,6 +2,7 @@
 
 import ast
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -38,16 +39,21 @@ def run(*args: str) -> Result:
 
 
 def flat(text: str) -> str:
-    """Text without Rich's frames and line wrapping."""
-    return " ".join(text.translate(str.maketrans("", "", "│|┌┐└┘─+")).split())
+    """Text without Rich's colours, frames and line wrapping.
+
+    Rich colours its output where it detects CI, e.g. GitHub Actions.
+    """
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", text)
+    return " ".join(plain.translate(str.maketrans("", "", "│|┌┐└┘╭╮╰╯─+")).split())
 
 
 def test_help_is_italian() -> None:
     result = run("--help")
     assert result.exit_code == ExitCode.OK
+    root = flat(result.stdout)
     for text in ("Uso: sugo", "Opzioni", "Comandi", "Mostra questo messaggio ed esci."):
-        assert text in result.stdout
-    assert "Documenti, ridotti" in result.stdout
+        assert text in root
+    assert "Documenti, ridotti" in root
     convert = flat(run("convert", "--help").stdout)
     for text in ("Argomenti", "File PDF, PNG, JPEG o WEBP.", "[obbligatorio]"):
         assert text in convert
