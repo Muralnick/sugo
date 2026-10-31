@@ -17,7 +17,6 @@ reserves for later versions (ARCHITECTURE §14) give a warning instead.
 Errors name the file or variable and the key, never the value.
 """
 
-import locale
 import os
 import tomllib
 from dataclasses import dataclass
@@ -28,6 +27,8 @@ import platformdirs
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from sugo.core.constants import CHUNK_MAX_TOKENS, CHUNK_MAX_TOKENS_LIMIT, CHUNK_MIN_TOKENS
+from sugo.i18n import gettext as _
+from sugo.i18n import os_reason, system_language
 from sugo.languages.packs import PACKS
 
 # Larger "configuration" files are not configuration.
@@ -84,10 +85,12 @@ class General(_Section):
         if value is None:
             return None
         if not value:
-            raise ValueError("at least one language is needed")
+            raise ValueError(_("at least one language is needed"))
         unknown = sorted(set(value) - set(PACKS))
         if unknown:
-            raise ValueError(f"languages must be among: {', '.join(sorted(PACKS))}")
+            raise ValueError(
+                _("languages must be among: {languages}").format(languages=", ".join(sorted(PACKS)))
+            )
         # Order and repeats do not change the output.
         return tuple(sorted(set(value)))
 
@@ -151,8 +154,8 @@ def load(*, cwd: Path | None = None, project: bool = True, environment: bool = T
     except OSError as error:
         # A folder that cannot be searched, e.g. a configuration folder with
         # no permissions: reported like any other configuration problem.
-        name = printable(error.filename or "configuration")
-        raise ConfigError(f"{name}: cannot be read ({error.strerror})") from None
+        name = printable(error.filename or _("configuration"))
+        raise ConfigError(_unreadable(name, error)) from None
 
 
 def _load(cwd: Path | None, *, project: bool, environment: bool) -> Loaded:
@@ -177,7 +180,7 @@ def _load(cwd: Path | None, *, project: bool, environment: bool) -> Loaded:
     if environment:
         # Already validated variable by variable, so errors name the variable.
         _merge(merged, _environment())
-    settings = _validate("configuration", merged)
+    settings = _validate(_("configuration"), merged)
     if settings.general.languages is None:
         # Resolved here, once: without the environment layer (the MCP server)
         # the locale variables must not choose languages either.
@@ -210,23 +213,10 @@ def user_config_path() -> Path:
 def default_languages() -> tuple[str, ...]:
     """The system's language, if Sugo has a pack for it, and English."""
     found = {"en"}
-    system = _system_language()
+    system = system_language()
     if system is not None and system in PACKS:
         found.add(system)
     return tuple(sorted(found))
-
-
-def _system_language() -> str | None:
-    for variable in ("LC_ALL", "LC_MESSAGES", "LANG"):
-        value = os.environ.get(variable)
-        if value and value not in ("C", "POSIX"):
-            return value[:2].lower()
-    name = locale.getlocale()[0]
-    if not name:
-        return None
-    # Windows names locales in English: "Italian_Italy".
-    names = {"italian": "it", "spanish": "es", "french": "fr", "german": "de", "english": "en"}
-    return names.get(name.split("_")[0].lower(), name[:2].lower())
 
 
 def _read_toml(path: Path) -> dict[str, Any]:
@@ -234,21 +224,30 @@ def _read_toml(path: Path) -> dict[str, Any]:
         with path.open("rb") as file:
             data = file.read(MAX_CONFIG_BYTES + 1)
     except OSError as error:
-        raise ConfigError(f"{printable(str(path))}: cannot be read ({error.strerror})") from None
+        raise ConfigError(_unreadable(printable(str(path)), error)) from None
     if len(data) > MAX_CONFIG_BYTES:
-        raise ConfigError(f"{printable(str(path))}: larger than {MAX_CONFIG_BYTES // 1024} KB")
+        raise ConfigError(
+            _("{name}: larger than {size} KB").format(
+                name=printable(str(path)), size=MAX_CONFIG_BYTES // 1024
+            )
+        )
     try:
         text = data.decode("utf-8")
     except UnicodeDecodeError as error:
         # The position only: the decoder's message would quote the byte.
-        raise ConfigError(f"{printable(str(path))}: not UTF-8 (byte {error.start})") from None
+        raise ConfigError(
+            _("{name}: not UTF-8 (byte {byte})").format(name=printable(str(path)), byte=error.start)
+        ) from None
     try:
         return tomllib.loads(text)
     except tomllib.TOMLDecodeError as error:
         # The parser's message gives the line and column, not the content.
         # Truncated and made printable: it may quote key names from the file.
+        # The parser's own words stay in English (ADR-052).
         raise ConfigError(
-            f"{printable(str(path))}: not valid TOML ({printable(str(error))})"
+            _("{name}: not valid TOML ({detail})").format(
+                name=printable(str(path)), detail=printable(str(error))
+            )
         ) from None
 
 
@@ -263,14 +262,20 @@ def _project_layer(folder: Path, warnings: list[str]) -> tuple[Path, dict[str, A
         table = _read_toml(pyproject)
     except ConfigError:
         # Another tool's file: a problem in it is not Sugo's to report as an error.
-        warnings.append(f"{printable(str(pyproject))}: not readable as TOML; [tool.sugo] ignored")
+        warnings.append(
+            _("{name}: not readable as TOML; [tool.sugo] ignored").format(
+                name=printable(str(pyproject))
+            )
+        )
         return None
     tool = table.get("tool")
     sugo = tool.get("sugo") if isinstance(tool, dict) else None
     if sugo is None:
         return None
     if not isinstance(sugo, dict):
-        raise ConfigError(f"{printable(str(pyproject))}: [tool.sugo] must be a table")
+        raise ConfigError(
+            _("{name}: [tool.sugo] must be a table").format(name=printable(str(pyproject)))
+        )
     return pyproject, sugo
 
 
@@ -295,12 +300,12 @@ def _from_text(variable: str, key: str, raw: str) -> object:
             return True
         if raw.lower() in _FALSE:
             return False
-        raise ConfigError(f"{variable}: expected true or false")
+        raise ConfigError(_("{name}: expected true or false").format(name=variable))
     if key == "max_tokens":
         try:
             return int(raw)
         except ValueError:
-            raise ConfigError(f"{variable}: expected a whole number") from None
+            raise ConfigError(_("{name}: expected a whole number").format(name=variable)) from None
     return raw
 
 
@@ -309,13 +314,23 @@ def _without_reserved(name: str, table: dict[str, Any], warnings: list[str]) -> 
     for section, values in table.items():
         reserved = _RESERVED.get(section, frozenset())
         if reserved is None:
-            warnings.append(f"{name}: [{section}] is not used in this version")
+            warnings.append(
+                _("{name}: [{section}] is not used in this version").format(
+                    name=name, section=section
+                )
+            )
             continue
         if not isinstance(values, dict):
-            raise ConfigError(f"{name}: {printable(section)} must be a table")
+            raise ConfigError(
+                _("{name}: {section} must be a table").format(name=name, section=printable(section))
+            )
         later = sorted(set(values) & reserved)
         for key in later:
-            warnings.append(f"{name}: {section}.{key} is not used in this version")
+            warnings.append(
+                _("{name}: {key} is not used in this version").format(
+                    name=name, key=f"{section}.{key}"
+                )
+            )
         kept[section] = {key: value for key, value in values.items() if key not in reserved}
     return kept
 
@@ -326,7 +341,36 @@ def _validate(name: str, table: dict[str, Any]) -> Settings:
     except ValidationError as error:
         # The keys at fault and what is expected, never the values.
         problems = sorted(
-            f"{printable('.'.join(map(str, item['loc'])))}: {item['msg']}"
+            f"{printable('.'.join(map(str, item['loc'])))}: {_problem(item)}"
             for item in error.errors()
         )
         raise ConfigError(f"{name}: {'; '.join(problems)}") from None
+
+
+def _unreadable(name: str, error: OSError) -> str:
+    return _("{name}: cannot be read ({reason})").format(name=name, reason=os_reason(error))
+
+
+def _problem(item: Any) -> str:
+    """Pydantic's complaint about one key in the interface language; never the value."""
+    kind = item["type"]
+    context = item.get("ctx", {})
+    if kind == "value_error":
+        # Raised by our own validators, already translated.
+        return str(context["error"])
+    if kind == "literal_error":
+        expected = str(context["expected"]).replace(" or ", ", ")
+        return _("expected one of: {expected}").format(expected=expected)
+    if kind == "greater_than_equal":
+        return _("must be at least {minimum}").format(minimum=context["ge"])
+    if kind == "less_than_equal":
+        return _("must be at most {maximum}").format(maximum=context["le"])
+    messages = {
+        "extra_forbidden": _("unknown key"),
+        "bool_type": _("expected true or false"),
+        "int_type": _("expected a whole number"),
+        "string_type": _("expected text"),
+        "tuple_type": _("expected a list"),
+        "model_type": _("must be a table"),
+    }
+    return messages.get(kind, str(item["msg"]))

@@ -27,6 +27,7 @@ import numpy.typing as npt
 from PIL import ExifTags, Image, ImageOps
 
 from sugo.core.constants import MAX_IMAGE_FILE_BYTES, MAX_IMAGE_PIXELS
+from sugo.i18n import gettext as _
 
 RgbArray = npt.NDArray[np.uint8]
 
@@ -63,6 +64,11 @@ class ImageTooLargeError(ImageLoadError):
     code: ClassVar[str] = "IMAGE_TOO_LARGE"
 
 
+def too_many_pixels() -> str:
+    """The message for an image over the pixel limit, in the interface language."""
+    return _("image exceeds {limit} pixels").format(limit=MAX_IMAGE_PIXELS)
+
+
 @dataclass(frozen=True)
 class LoadedImage:
     """A decoded image: read-only 8-bit RGB pixels, height x width x 3."""
@@ -97,7 +103,7 @@ def detect_format(data: bytes) -> ImageFormat:
         return ImageFormat.JPEG
     if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
         return ImageFormat.WEBP
-    raise UnsupportedImageError("not a PNG, JPEG or WEBP image")
+    raise UnsupportedImageError(_("not a PNG, JPEG or WEBP image"))
 
 
 def read_image_file(path: Path) -> LoadedImage:
@@ -126,7 +132,9 @@ def decode_image(data: bytes) -> LoadedImage:
         ImageLoadError: If the data is corrupt or truncated.
     """
     if len(data) > MAX_IMAGE_FILE_BYTES:
-        raise ImageTooLargeError(f"image file exceeds {MAX_IMAGE_FILE_BYTES} bytes")
+        raise ImageTooLargeError(
+            _("image file exceeds {limit} bytes").format(limit=MAX_IMAGE_FILE_BYTES)
+        )
     image_format = detect_format(data)
     try:
         with warnings.catch_warnings():
@@ -136,18 +144,18 @@ def decode_image(data: bytes) -> LoadedImage:
             with Image.open(BytesIO(data), formats=[image_format.value]) as image:
                 width, height = image.size
                 if width * height > MAX_IMAGE_PIXELS:
-                    raise ImageTooLargeError(f"image exceeds {MAX_IMAGE_PIXELS} pixels")
+                    raise ImageTooLargeError(too_many_pixels())
                 if getattr(image, "n_frames", 1) > 1:
-                    raise UnsupportedImageError("animated images are not supported")
+                    raise UnsupportedImageError(_("animated images are not supported"))
                 rgb = _to_rgb(ImageOps.exif_transpose(image))
     except ImageLoadError:
         raise
     except (Image.DecompressionBombError, Image.DecompressionBombWarning) as error:
         # Pillow's own bomb guard can trigger first, while opening the header.
-        raise ImageTooLargeError(f"image exceeds {MAX_IMAGE_PIXELS} pixels") from error
+        raise ImageTooLargeError(too_many_pixels()) from error
     except (OSError, ValueError, SyntaxError) as error:
         # Pillow reports corrupt data through several exception types.
-        raise ImageLoadError("image data is corrupt or truncated") from error
+        raise ImageLoadError(_("image data is corrupt or truncated")) from error
     pixels = np.asarray(rgb, dtype=np.uint8).copy()
     pixels.setflags(write=False)
     return LoadedImage(pixels=pixels, format=image_format, sha256=hashlib.sha256(data).hexdigest())
@@ -169,9 +177,9 @@ def image_size(data: bytes) -> tuple[int, int]:
                 width, height = image.size
                 orientation = image.getexif().get(ExifTags.Base.Orientation, 1)
     except (Image.DecompressionBombError, Image.DecompressionBombWarning) as error:
-        raise ImageTooLargeError(f"image exceeds {MAX_IMAGE_PIXELS} pixels") from error
+        raise ImageTooLargeError(too_many_pixels()) from error
     except (OSError, ValueError, SyntaxError) as error:
-        raise ImageLoadError("image data is corrupt or truncated") from error
+        raise ImageLoadError(_("image data is corrupt or truncated")) from error
     return (height, width) if orientation in _QUARTER_TURNS else (width, height)
 
 

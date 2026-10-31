@@ -1,0 +1,511 @@
+# Italian interface of Sugo (ADR-024, ADR-052).
+# Distributed under the same licence as Sugo (AGPL-3.0-or-later).
+# Style: informal "tu" with the imperative; "chunk", "token", "Markdown",
+# "cache" and "JSON" stay in English. Placeholders in braces stay unchanged.
+msgid ""
+msgstr ""
+"Project-Id-Version: sugo\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+# --- Command line: help -------------------------------------------------------
+
+msgid "Documents, reduced: convert PDFs and images into compact Markdown, locally."
+msgstr "Documenti, ridotti: converti PDF e immagini in Markdown compatto, in locale."
+
+msgid "Show the version and exit."
+msgstr "Mostra la versione ed esci."
+
+msgid ""
+"Convert files into compact Markdown (sugo FILE is short for sugo convert FILE).\n"
+"\n"
+"Without -o the Markdown of one file goes to stdout; with --chunks, its chunks as "
+"JSON Lines. With -o each file becomes NAME.md, and NAME.jsonl with --chunks. A "
+"file that fails does not stop the others."
+msgstr ""
+"Converti i file in Markdown compatto (sugo FILE è l'abbreviazione di sugo convert FILE).\n"
+"\n"
+"Senza -o il Markdown di un file va sullo standard output; con --chunks, i suoi "
+"chunk in JSON Lines. Con -o ogni file diventa NOME.md, e NOME.jsonl con --chunks. "
+"Un file che non riesce non ferma gli altri."
+
+msgid "PDF, PNG, JPEG or WEBP files."
+msgstr "File PDF, PNG, JPEG o WEBP."
+
+msgid "Write NAME.md files to this folder."
+msgstr "Scrivi i file NOME.md in questa cartella."
+
+msgid "Also split into chunks (JSONL) for RAG."
+msgstr "Dividi anche in chunk (JSONL) per il RAG."
+
+msgid "Chunk size in tokens."
+msgstr "Dimensione dei chunk in token."
+
+msgid "Start the Markdown with YAML metadata."
+msgstr "Inizia il Markdown con i metadati YAML."
+
+msgid "Keep no page cache on disk."
+msgstr "Non tenere la cache delle pagine sul disco."
+
+msgid "Print one JSON object."
+msgstr "Stampa un solo oggetto JSON."
+
+msgid "Show the tokens Sugo saves on a file, per LLM provider."
+msgstr "Mostra i token che Sugo risparmia su un file, per ogni fornitore di LLM."
+
+msgid "PDF or image file."
+msgstr "File PDF o immagine."
+
+msgid "Compare with this provider only; repeatable."
+msgstr "Confronta solo con questo fornitore; ripetibile."
+
+msgid "Convert the image in the clipboard, e.g. a screenshot."
+msgstr "Converti l'immagine negli appunti, per esempio uno screenshot."
+
+msgid "Write clip-HASH.md to this folder."
+msgstr "Scrivi clip-HASH.md in questa cartella."
+
+msgid "Check the installation: levels, verified models, cache and clipboard."
+msgstr "Controlla l'installazione: livelli, modelli verificati, cache e appunti."
+
+msgid "Serve Sugo to AI agents over MCP (stdio), reading only inside the given folders."
+msgstr "Offri Sugo agli agenti IA tramite MCP (stdio), leggendo solo nelle cartelle indicate."
+
+msgid "A folder agents may read; repeatable. Required."
+msgstr "Una cartella che gli agenti possono leggere; ripetibile. Obbligatoria."
+
+# --- Command line: what Typer's copy of Click writes in English ----------------
+
+msgid "Usage:"
+msgstr "Uso:"
+
+msgid "Show this message and exit."
+msgstr "Mostra questo messaggio ed esci."
+
+msgid "Invalid value for {hint}: {message}"
+msgstr "Valore non valido per {hint}: {message}"
+
+msgid "Invalid value: {message}"
+msgstr "Valore non valido: {message}"
+
+msgid "Missing argument{hint}.{extra}"
+msgstr "Argomento mancante{hint}.{extra}"
+
+msgid "Missing option{hint}.{extra}"
+msgstr "Opzione mancante{hint}.{extra}"
+
+msgid "Missing parameter{hint}.{extra}"
+msgstr "Parametro mancante{hint}.{extra}"
+
+msgid "No such option: {name} (possible options: {options})"
+msgstr "L'opzione {name} non esiste (opzioni possibili: {options})"
+
+msgid "No such option: {name}"
+msgstr "L'opzione {name} non esiste"
+
+msgid "Got unexpected extra argument(s) ({arguments})"
+msgstr "Argomenti in più non previsti ({arguments})"
+
+msgid "Option {name} does not take a value."
+msgstr "L'opzione {name} non accetta un valore."
+
+msgid "Option {name} requires an argument."
+msgstr "L'opzione {name} richiede un argomento."
+
+msgid "Option {name} requires {count} arguments."
+msgstr "L'opzione {name} richiede {count} argomenti."
+
+msgid "Argument {name} takes {count} values."
+msgstr "L'argomento {name} accetta {count} valori."
+
+msgid "{count} values are required, but {given} given."
+msgstr "Servono {count} valori, ma ne sono stati dati {given}."
+
+msgid "{value} is not a valid integer."
+msgstr "{value} non è un numero intero valido."
+
+msgid "{value} is not a valid number."
+msgstr "{value} non è un numero valido."
+
+msgid "{value} is not in the range {range}."
+msgstr "{value} non è nell'intervallo {range}."
+
+msgid "{value} is not a valid boolean. Recognized values: {states}"
+msgstr "{value} non è un valore vero/falso valido. Valori riconosciuti: {states}"
+
+msgid "{value} is not one of {choices}."
+msgstr "{value} non è uno tra {choices}."
+
+msgid "{kind} {name} does not exist."
+msgstr "{kind} {name}: non esiste."
+
+msgid "{kind} {name} is a file."
+msgstr "{kind} {name}: è un file."
+
+msgid "{kind} {name} is a directory."
+msgstr "{kind} {name}: è una cartella."
+
+msgid "{kind} {name} is not readable."
+msgstr "{kind} {name}: non è leggibile."
+
+msgid "{kind} {name} is not writable."
+msgstr "{kind} {name}: non è scrivibile."
+
+msgid "File"
+msgstr "File"
+
+msgid "Directory"
+msgstr "Cartella"
+
+msgid "Path"
+msgstr "Percorso"
+
+msgid "Value must be an iterable."
+msgstr "Il valore deve essere un elenco."
+
+# --- Command line: usage errors -----------------------------------------------
+
+msgid "--max-tokens needs --chunks"
+msgstr "--max-tokens richiede --chunks"
+
+msgid "several files need an output folder"
+msgstr "più file richiedono una cartella di uscita"
+
+msgid "front matter goes only into Markdown output"
+msgstr "il front matter va solo nell'output Markdown"
+
+msgid "{first} and {second} would both write {name}.md"
+msgstr "{first} e {second} scriverebbero entrambi {name}.md"
+
+msgid "writing {name}.md would overwrite an input file"
+msgstr "scrivere {name}.md sovrascriverebbe un file di ingresso"
+
+msgid "unknown provider {names}; choose from {choices}"
+msgstr "fornitore sconosciuto {names}; scegli tra {choices}"
+
+# --- Command line: progress and results ---------------------------------------
+
+msgid "Converting"
+msgstr "Conversione in corso"
+
+msgid "Converting {source}"
+msgstr "Conversione di {source}"
+
+msgid "clipboard"
+msgstr "appunti"
+
+msgid "{source}: page {pages} could not be read"
+msgid_plural "{source}: pages {pages} could not be read"
+msgstr[0] "{source}: la pagina {pages} non si può leggere"
+msgstr[1] "{source}: le pagine {pages} non si possono leggere"
+
+msgid "{count} page"
+msgid_plural "{count} pages"
+msgstr[0] "{count} pagina"
+msgstr[1] "{count} pagine"
+
+msgid "image"
+msgstr "immagine"
+
+msgid "Text before and after cleaning: {before} -> {after} tokens ({saved:.1f}% saved)"
+msgstr "Testo prima e dopo la pulizia: {before} -> {after} token ({saved:.1f}% risparmiato)"
+
+msgid "Sending the image vs sending its Markdown"
+msgstr "Inviare l'immagine o il suo Markdown"
+
+msgid "provider"
+msgstr "fornitore"
+
+msgid "tier"
+msgstr "fascia"
+
+msgid "image tokens"
+msgstr "token immagine"
+
+msgid "Markdown tokens"
+msgstr "token Markdown"
+
+msgid "saved"
+msgstr "risparmio"
+
+msgid "{provider} (unverified)"
+msgstr "{provider} (non verificato)"
+
+msgid "rejected"
+msgstr "rifiutata"
+
+msgid "warning: {message}"
+msgstr "avviso: {message}"
+
+msgid "Interrupted."
+msgstr "Interrotto."
+
+msgid "error"
+msgstr "errore"
+
+msgid "hint: {hint}"
+msgstr "suggerimento: {hint}"
+
+# --- Errors and hints ---------------------------------------------------------
+
+msgid "Sugo reads PDF, PNG, JPEG and WEBP files."
+msgstr "Sugo legge file PDF, PNG, JPEG e WEBP."
+
+msgid "Save the image as a still PNG, JPEG or WEBP."
+msgstr "Salva l'immagine come PNG, JPEG o WEBP non animato."
+
+msgid "The file may be damaged; open it and save it again."
+msgstr "Il file potrebbe essere danneggiato; aprilo e salvalo di nuovo."
+
+msgid "Reduce the image size, or split it."
+msgstr "Riduci le dimensioni dell'immagine, oppure dividila."
+
+msgid "Save an unprotected copy of the PDF and convert that."
+msgstr "Salva una copia non protetta del PDF e converti quella."
+
+msgid "Split the PDF into smaller files."
+msgstr "Dividi il PDF in file più piccoli."
+
+msgid "Try again; if it fails again, run: sugo doctor"
+msgstr "Riprova; se non riesce di nuovo, esegui: sugo doctor"
+
+msgid "Fix the file or variable named above; run: sugo doctor"
+msgstr "Correggi il file o la variabile indicati sopra; esegui: sugo doctor"
+
+msgid "The lite level is not installed."
+msgstr "Il livello lite non è installato."
+
+msgid "Reinstall Sugo; a bundled file was altered or damaged."
+msgstr "Reinstalla Sugo: un file incluso è stato alterato o danneggiato."
+
+msgid "Check the output folder: free space and permission to write."
+msgstr "Controlla la cartella di uscita: spazio libero e permesso di scrittura."
+
+msgid "The clipboard cannot be read."
+msgstr "Impossibile leggere gli appunti."
+
+msgid "On Linux, install wl-clipboard (Wayland) or xclip (X11)."
+msgstr "Su Linux, installa wl-clipboard (Wayland) o xclip (X11)."
+
+msgid "The clipboard holds no image."
+msgstr "Negli appunti non c'è un'immagine."
+
+msgid "Copy an image or take a screenshot; to convert a file, run: sugo FILE"
+msgstr "Copia un'immagine o fai uno screenshot; per convertire un file, esegui: sugo FILE"
+
+msgid "no such file or folder"
+msgstr "file o cartella inesistente"
+
+msgid "permission denied"
+msgstr "permesso negato"
+
+msgid "it is a folder"
+msgstr "è una cartella"
+
+msgid "a part of the path is not a folder"
+msgstr "una parte del percorso non è una cartella"
+
+msgid "no space left on the disk"
+msgstr "spazio esaurito sul disco"
+
+msgid "the disk is read-only"
+msgstr "il disco è di sola lettura"
+
+msgid "it already exists"
+msgstr "esiste già"
+
+msgid "the name is too long"
+msgstr "il nome è troppo lungo"
+
+msgid "unknown error"
+msgstr "errore sconosciuto"
+
+msgid "not a supported input: PDF, PNG, JPEG or WEBP expected"
+msgstr "formato non supportato: attesi PDF, PNG, JPEG o WEBP"
+
+msgid "not a PNG, JPEG or WEBP image"
+msgstr "non è un'immagine PNG, JPEG o WEBP"
+
+msgid "animated images are not supported"
+msgstr "le immagini animate non sono supportate"
+
+msgid "image data is corrupt or truncated"
+msgstr "i dati dell'immagine sono danneggiati o troncati"
+
+msgid "image exceeds {limit} pixels"
+msgstr "l'immagine supera {limit} pixel"
+
+msgid "image file exceeds {limit} bytes"
+msgstr "il file immagine supera {limit} byte"
+
+msgid "model {name} failed its SHA-256 check"
+msgstr "il modello {name} non ha superato il controllo SHA-256"
+
+msgid "tokenizer vocabulary failed its SHA-256 check"
+msgstr "il vocabolario del tokenizer non ha superato il controllo SHA-256"
+
+msgid "not a PDF file"
+msgstr "non è un file PDF"
+
+msgid "PDF file exceeds {limit} bytes"
+msgstr "il file PDF supera {limit} byte"
+
+msgid "the file is not a readable PDF"
+msgstr "il file non è un PDF leggibile"
+
+msgid "the PDF is protected by a password"
+msgstr "il PDF è protetto da una password"
+
+msgid "the PDF has more than {pages} pages"
+msgstr "il PDF ha più di {pages} pagine"
+
+msgid "a stream of the PDF cannot be decoded, so it cannot be checked"
+msgstr "un flusso del PDF non si può decodificare, quindi non si può controllare"
+
+msgid "the PDF uses Brotli compression, refused until MuPDF fixes CVE-2026-111497"
+msgstr "il PDF usa la compressione Brotli, rifiutata finché MuPDF non corregge CVE-2026-111497"
+
+msgid "the PDF names a stream filter indirectly, which Sugo cannot check safely"
+msgstr "il PDF indica un filtro di flusso in modo indiretto, che Sugo non può controllare in sicurezza"
+
+msgid "the PDF worker failed to open the document"
+msgstr "il processo che legge i PDF non è riuscito ad aprire il documento"
+
+msgid "the PDF keeps crashing or stalling the PDF worker"
+msgstr "il PDF continua a bloccare o a far chiudere il processo che legge i PDF"
+
+# --- Configuration ------------------------------------------------------------
+
+msgid "configuration"
+msgstr "configurazione"
+
+msgid "at least one language is needed"
+msgstr "serve almeno una lingua"
+
+msgid "languages must be among: {languages}"
+msgstr "le lingue devono essere tra: {languages}"
+
+msgid "{name}: cannot be read ({reason})"
+msgstr "{name}: non si può leggere ({reason})"
+
+msgid "{name}: larger than {size} KB"
+msgstr "{name}: più grande di {size} KB"
+
+msgid "{name}: not UTF-8 (byte {byte})"
+msgstr "{name}: non è UTF-8 (byte {byte})"
+
+msgid "{name}: not valid TOML ({detail})"
+msgstr "{name}: TOML non valido ({detail})"
+
+msgid "{name}: not readable as TOML; [tool.sugo] ignored"
+msgstr "{name}: non leggibile come TOML; [tool.sugo] ignorata"
+
+msgid "{name}: [tool.sugo] must be a table"
+msgstr "{name}: [tool.sugo] deve essere una tabella"
+
+msgid "{name}: expected true or false"
+msgstr "{name}: atteso true o false"
+
+msgid "{name}: expected a whole number"
+msgstr "{name}: atteso un numero intero"
+
+msgid "{name}: [{section}] is not used in this version"
+msgstr "{name}: [{section}] non è usata in questa versione"
+
+msgid "{name}: {section} must be a table"
+msgstr "{name}: {section} deve essere una tabella"
+
+msgid "{name}: {key} is not used in this version"
+msgstr "{name}: {key} non è usata in questa versione"
+
+msgid "expected one of: {expected}"
+msgstr "atteso uno tra: {expected}"
+
+msgid "must be at least {minimum}"
+msgstr "deve essere almeno {minimum}"
+
+msgid "must be at most {maximum}"
+msgstr "deve essere al massimo {maximum}"
+
+msgid "unknown key"
+msgstr "chiave sconosciuta"
+
+msgid "expected true or false"
+msgstr "atteso true o false"
+
+msgid "expected a whole number"
+msgstr "atteso un numero intero"
+
+msgid "expected text"
+msgstr "atteso un testo"
+
+msgid "expected a list"
+msgstr "attesa una lista"
+
+msgid "must be a table"
+msgstr "deve essere una tabella"
+
+# --- sugo doctor --------------------------------------------------------------
+
+msgid "ok"
+msgstr "ok"
+
+msgid "warning"
+msgstr "avviso"
+
+msgid "{version} on {system}"
+msgstr "{version} su {system}"
+
+msgid "cpus"
+msgstr "cpu"
+
+msgid "unknown"
+msgstr "sconosciuto"
+
+msgid "level lite"
+msgstr "livello lite"
+
+msgid "missing {packages}: pip install \"sugo[lite]\""
+msgstr "mancano {packages}: pip install \"sugo[lite]\""
+
+msgid "not installed"
+msgstr "non installato"
+
+msgid "ocr models"
+msgstr "modelli ocr"
+
+msgid "{count} models, SHA-256 verified"
+msgstr "{count} modelli, SHA-256 verificato"
+
+msgid "{version} has known memory-safety bugs; convert only PDFs you trust"
+msgstr "{version} ha bug noti di sicurezza della memoria; converti solo PDF di cui ti fidi"
+
+msgid "tokenizer"
+msgstr "tokenizer"
+
+msgid "o200k_base, SHA-256 verified"
+msgstr "o200k_base, SHA-256 verificato"
+
+msgid "config"
+msgstr "configurazione"
+
+msgid "defaults (none at {path})"
+msgstr "valori predefiniti (nessun file in {path})"
+
+msgid "{files}; languages {languages}; sugo mcp: languages {mcp_languages}"
+msgstr "{files}; lingue {languages}; sugo mcp: lingue {mcp_languages}"
+
+msgid "cache"
+msgstr "cache"
+
+msgid "{folder} (empty)"
+msgstr "{folder} (vuota)"
+
+msgid "native"
+msgstr "nativo"
+
+msgid "install wl-clipboard (Wayland) or xclip (X11)"
+msgstr "installa wl-clipboard (Wayland) o xclip (X11)"

@@ -30,8 +30,10 @@ from typing import ClassVar
 
 import numpy as np
 
+from sugo import i18n
 from sugo.core.constants import (
     MAX_PDF_FILE_BYTES,
+    MAX_PDF_PAGES,
     PDF_MAX_WORKER_RESTARTS,
     PDF_OPEN_TIMEOUT_S,
     PDF_PAGE_TIMEOUT_S,
@@ -54,6 +56,7 @@ from sugo.extractors.pymupdf.protocol import (
     parse_message,
     read_frame,
 )
+from sugo.i18n import gettext as _
 
 # "-I": isolated mode, so the environment and the current directory cannot
 # change which code the worker runs.
@@ -101,6 +104,24 @@ _REFUSALS: dict[str, type[PdfError]] = {
 }
 
 
+def _file_too_large() -> str:
+    return _("PDF file exceeds {limit} bytes").format(limit=MAX_PDF_FILE_BYTES)
+
+
+def _refusal(message: Refused) -> PdfError:
+    """The error for a refusal the worker sent, in the interface language.
+
+    The worker sends fixed English sentences, marked for translation where
+    it writes them, and they are looked up as they are. They are never used
+    as format strings: the worker parses hostile PDFs, so its text is data.
+    """
+    if message.code == "PDF_TOO_LARGE":
+        text = _("the PDF has more than {pages} pages").format(pages=MAX_PDF_PAGES)
+    else:
+        text = i18n.gettext(message.message)
+    return _REFUSALS[message.code](text)
+
+
 def read_pdf_file(path: Path) -> bytes:
     """Read a PDF file, refusing it early if it is too large.
 
@@ -112,7 +133,7 @@ def read_pdf_file(path: Path) -> bytes:
         # One byte more than the limit tells "too large" apart from "exactly the limit".
         data = file.read(MAX_PDF_FILE_BYTES + 1)
     if len(data) > MAX_PDF_FILE_BYTES:
-        raise PdfTooLargeError(f"PDF file exceeds {MAX_PDF_FILE_BYTES} bytes")
+        raise PdfTooLargeError(_file_too_large())
     return data
 
 
@@ -149,12 +170,12 @@ def extract_pdf(
         PdfError: If the file is not a readable PDF; subclasses say why.
     """
     if len(data) > MAX_PDF_FILE_BYTES:
-        raise PdfTooLargeError(f"PDF file exceeds {MAX_PDF_FILE_BYTES} bytes")
+        raise PdfTooLargeError(_file_too_large())
     if PDF_SIGNATURE not in data[:PDF_SIGNATURE_WINDOW]:
-        raise PdfError("not a PDF file")
+        raise PdfError(_("not a PDF file"))
     problem = raw_problem(data)
     if problem is not None:
-        raise PdfUnsupportedError(problem)
+        raise PdfUnsupportedError(i18n.gettext(problem))
     if start < 0:
         raise ValueError("start must not be negative")
     return _pages(data, _LazyOcr(ocr), worker, open_timeout, page_timeout, start, skip)
@@ -189,7 +210,7 @@ def _pages(
             try:
                 boxes = _open(worker, open_timeout, boxes).pages
             except _WorkerError:
-                raise PdfExtractionError("the PDF worker failed to open the document") from None
+                raise PdfExtractionError(_("the PDF worker failed to open the document")) from None
             try:
                 for index in range(first, len(boxes)):
                     if skip is not None and skip(index):
@@ -201,7 +222,7 @@ def _pages(
                 restarts += 1
                 if restarts > PDF_MAX_WORKER_RESTARTS:
                     raise PdfExtractionError(
-                        "the PDF keeps crashing or stalling the PDF worker"
+                        _("the PDF keeps crashing or stalling the PDF worker")
                     ) from None
                 failed = first
             else:
@@ -216,7 +237,7 @@ def _pages(
 def _open(worker: "_Worker", timeout: float, known: tuple[PageBox, ...] | None) -> Opened:
     message = worker.message(timeout)
     if isinstance(message, Refused):
-        raise _REFUSALS[message.code](message.message)
+        raise _refusal(message)
     if not isinstance(message, Opened) or (known is not None and message.pages != known):
         raise _WorkerError
     return message

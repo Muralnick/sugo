@@ -1,0 +1,64 @@
+# Italian text for the messages Typer marks for translation (ADR-052).
+# Distributed under the same licence as Sugo (AGPL-3.0-or-later).
+# The message ids are Typer's own English text; a test checks that this file
+# holds exactly the messages the installed Typer marks, no more and no less.
+# Typer's copy of Click marks none: Sugo translates those messages itself.
+msgid ""
+msgstr ""
+"Project-Id-Version: sugo-typer\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Arguments"
+msgstr "Argomenti"
+
+msgid "Options"
+msgstr "Opzioni"
+
+msgid "Commands"
+msgstr "Comandi"
+
+msgid "Error"
+msgstr "Errore"
+
+msgid "[default: {}]"
+msgstr "[predefinito: {}]"
+
+msgid "[env var: {}]"
+msgstr "[variabile d'ambiente: {}]"
+
+msgid "[required]"
+msgstr "[obbligatorio]"
+
+msgid "default: {default}"
+msgstr "predefinito: {default}"
+
+msgid "env var: {var}"
+msgstr "variabile d'ambiente: {var}"
+
+msgid "required"
+msgstr "obbligatorio"
+
+msgid "(deprecated) "
+msgstr "(deprecato) "
+
+msgid "(dynamic)"
+msgstr "(dinamico)"
+
+msgid "Try [blue]'{command_path} {help_option}'[/] for help."
+msgstr "Prova [blue]'{command_path} {help_option}'[/] per l'aiuto."
+
+msgid "Aborted!"
+msgstr "Interrotto!"
+
+msgid "Aborted."
+msgstr "Interrotto."
+
+msgid "Missing command."
+msgstr "Comando mancante."
+
+msgid "No such command {name!r}."
+msgstr "Il comando {name!r} non esiste."

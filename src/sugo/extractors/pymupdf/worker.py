@@ -64,6 +64,7 @@ from sugo.extractors.pymupdf.protocol import (
     write_frame,
     write_message,
 )
+from sugo.i18n import N_
 
 Pixels = npt.NDArray[np.uint8]
 
@@ -121,7 +122,7 @@ def run(
     try:
         document = pymupdf.open(stream=data, filetype="pdf")
     except (RuntimeError, ValueError):
-        yield Refused(code="PDF_INVALID", message="the file is not a readable PDF"), None
+        yield Refused(code="PDF_INVALID", message=N_("the file is not a readable PDF")), None
         return
     with document:
         refusal = _check(document, streams=check_streams)
@@ -152,7 +153,7 @@ def _limit_resources() -> None:
 
 def _check(document: pymupdf.Document, *, streams: bool) -> Refused | None:
     if document.needs_pass:
-        return Refused(code="PDF_ENCRYPTED", message="the PDF is protected by a password")
+        return Refused(code="PDF_ENCRYPTED", message=N_("the PDF is protected by a password"))
     if document.page_count > MAX_PDF_PAGES:
         return Refused(code="PDF_TOO_LARGE", message=f"the PDF has more than {MAX_PDF_PAGES} pages")
     if streams:
@@ -176,7 +177,7 @@ def _stream_problem(document: pymupdf.Document) -> Refused | None:
         except Exception:  # noqa: BLE001  (any MuPDF failure means "unchecked")
             return Refused(
                 code="PDF_UNSUPPORTED",
-                message="a stream of the PDF cannot be decoded, so it cannot be checked",
+                message=N_("a stream of the PDF cannot be decoded, so it cannot be checked"),
             )
         if names_brotli(decoded):
             return Refused(
