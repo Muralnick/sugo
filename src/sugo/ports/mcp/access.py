@@ -21,6 +21,7 @@ from sugo.core.constants import (
     MCP_EXCLUDED_DIRS,
     MCP_EXCLUDED_FILES,
     MCP_EXCLUDED_PATTERNS,
+    MCP_EXCLUDED_SEQUENCES,
     MCP_MAX_PATH_CHARS,
 )
 from sugo.ports.errors import ExitCode, PortError
@@ -39,13 +40,18 @@ class Allowed:
 
 
 def is_excluded(path: Path) -> bool:
-    """True if any part of the path is a folder or file that holds secrets."""
-    for part in (part.casefold() for part in path.parts):
+    """True if any part of the path, or run of parts, is a folder or file that holds secrets."""
+    parts = tuple(part.casefold() for part in path.parts)
+    for part in parts:
         if part in MCP_EXCLUDED_DIRS or part in MCP_EXCLUDED_FILES:
             return True
         if any(fnmatch.fnmatchcase(part, pattern) for pattern in MCP_EXCLUDED_PATTERNS):
             return True
-    return False
+    return any(
+        parts[start : start + len(sequence)] == sequence
+        for sequence in MCP_EXCLUDED_SEQUENCES
+        for start in range(len(parts) - len(sequence) + 1)
+    )
 
 
 class Roots:
