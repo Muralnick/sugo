@@ -206,6 +206,7 @@ def test_typer_constants_are_the_ones_typer_translates() -> None:
         and isinstance(node.value, ast.Call)
         and isinstance(node.value.func, ast.Name)
         and node.value.func.id == "_"
+        and isinstance(node.value.args[0], ast.Constant)
     }
     assert marked == TYPER_CONSTANTS
 
