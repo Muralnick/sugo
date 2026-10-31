@@ -163,7 +163,7 @@ def test_resolve_follows_the_system_only_for_auto(
 
 def test_os_errors_are_explained_without_the_path() -> None:
     error = FileNotFoundError(errno.ENOENT, "No such file or directory", "secret/name.pdf")
-    assert i18n.os_reason(error) == "no such file or folder"
+    assert i18n.os_reason(error) == "No such file or directory"
     i18n.activate("it")
     assert i18n.os_reason(error) == "file o cartella inesistente"
     # An error Sugo has no words for keeps the system's, never the path.

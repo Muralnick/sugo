@@ -65,8 +65,6 @@ def find(paths: Iterable[Path], *, names: frozenset[str] = SINGULAR | PLURAL) ->
 TRANSLATED = [language for language in LANGUAGES if language != "en"]
 # Rich markup Typer puts in its own messages, e.g. "[blue]...[/]".
 _MARKUP = re.compile(r"\[/?(?:blue|bold|dim|red|green|yellow)?\]")
-# printf-style placeholders, such as "%(prog)s".
-_PRINTF = re.compile(r"%\([a-z_]+\)[sd]")
 
 
 def _entries(language: str, domain: str) -> list[Entry]:
@@ -90,7 +88,7 @@ def _placeholders(text: str) -> list[str]:
         for _, name, spec, conversion in string.Formatter().parse(text)
         if name is not None
     )
-    return fields + sorted(_PRINTF.findall(text)) + sorted(_MARKUP.findall(text))
+    return fields + sorted(_MARKUP.findall(text))
 
 
 @pytest.mark.parametrize("language", TRANSLATED)

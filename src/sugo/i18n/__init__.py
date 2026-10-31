@@ -98,9 +98,13 @@ def system_language() -> str | None:
 def os_reason(error: OSError) -> str:
     """Why a file operation failed, in the active language, without the path.
 
-    The operating system's own text is English on most systems, and
-    ``str(error)`` repeats the path, which callers show separately.
+    English keeps the operating system's own words, as before translations
+    existed (``--json`` output does not change); other languages get Sugo's.
+    ``str(error)`` is never used: it repeats the path, which callers show
+    separately.
     """
+    if _active_language == "en" and error.strerror:
+        return error.strerror
     reasons = {
         errno.ENOENT: N_("no such file or folder"),
         errno.EACCES: N_("permission denied"),

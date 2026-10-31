@@ -1,13 +1,24 @@
 """Tests for the CLI's interface language: Italian help, messages and usage errors (ADR-052)."""
 
+import ast
 import json
 from pathlib import Path
 
 import pytest
+import typer.rich_utils
 from typer.testing import CliRunner, Result
 
+from sugo.core.constants import CHUNK_MAX_TOKENS, MAX_PDF_PAGES
+from sugo.extractors.pymupdf.extract import _refusal
+from sugo.extractors.pymupdf.guard import PAGES_REFUSAL
+from sugo.extractors.pymupdf.protocol import Refused
 from sugo.ports.cli import app as cli
-from sugo.ports.cli.translation import USAGE_ERRORS, translate_usage_error, use_language
+from sugo.ports.cli.translation import (
+    TYPER_CONSTANTS,
+    USAGE_ERRORS,
+    translate_usage_error,
+    use_language,
+)
 from sugo.ports.errors import ExitCode
 from sugo.storage.paths import CACHE_DIR_ENV
 
@@ -182,3 +193,34 @@ def test_unknown_messages_stay_as_they_are() -> None:
     assert translate_usage_error("Something new in Typer 0.28.") == ("Something new in Typer 0.28.")
     use_language("en")
     assert translate_usage_error("No such option: --bogus") == "No such option: --bogus"
+
+
+def test_typer_constants_are_the_ones_typer_translates() -> None:
+    # A renamed or reworded constant would otherwise stay English in silence.
+    source = Path(typer.rich_utils.__file__).read_text(encoding="utf-8")
+    marked = {
+        node.targets[0].id: node.value.args[0].value
+        for node in ast.parse(source).body
+        if isinstance(node, ast.Assign)
+        and isinstance(node.targets[0], ast.Name)
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+        and node.value.func.id == "_"
+    }
+    assert marked == TYPER_CONSTANTS
+
+
+def test_help_shows_the_chunk_size_default() -> None:
+    # Brackets inside a help text would be eaten as Rich markup: Typer shows it.
+    expected = f"[predefinito: (chunking.max_tokens, {CHUNK_MAX_TOKENS})]"
+    assert expected in flat(run("convert", "--help").stdout)
+
+
+def test_page_count_refusal_is_translated_and_only_when_recognised() -> None:
+    too_many = Refused(code="PDF_TOO_LARGE", message=PAGES_REFUSAL.format(pages=MAX_PDF_PAGES))
+    assert str(_refusal(too_many)) == f"il PDF ha più di {MAX_PDF_PAGES} pagine"
+    # Any other text from the worker is data: looked up, never formatted.
+    other = Refused(code="PDF_TOO_LARGE", message="the PDF has more than {pages} pages")
+    assert str(_refusal(other)) == "il PDF ha più di {pages} pagine"
+    unknown = Refused(code="PDF_INVALID", message="{0.__class__} something new")
+    assert str(_refusal(unknown)) == "{0.__class__} something new"

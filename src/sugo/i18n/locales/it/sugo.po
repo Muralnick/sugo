@@ -207,6 +207,9 @@ msgid_plural "{count} pages"
 msgstr[0] "{count} pagina"
 msgstr[1] "{count} pagine"
 
+msgid "pdf"
+msgstr "PDF"
+
 msgid "image"
 msgstr "immagine"
 

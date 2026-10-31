@@ -99,6 +99,7 @@ USAGE_ERRORS: tuple[tuple[re.Pattern[str], str, tuple[str, ...]], ...] = (
 _WORDS = {"File": N_("File"), "Directory": N_("Directory"), "Path": N_("Path")}
 
 _rich_format_error = typer.rich_utils.rich_format_error
+_HIGHLIGHTS = list(typer.rich_utils.OptionHighlighter.highlights)
 
 
 def use_language(language: str) -> None:
@@ -112,6 +113,9 @@ def use_language(language: str) -> None:
         module._ = _typer_gettext  # type: ignore[attr-defined]
     for name, english in TYPER_CONSTANTS.items():
         setattr(typer.rich_utils, name, _typer_gettext(english))
+    # Typer colours the usage line by finding its English prefix.
+    usage = re.escape(_("Usage:") + " ")
+    typer.rich_utils.OptionHighlighter.highlights = [*_HIGHLIGHTS, rf"(?P<usage>{usage})"]
     # Typer's main loop finds the function in its module when an error happens.
     typer.rich_utils.rich_format_error = _format_error
 

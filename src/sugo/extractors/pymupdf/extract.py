@@ -42,7 +42,7 @@ from sugo.core.models import Block, BlockFlag, BlockType, Page, PageOrigin
 from sugo.extractors.image.extract import extract_image
 from sugo.extractors.image.loader import LoadedImage
 from sugo.extractors.image.ocr_engine import OcrEngine, bundled_models
-from sugo.extractors.pymupdf.guard import raw_problem
+from sugo.extractors.pymupdf.guard import PAGES_REFUSAL, raw_problem
 from sugo.extractors.pymupdf.layout import ENGINE_NAME, build_blocks, hidden_block
 from sugo.extractors.pymupdf.protocol import (
     Message,
@@ -115,8 +115,8 @@ def _refusal(message: Refused) -> PdfError:
     it writes them, and they are looked up as they are. They are never used
     as format strings: the worker parses hostile PDFs, so its text is data.
     """
-    if message.code == "PDF_TOO_LARGE":
-        text = _("the PDF has more than {pages} pages").format(pages=MAX_PDF_PAGES)
+    if message.message == PAGES_REFUSAL.format(pages=MAX_PDF_PAGES):
+        text = i18n.gettext(PAGES_REFUSAL).format(pages=MAX_PDF_PAGES)
     else:
         text = i18n.gettext(message.message)
     return _REFUSALS[message.code](text)

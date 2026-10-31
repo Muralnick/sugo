@@ -52,7 +52,7 @@ _stderr = Console(stderr=True, markup=False, highlight=False, soft_wrap=True)
 _stdout = Console(markup=False, highlight=False)
 _STATUS_STYLES = {Status.OK: "green", Status.WARNING: "yellow", Status.ERROR: "bold red"}
 _STATUS_NAMES = {Status.OK: N_("ok"), Status.WARNING: N_("warning"), Status.ERROR: N_("error")}
-_KIND_NAMES = {"image": N_("image")}
+_KIND_NAMES = {"pdf": N_("pdf"), "image": N_("image")}
 
 
 class _DefaultConvert(TranslatedGroup):
@@ -160,6 +160,7 @@ def convert_command(
             min=CHUNK_MIN_TOKENS,
             max=CHUNK_MAX_TOKENS_LIMIT,
             help=N_("Chunk size in tokens."),
+            # Typer's own default line: brackets in a help text would be Rich markup.
             show_default=f"chunking.max_tokens, {CHUNK_MAX_TOKENS}",
         ),
     ] = None,
@@ -382,8 +383,7 @@ def stats_command(
 
 def _print_stats(source: str, estimate: "SavingsEstimate") -> None:
     pages = ngettext("{count} page", "{count} pages", estimate.pages).format(count=estimate.pages)
-    kind = estimate.kind.value
-    kind = i18n.gettext(_KIND_NAMES[kind]) if kind in _KIND_NAMES else kind
+    kind = i18n.gettext(_KIND_NAMES.get(estimate.kind.value, estimate.kind.value))
     _stdout.print(Text(f"{source}: {kind}, {pages}"))
     text = estimate.text
     summary = _("Text before and after cleaning: {before} -> {after} tokens ({saved:.1f}% saved)")

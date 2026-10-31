@@ -50,7 +50,7 @@ from sugo.core.constants import (
     PDF_WORKER_MEMORY_BYTES,
 )
 from sugo.core.models import BBox
-from sugo.extractors.pymupdf.guard import BROTLI_REFUSAL, names_brotli
+from sugo.extractors.pymupdf.guard import BROTLI_REFUSAL, PAGES_REFUSAL, names_brotli
 from sugo.extractors.pymupdf.protocol import (
     Message,
     NativeLine,
@@ -155,7 +155,7 @@ def _check(document: pymupdf.Document, *, streams: bool) -> Refused | None:
     if document.needs_pass:
         return Refused(code="PDF_ENCRYPTED", message=N_("the PDF is protected by a password"))
     if document.page_count > MAX_PDF_PAGES:
-        return Refused(code="PDF_TOO_LARGE", message=f"the PDF has more than {MAX_PDF_PAGES} pages")
+        return Refused(code="PDF_TOO_LARGE", message=PAGES_REFUSAL.format(pages=MAX_PDF_PAGES))
     if streams:
         return _stream_problem(document)
     return None

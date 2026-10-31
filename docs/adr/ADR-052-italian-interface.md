@@ -30,13 +30,13 @@ Typer 0.27 bundles its own copy of Click (`typer._click`). That copy no longer m
 - **Catalogs are `.po` files read directly**, in `sugo/i18n/locales/<language>/<domain>.po`: text that can be reviewed, in the format translation tools such as Weblate edit. The standard library reads only compiled `.mo` files, which are binaries in the repository, and compiles the `Plural-Forms` header into Python code with `exec`. Sugo's reader (`sugo.i18n.catalog`) handles the subset of the format the catalogs use, refuses anything else, skips `fuzzy` drafts, and takes each language's plural rule from the code (`PLURAL_RULES`), never from the file. Translations still subclass the standard `gettext.NullTranslations`.
 - **Two domains:** `sugo` for Sugo's own text, `typer` for the text Typer marks.
 - **Exceptions are translated where they are raised**, in the language active then. The PDF worker process sends fixed English sentences, marked with `N_`; the parent looks them up as they are and never uses them as format strings, since the worker parses hostile PDFs.
-- **Operating-system reasons** (`no such file or folder`, `permission denied`, …) come from Sugo's own wording per `errno`, without the path; unknown errors keep the system's text. TOML parser details stay in English inside parentheses.
+- **Operating-system reasons** come from Sugo's own wording per `errno` in Italian (`file o cartella inesistente`, `permesso negato`, …), without the path; English keeps the system's own words, so `--json` does not change, and unknown errors keep the system's text. TOML parser details stay in English inside parentheses.
 - **Configuration errors** translate pydantic's complaints by error type (`unknown key`, `must be at least 32`, …), still without the value given.
 
 ### Typer
 
 - Typer's marked text: the CLI points the `_` of `typer.core` and `typer.rich_utils` at the `typer` catalog, and refreshes the constants `typer.rich_utils` translates at import (panel titles, `[default: …]`, the help hint).
-- Typer's copy of Click: the CLI's command classes write the usage line ("Uso:") and the help of `--help` themselves. Usage errors are recognised by their shape when Typer prints them, from a table of 24 patterns in `sugo.ports.cli.translation`, and rebuilt from Sugo's templates. User input fills placeholders but is never a format string. **A message that no pattern matches stays in English**: nothing is guessed and nothing fails.
+- Typer's copy of Click: the CLI's command classes write the usage line ("Uso:", still coloured by Typer's highlighter) and the help of `--help` themselves. Usage errors are recognised by their shape when Typer prints them, from a table of 24 patterns in `sugo.ports.cli.translation`, and rebuilt from Sugo's templates. User input fills placeholders but is never a format string. **A message that no pattern matches stays in English**: nothing is guessed and nothing fails.
 - Typer is pinned below 0.28. Tests check each pattern against a message in Typer's wording and against real errors, and check that the `typer` catalog holds exactly what the installed Typer marks, so an upgrade that changes a text fails in CI, not on a user's screen.
 
 ### Encoding
@@ -65,6 +65,6 @@ Copy `locales/it/` to `locales/<code>/`, translate, add the plural rule to `PLUR
 
 ## Consequences
 
-- Behaviour changes, in English too: file errors now say "no such file or folder" instead of the system's "No such file or directory"; the `--max-tokens` help shows its default in Typer's format; piped stderr is UTF-8.
+- Behaviour changes, in English too: the `--max-tokens` help now shows its default, in Typer's format (`[default: (chunking.max_tokens, 512)]`): the old text in brackets was swallowed by Rich as markup and never appeared; piped stderr is UTF-8. The PDF worker's page-count refusal is recognised by its exact text before it is translated.
 - Every new user-facing text must be marked and translated in the same pull request, or the catalog test fails.
 - Typer upgrades need the catalog and the pattern table to be checked; the tests say where.

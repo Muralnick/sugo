@@ -33,7 +33,7 @@ def test_known_errors_get_a_code_and_exit_code(
 
 def test_unreadable_input_does_not_repeat_the_path() -> None:
     mapped = unreadable(FileNotFoundError(2, "No such file or directory", "secret/name.pdf"))
-    assert (mapped.code, mapped.message) == ("FILE_UNREADABLE", "no such file or folder")
+    assert (mapped.code, mapped.message) == ("FILE_UNREADABLE", "No such file or directory")
 
 
 def test_os_errors_are_not_mapped_outside_reading() -> None:
