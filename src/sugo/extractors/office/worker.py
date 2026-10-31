@@ -22,10 +22,12 @@ from sugo.extractors.office.docx_reader import read_docx
 from sugo.extractors.office.protocol import (
     Message,
     Opened,
+    PageFailed,
     PageRead,
     Refused,
     write_message,
 )
+from sugo.extractors.office.xlsx_reader import read_xlsx
 from sugo.extractors.office.xml_reader import Refusal, lay_out, parse
 from sugo.extractors.worker import limit_resources, private_stdout
 
@@ -44,26 +46,36 @@ def main() -> None:
 def run(data: bytes, kind: str, first_page: int) -> Iterator[Message]:
     """Check and parse the file, then yield one message per page from ``first_page``.
 
-    The whole file is laid out before the first page: page breaks, numbering
-    and notes depend on everything before them.
+    Every check that can refuse the file runs before the first page: a
+    document is laid out whole, since page breaks, numbering and notes depend
+    on everything before them; a workbook's sheets are scanned, then each is
+    laid out when its page is sent. A page whose parts turn out broken then
+    is reported as failed, never dropped.
     """
     if kind not in _READERS:
         raise ValueError(f"unknown kind {kind!r}")
     try:
-        pages = _READERS[kind](data)
+        count, page = _READERS[kind](data)
     except Refusal as refusal:
         yield _refused(refusal)
         return
-    yield Opened(pages=len(pages))
-    for page in pages[first_page:]:
-        yield PageRead(page=page)
+    yield Opened(pages=count)
+    for index in range(first_page, count):
+        try:
+            yield PageRead(page=page(index))
+        except Refusal:
+            yield PageFailed(index=index)
 
 
-def _read_xml(data: bytes) -> list[Page]:
-    return [lay_out(parse(data))]
+def _laid_out(pages: list[Page]) -> tuple[int, Callable[[int], Page]]:
+    return len(pages), pages.__getitem__
 
 
-_READERS: dict[str, Callable[[bytes], list[Page]]] = {"xml": _read_xml, "docx": read_docx}
+_READERS: dict[str, Callable[[bytes], tuple[int, Callable[[int], Page]]]] = {
+    "xml": lambda data: _laid_out([lay_out(parse(data))]),
+    "docx": lambda data: _laid_out(read_docx(data)),
+    "xlsx": read_xlsx,
+}
 
 
 def _refused(refusal: Refusal) -> Refused:

@@ -32,8 +32,8 @@ msgstr ""
 "chunk in JSON Lines. Con -o ogni file diventa NOME.md, e NOME.jsonl con --chunks. "
 "Un file che non riesce non ferma gli altri."
 
-msgid "PDF, DOCX, PNG, JPEG, WEBP or XML files."
-msgstr "File PDF, DOCX, PNG, JPEG, WEBP o XML."
+msgid "PDF, DOCX, XLSX, PNG, JPEG, WEBP or XML files."
+msgstr "File PDF, DOCX, XLSX, PNG, JPEG, WEBP o XML."
 
 msgid "Write NAME.md files to this folder."
 msgstr "Scrivi i file NOME.md in questa cartella."
@@ -254,8 +254,8 @@ msgstr "suggerimento: {hint}"
 
 # --- Errors and hints ---------------------------------------------------------
 
-msgid "Sugo reads PDF, DOCX, PNG, JPEG, WEBP and XML files."
-msgstr "Sugo legge file PDF, DOCX, PNG, JPEG, WEBP e XML."
+msgid "Sugo reads PDF, DOCX, XLSX, PNG, JPEG, WEBP and XML files."
+msgstr "Sugo legge file PDF, DOCX, XLSX, PNG, JPEG, WEBP e XML."
 
 msgid "Save the image as a still PNG, JPEG or WEBP."
 msgstr "Salva l'immagine come PNG, JPEG o WEBP non animato."
@@ -326,8 +326,8 @@ msgstr "il nome è troppo lungo"
 msgid "unknown error"
 msgstr "errore sconosciuto"
 
-msgid "not a supported input: PDF, DOCX, PNG, JPEG, WEBP or XML expected"
-msgstr "formato non supportato: attesi PDF, DOCX, PNG, JPEG, WEBP o XML"
+msgid "not a supported input: PDF, DOCX, XLSX, PNG, JPEG, WEBP or XML expected"
+msgstr "formato non supportato: attesi PDF, DOCX, XLSX, PNG, JPEG, WEBP o XML"
 
 msgid "not a PNG, JPEG or WEBP image"
 msgstr "non è un'immagine PNG, JPEG o WEBP"
@@ -557,5 +557,5 @@ msgstr "il file Office è troppo grande per leggerlo in sicurezza"
 msgid "Split the document into smaller files."
 msgstr "Dividi il documento in file più piccoli."
 
-msgid "Open it in Word or LibreOffice and save it as .docx, without a password."
-msgstr "Aprilo con Word o LibreOffice e salvalo come .docx, senza password."
+msgid "Open it in Word or LibreOffice and save it as .docx or .xlsx, without a password."
+msgstr "Aprilo con Word o LibreOffice e salvalo come .docx o .xlsx, senza password."

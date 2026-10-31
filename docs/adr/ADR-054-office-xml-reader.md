@@ -54,7 +54,10 @@ Macro-enabled files are read like the others: macros are never run nor output. T
 | Compression ratio of a part over 1 MB | 200 : 1 | `OFFICE_TOO_LARGE` |
 | XML nesting depth | 256 | `OFFICE_INVALID` / `XML_INVALID` |
 | XML elements | 2 000 000 in one Office part; 1 000 000 in a generic XML file | `OFFICE_TOO_LARGE` / `XML_TOO_LARGE` |
-| Spreadsheet cells read | 2 000 000 | `OFFICE_TOO_LARGE` |
+| Spreadsheet cells read | 2 000 000 in a workbook, 500 000 in one sheet (one sheet is one page: measured, 500 000 numeric cells take 11 s and a 29 MB message, a million 22 s and 59 MB, too close to the 30 s page time and 64 MB message limits) | `OFFICE_TOO_LARGE` |
+| Spreadsheet table cells written, empty ones included | 4 000 000, so that a few cells far apart cannot make a huge grid | `OFFICE_TOO_LARGE` |
+| Characters of cell text in one sheet, hidden cells included | 16 000 000, so that one long shared string used by many cells cannot fill the worker or the page message (security review) | `OFFICE_TOO_LARGE` |
+| Workbook whose sheets share a part, or a sheet with more column ranges than Excel has columns | — (Excel never writes them; a part read twice counts once towards the total) | `OFFICE_INVALID` |
 | Encrypted ZIP entries, broken archive, missing main part | — | `OFFICE_INVALID` |
 
 Nothing is ever extracted to disk, so entry names with `..` or absolute paths do no harm; parts are found only through the package's relationships, and **external relationships are never followed** (no download of linked images, templates or data). An external hyperlink is kept as text and goes through the tracking URL cleaner (ADR-050).
@@ -84,9 +87,13 @@ Each page is cached like a PDF page (ADR-045); the reader's version is part of t
 - Measured on o200k_base: a five-article contract with a ten-row table is 1 805 tokens as `document.xml`, 325 as plain extracted text and **314** as Sugo's Markdown, with one hidden instruction removed.
 
 **XLSX**
-- Each sheet becomes one or more tables; empty outer rows and columns are trimmed. A sheet over 200 rows is split into tables of 200 rows; when the first row is all text it is treated as the header and repeated.
-- Cells show their **cached value**: formulas are never evaluated and their text is not output. Dates (built-in date formats and custom formats with day, month or year codes) become ISO 8601; other numbers are written with at most 15 significant digits, as Excel's "General" format shows them. Shared and inline strings are both read.
-- Charts, pivot caches and images in sheets are marked not converted in v0.1, except images, below.
+- Each sheet starts with its name as a heading, then becomes one or more tables. Empty rows and columns are left out, inside the sheet as well as around it: they carry nothing, and cells far apart would otherwise make a huge empty grid. A sheet over 200 rows is split into tables of 200 rows; when the first row holds only text (and the sheet has more rows) it is the header and is repeated.
+- Cells show their **cached value**: formulas are never evaluated and their text is not output; a formula saved without a value is an empty cell. Dates (built-in date formats and custom formats with day, month or year codes) become ISO 8601: `2024-03-15`, `2024-03-15T18:00:00`, and a time-only format `12:00:00`; both the 1900 and 1904 date systems are read, including Excel's fictitious 1900-02-29. Elapsed times (`[h]:mm`) stay numbers, and so do built-in formats 34, 35, 55 and 56, times in Chinese but dates in Japanese and Korean. A date past 9999-12-31 stays a number. Other numbers are written with at most 15 significant digits, as Excel's "General" format shows them; truth values as `TRUE`/`FALSE`, errors as Excel shows them (`#DIV/0!`). Shared and inline strings are both read; phonetic guides are not.
+- Charts, pivot tables, images in sheets and chart sheets are marked not converted in v0.1, one block each (images until the image PR, below). The values a pivot table shows are cells, and are read.
+- Sheets are parsed piece by piece: each row is dropped from the tree once read, and at most 2 000 000 elements are held at once (the Office part limit, here counted on what is held). Every sheet is scanned before the first page, so the limits refuse the file before any output; each page is then laid out when it is sent. A sheet whose comments or drawings turn out broken at that point is marked illegible, never dropped.
+- Like DOCX, a workbook is read again on every run (its limits need every sheet anyway); its cleaned pages are still cached.
+- Recognised like DOCX, from the ZIP directory and a byte search in `[Content_Types].xml` for a workbook or template main part (`.xlsx`, `.xltx`, `.xlsm`, `.xltm`).
+- Measured on o200k_base: a 50-row sales sheet (date, region, product, quantity, price, a formula total) is 5 382 tokens as `sheet1.xml` and **1 416** as Sugo's Markdown (**−74%**).
 
 **PPTX**
 - Shapes in reading order by position, through the XY-cut shared with the image and PDF extractors; group shapes are entered. The title placeholder becomes a heading, body text keeps its bullet levels, tables become tables.
@@ -103,7 +110,7 @@ Each page is cached like a PDF page (ADR-045); the reader's version is part of t
 What a reader of the document does not see stays in the IR, flagged `hidden`, and a cleaner proposes its removal with a reason; the core applies a soft deletion (principle 3, ADR-041), as for hidden PDF text (ADR-043). Covered:
 
 - DOCX: runs with `vanish` (directly or through their style), text under 2 pt, white text without shading or highlight (not in tables, whose styles often paint the cell dark); comments; deleted and moved-away text of tracked changes (the output shows the document **with changes accepted**: insertions kept, deletions removed). A text box anchored in such a run is hidden with everything in it, tables included (security review).
-- XLSX: hidden and very hidden sheets, hidden rows and columns; cell comments and notes.
+- XLSX: hidden and very hidden sheets (every block of the page), hidden rows and columns, including rows of zero height, columns of zero width and rows hidden by a sheet's `zeroHeight` default; values hidden by the number formats `;;;` (everything) and `;;` (numbers); any sheet state other than `visible`; column and row-height settings wherever they stand in the sheet; cell comments and notes. Hidden cells go into one hidden block per sheet, a line per row.
 - PPTX: hidden slides, speaker notes, comments, shapes marked hidden or placed entirely outside the slide.
 
 ### Images inside Office files (maintainer decision)
@@ -131,7 +138,7 @@ What a reader of the document does not see stays in the IR, flagged `hidden`, an
 - Agents can now ask for XML files, so ADR-053 must be merged before this reader.
 - Each Office file pays a worker start (about 0.3 s). Speed and token savings are measured on DOCX, XLSX, PPTX and XML samples in the implementation PR and in step 8.
 - Residual risks:
-  - text hidden by means not listed above (text the same colour as a background image or shape, tiny text set through a theme) reaches the LLM;
+  - text hidden by means not listed above (text the same colour as a background image or shape, tiny text set through a theme; in a workbook, white text, conditional formats, cells covered by shapes) reaches the LLM;
   - complex layouts (multi-column DOCX, SmartArt, floating shapes) may come out in a different order; Docling handles them in v0.2;
   - the XML outline is cleaned like prose, so the hyphen-join rule (ADR-050) could fuse a value ending in "-" with the next field name; it needs the fused word to appear elsewhere in the document, which field names make very unlikely. A block type for structured data, which text cleaners skip, would close it;
   - Windows has no memory cap or core-dump switch in the worker (as ADR-043).

@@ -138,8 +138,8 @@ def test_json_reports_every_document() -> None:
         "status": "error",
         "error": {
             "code": "INPUT_UNSUPPORTED",
-            "message": "not a supported input: PDF, DOCX, PNG, JPEG, WEBP or XML expected",
-            "hint": "Sugo reads PDF, DOCX, PNG, JPEG, WEBP and XML files.",
+            "message": "not a supported input: PDF, DOCX, XLSX, PNG, JPEG, WEBP or XML expected",
+            "hint": "Sugo reads PDF, DOCX, XLSX, PNG, JPEG, WEBP and XML files.",
             "details": {},
         },
     }
