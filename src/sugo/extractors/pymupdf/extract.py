@@ -18,12 +18,7 @@ Pages are yielded in order as they are read, so memory does not grow with
 the length of the document (ADR-006).
 """
 
-import contextlib
 import hashlib
-import queue
-import subprocess
-import sys
-import threading
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 from typing import ClassVar
@@ -34,6 +29,7 @@ from sugo import i18n
 from sugo.core.constants import (
     MAX_PDF_FILE_BYTES,
     MAX_PDF_PAGES,
+    PDF_MAX_MESSAGE_BYTES,
     PDF_MAX_WORKER_RESTARTS,
     PDF_OPEN_TIMEOUT_S,
     PDF_PAGE_TIMEOUT_S,
@@ -54,13 +50,11 @@ from sugo.extractors.pymupdf.protocol import (
     Refused,
     ScanPage,
     parse_message,
-    read_frame,
 )
+from sugo.extractors.worker import WorkerError, WorkerProcess, module_command
 from sugo.i18n import gettext as _
 
-# "-I": isolated mode, so the environment and the current directory cannot
-# change which code the worker runs.
-WORKER_COMMAND: tuple[str, ...] = (sys.executable, "-I", "-m", "sugo.extractors.pymupdf.worker")
+WORKER_COMMAND: tuple[str, ...] = module_command("sugo.extractors.pymupdf.worker")
 # The PDF signature may follow a few bytes of junk, which readers tolerate.
 PDF_SIGNATURE = b"%PDF-"
 PDF_SIGNATURE_WINDOW = 1024
@@ -209,7 +203,7 @@ def _pages(
         with _Worker(command, data, first, check_streams=boxes is None) as worker:
             try:
                 boxes = _open(worker, open_timeout, boxes).pages
-            except _WorkerError:
+            except WorkerError:
                 raise PdfExtractionError(_("the PDF worker failed to open the document")) from None
             try:
                 for index in range(first, len(boxes)):
@@ -218,7 +212,7 @@ def _pages(
                     else:
                         yield _page(worker, index, boxes[index], ocr, page_timeout)
                     first = index + 1
-            except _WorkerError:
+            except WorkerError:
                 restarts += 1
                 if restarts > PDF_MAX_WORKER_RESTARTS:
                     raise PdfExtractionError(
@@ -239,7 +233,7 @@ def _open(worker: "_Worker", timeout: float, known: tuple[PageBox, ...] | None) 
     if isinstance(message, Refused):
         raise _refusal(message)
     if not isinstance(message, Opened) or (known is not None and message.pages != known):
-        raise _WorkerError
+        raise WorkerError
     return message
 
 
@@ -247,15 +241,15 @@ def _skip_page(worker: "_Worker", index: int, timeout: float) -> None:
     """Receive a page the caller already has, checking it as strictly as any other."""
     message = worker.message(timeout)
     if not isinstance(message, NativePage | ScanPage | PageFailed) or message.index != index:
-        raise _WorkerError
+        raise WorkerError
     if isinstance(message, ScanPage) and len(worker.frame(timeout)) != message.pixel_bytes:
-        raise _WorkerError
+        raise WorkerError
 
 
 def _page(worker: "_Worker", index: int, box: PageBox, ocr: "_LazyOcr", timeout: float) -> Page:
     message = worker.message(timeout)
     if not isinstance(message, NativePage | ScanPage | PageFailed) or message.index != index:
-        raise _WorkerError
+        raise WorkerError
     if isinstance(message, PageFailed):
         return _failed_page(index, box)
     if isinstance(message, NativePage):
@@ -263,11 +257,11 @@ def _page(worker: "_Worker", index: int, box: PageBox, ocr: "_LazyOcr", timeout:
             blocks = build_blocks(message.lines)
         except (ValueError, IndexError):
             # Validated data that still breaks the layout came from a broken worker.
-            raise _WorkerError from None
+            raise WorkerError from None
         return _page_of(index, box, PageOrigin.NATIVE, blocks)
     pixels = worker.frame(timeout)
     if len(pixels) != message.pixel_bytes:
-        raise _WorkerError
+        raise WorkerError
     array = np.frombuffer(pixels, dtype=np.uint8).reshape(
         message.pixel_height, message.pixel_width, 3
     )
@@ -318,102 +312,25 @@ class _LazyOcr:
         return self._engine
 
 
-class _WorkerError(Exception):
-    """The worker stalled, crashed or sent something invalid."""
-
-
-_END = object()
-# Frames read ahead of the caller: enough to overlap the worker's parsing with
-# Sugo's own work; more would let a scanned book pile up in memory.
-_READ_AHEAD = 2
-_JOIN_POLL_S = 0.05
-
-
-class _Worker:
-    """A worker process reading one document from a given page.
-
-    Two threads move the bytes, so a stalled worker can never block Sugo: one
-    writes the PDF to the worker's stdin, the other reads frames from its
-    stdout into a queue that the caller waits on with a timeout.
-    """
+class _Worker(WorkerProcess):
+    """The PDF worker reading one document from a given page."""
 
     def __init__(
         self, command: Sequence[str], data: bytes, first_page: int, *, check_streams: bool
     ) -> None:
-        # No shell: the command is a fixed list of arguments.
-        self._process = subprocess.Popen(  # noqa: S603
+        super().__init__(
             [*command, str(first_page), "check" if check_streams else "trust"],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            data,
+            max_frame_bytes=PDF_MAX_MESSAGE_BYTES,
         )
-        self._frames: queue.Queue[bytes | object] = queue.Queue(maxsize=_READ_AHEAD)
-        self._writer = threading.Thread(target=self._write, args=(data,), daemon=True)
-        self._reader = threading.Thread(target=self._read, daemon=True)
-        self._writer.start()
-        self._reader.start()
-
-    def __enter__(self) -> "_Worker":
-        return self
-
-    def __exit__(self, *_: object) -> None:
-        self.close()
-
-    def frame(self, timeout: float) -> bytes:
-        """The next frame.
-
-        Raises:
-            _WorkerError: On timeout, end of output or a malformed frame.
-        """
-        try:
-            item = self._frames.get(timeout=timeout)
-        except queue.Empty:
-            raise _WorkerError from None
-        if not isinstance(item, bytes):
-            raise _WorkerError
-        return item
 
     def message(self, timeout: float) -> Message:
         """The next frame, parsed as a message.
 
         Raises:
-            _WorkerError: As ``frame``, or if the frame is not a valid message.
+            WorkerError: As ``frame``, or if the frame is not a valid message.
         """
         try:
             return parse_message(self.frame(timeout))
         except ProtocolError:
-            raise _WorkerError from None
-
-    def close(self) -> None:
-        """Stop the worker if it still runs and wait for both threads."""
-        if self._process.poll() is None:
-            self._process.kill()
-        self._process.wait()
-        self._writer.join()
-        # The reader may wait for room in the queue; make room until it ends.
-        while self._reader.is_alive():
-            with contextlib.suppress(queue.Empty):
-                self._frames.get_nowait()
-            self._reader.join(timeout=_JOIN_POLL_S)
-        for stream in (self._process.stdin, self._process.stdout):
-            if stream is not None:
-                stream.close()
-
-    def _write(self, data: bytes) -> None:
-        stdin = self._process.stdin
-        if stdin is None:
-            return
-        try:
-            stdin.write(data)
-            stdin.close()
-        except OSError:
-            pass  # The worker exited early; its output tells the reason.
-
-    def _read(self) -> None:
-        stdout = self._process.stdout
-        try:
-            while stdout is not None and (frame := read_frame(stdout)) is not None:
-                self._frames.put(frame)
-        except (ProtocolError, OSError, ValueError):
-            pass  # Reported to the caller as the end of the frames.
-        self._frames.put(_END)
+            raise WorkerError from None

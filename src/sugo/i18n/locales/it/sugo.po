@@ -32,8 +32,8 @@ msgstr ""
 "chunk in JSON Lines. Con -o ogni file diventa NOME.md, e NOME.jsonl con --chunks. "
 "Un file che non riesce non ferma gli altri."
 
-msgid "PDF, PNG, JPEG or WEBP files."
-msgstr "File PDF, PNG, JPEG o WEBP."
+msgid "PDF, PNG, JPEG, WEBP or XML files."
+msgstr "File PDF, PNG, JPEG, WEBP o XML."
 
 msgid "Write NAME.md files to this folder."
 msgstr "Scrivi i file NOME.md in questa cartella."
@@ -254,8 +254,8 @@ msgstr "suggerimento: {hint}"
 
 # --- Errors and hints ---------------------------------------------------------
 
-msgid "Sugo reads PDF, PNG, JPEG and WEBP files."
-msgstr "Sugo legge file PDF, PNG, JPEG e WEBP."
+msgid "Sugo reads PDF, PNG, JPEG, WEBP and XML files."
+msgstr "Sugo legge file PDF, PNG, JPEG, WEBP e XML."
 
 msgid "Save the image as a still PNG, JPEG or WEBP."
 msgstr "Salva l'immagine come PNG, JPEG o WEBP non animato."
@@ -326,8 +326,8 @@ msgstr "il nome è troppo lungo"
 msgid "unknown error"
 msgstr "errore sconosciuto"
 
-msgid "not a supported input: PDF, PNG, JPEG or WEBP expected"
-msgstr "formato non supportato: attesi PDF, PNG, JPEG o WEBP"
+msgid "not a supported input: PDF, PNG, JPEG, WEBP or XML expected"
+msgstr "formato non supportato: attesi PDF, PNG, JPEG, WEBP o XML"
 
 msgid "not a PNG, JPEG or WEBP image"
 msgstr "non è un'immagine PNG, JPEG o WEBP"
@@ -512,3 +512,32 @@ msgstr "nativo"
 
 msgid "install wl-clipboard (Wayland) or xclip (X11)"
 msgstr "installa wl-clipboard (Wayland) o xclip (X11)"
+
+# --- Office and XML reader (ADR-054) ------------------------------------------
+
+msgid "XML file exceeds {limit} bytes"
+msgstr "il file XML supera {limit} byte"
+
+msgid "the document worker failed to open the file"
+msgstr "il processo di lettura non è riuscito ad aprire il file"
+
+msgid "the file keeps crashing or stalling the document worker"
+msgstr "il file continua a bloccare o a far chiudere il processo di lettura"
+
+msgid "the file is not well-formed XML, or it uses a DTD or entities"
+msgstr "il file non è XML ben formato, oppure usa una DTD o delle entità"
+
+msgid "the XML file is too large"
+msgstr "il file XML è troppo grande"
+
+msgid "the XML nests too deeply"
+msgstr "l'XML ha troppi livelli annidati"
+
+msgid "the XML has too many elements"
+msgstr "l'XML ha troppi elementi"
+
+msgid "Check that the file is well-formed XML without a DTD."
+msgstr "Controlla che il file sia XML ben formato e senza DTD."
+
+msgid "Split the XML file into smaller files."
+msgstr "Dividi il file XML in file più piccoli."

@@ -8,7 +8,8 @@ statistics, caches the result and renders it. Only one page is in memory at
 a time, whatever the document's length.
 
 The input is routed by its content, never by its file name: PDFs to the
-isolated PDF extractor (ADR-043), PNG, JPEG and WEBP to the image pipeline.
+isolated PDF extractor (ADR-043), PNG, JPEG and WEBP to the image pipeline,
+XML to the isolated Office and XML reader (ADR-054).
 Without a persistent cache the job uses a private temporary one, deleted at
 the end. Extracted pages the cache could not store are kept in memory
 instead, so a full disk loses nothing; memory then grows with the document.
@@ -36,12 +37,18 @@ from sugo.cleaners.text_normalization import TextNormalizationCleaner
 from sugo.cleaners.tracking_urls import TrackingUrlCleaner
 from sugo.cleaners.ui_chrome import UiChromeCleaner
 from sugo.core.chunks import Chunk
-from sugo.core.constants import CHUNK_MIN_TOKENS, MAX_IMAGE_FILE_BYTES, MAX_PDF_FILE_BYTES
+from sugo.core.constants import (
+    CHUNK_MIN_TOKENS,
+    MAX_IMAGE_FILE_BYTES,
+    MAX_PDF_FILE_BYTES,
+    MAX_XML_FILE_BYTES,
+)
 from sugo.core.decisions import InvalidDecisionError, Proposal, apply_decisions
-from sugo.core.models import Page
+from sugo.core.models import BlockFlag, Page
 from sugo.extractors.image.extract import extract_page
 from sugo.extractors.image.loader import UnsupportedImageError, detect_format
 from sugo.extractors.image.ocr_engine import OcrEngine
+from sugo.extractors.office import extract as office
 from sugo.extractors.pymupdf.extract import (
     PDF_SIGNATURE,
     PDF_SIGNATURE_WINDOW,
@@ -64,7 +71,7 @@ from sugo.storage.paths import StorageDirError
 _log = logging.getLogger(__name__)
 
 # The largest file any extractor accepts; each one applies its own limit.
-_MAX_INPUT_BYTES = max(MAX_PDF_FILE_BYTES, MAX_IMAGE_FILE_BYTES)
+_MAX_INPUT_BYTES = max(MAX_PDF_FILE_BYTES, MAX_IMAGE_FILE_BYTES, MAX_XML_FILE_BYTES)
 
 
 _Stats = TypeVar("_Stats", contravariant=True)
@@ -98,10 +105,11 @@ class InputKind(StrEnum):
 
     PDF = "pdf"
     IMAGE = "image"
+    XML = "xml"
 
 
 class InputUnsupportedError(ValueError):
-    """The input is neither a PDF nor a supported image."""
+    """The input is neither a PDF, a supported image nor XML."""
 
     code: ClassVar[str] = "INPUT_UNSUPPORTED"
 
@@ -131,6 +139,9 @@ class Conversion:
     raw_tokens: int | None = None
     # Text edits, per cleaner name (ADR-050); each one is recorded on its block.
     edited: Mapping[str, int] = MappingProxyType({})
+    # Blocks flagged as holding credentials, removed or not: the MCP server
+    # never sends such a document to an agent (ADR-053).
+    secret_blocks: int = 0
 
 
 def convert_file(
@@ -147,10 +158,11 @@ def convert_file(
     """Read a file and convert it; ``source`` defaults to the path as given.
 
     Raises:
-        InputUnsupportedError: If the file is neither a PDF nor a supported image.
+        InputUnsupportedError: If the file is neither a PDF, a supported image nor XML.
         OSError: If the file cannot be read.
         sugo.extractors.pymupdf.extract.PdfError: If a PDF is refused.
         sugo.extractors.image.loader.ImageLoadError: If an image is refused.
+        sugo.extractors.office.extract.XmlError: If an XML file is refused.
     """
     return convert(
         read_input(path),
@@ -202,9 +214,10 @@ def convert(
 
     Raises:
         ValueError: If a language has no pack, or ``max_chunk_tokens`` is too small.
-        InputUnsupportedError: If the data is neither a PDF nor a supported image.
+        InputUnsupportedError: If the data is neither a PDF, a supported image nor XML.
         sugo.extractors.pymupdf.extract.PdfError: If a PDF is refused.
         sugo.extractors.image.loader.ImageLoadError: If an image is refused.
+        sugo.extractors.office.extract.XmlError: If an XML file is refused.
     """
     kind = detect_kind(data)
     if max_chunk_tokens is not None and max_chunk_tokens < CHUNK_MIN_TOKENS:
@@ -233,15 +246,17 @@ def detect_kind(data: bytes) -> InputKind:
     """Route the input by its content (magic bytes), never by its name.
 
     Raises:
-        InputUnsupportedError: If the data is neither a PDF nor a supported image.
+        InputUnsupportedError: If the data is neither a PDF, a supported image nor XML.
     """
     if PDF_SIGNATURE in data[:PDF_SIGNATURE_WINDOW]:
         return InputKind.PDF
     try:
         detect_format(data)
     except UnsupportedImageError:
+        if office.looks_like_xml(data):
+            return InputKind.XML
         raise InputUnsupportedError(
-            _("not a supported input: PDF, PNG, JPEG or WEBP expected")
+            _("not a supported input: PDF, PNG, JPEG, WEBP or XML expected")
         ) from None
     return InputKind.IMAGE
 
@@ -329,6 +344,7 @@ class _Job:
         )
         removed: Counter[str] = Counter()
         edited: Counter[str] = Counter()
+        secret_blocks = 0
         parts: list[str] = []
         raw_parts: list[str] | None = [] if self._options.count_raw_tokens else None
         chunks: list[Chunk] = []
@@ -340,6 +356,7 @@ class _Job:
             page = self._cleaned(index, stats, lexicon, cleaning)
             removed.update(block.removed_by for block in page.blocks if block.removed_by)
             edited.update(edit.edited_by for block in page.blocks for edit in block.edits)
+            secret_blocks += sum(BlockFlag.SECRET in block.flags for block in page.blocks)
             text = render(page.blocks)
             if text:
                 parts.append(text)
@@ -363,6 +380,7 @@ class _Job:
             # Joined like the Markdown, so both counts measure the same layout.
             raw_tokens=None if raw_parts is None else count_tokens("\n\n".join(raw_parts)),
             edited=MappingProxyType(dict(sorted(edited.items()))),
+            secret_blocks=secret_blocks,
         )
 
     def _extract(self) -> int:
@@ -370,6 +388,11 @@ class _Job:
         if self._kind is InputKind.IMAGE:
             if self._get(CacheLevel.EXTRACTION, self._key(0)) is None:
                 self._keep(extract_page(self._data, self._ocr()))
+            return 1
+        if self._kind is InputKind.XML:
+            if self._get(CacheLevel.EXTRACTION, self._key(0)) is None:
+                for page in office.extract_xml(self._data):
+                    self._keep(page)
             return 1
         # Pages cached by an earlier run are neither laid out nor read with
         # OCR again: the extractor starts at the first missing one and skips
@@ -391,7 +414,7 @@ class _Job:
 
     def _keep(self, page: Page) -> None:
         """Store an extracted page, or keep it in memory if it cannot or must not be cached."""
-        if self._kind is InputKind.PDF and is_failed_page(page):
+        if self._is_failed(page):
             # A page the worker could not read may read fine next time.
             self._failed.add(page.index)
             self._spilled[page.index] = page
@@ -408,7 +431,7 @@ class _Job:
             # or the entry was damaged. Read this page again, once.
             _log.warning("page missing from the page store; extracting it again")
             page = self._reextract(index)
-            if self._kind is InputKind.PDF and is_failed_page(page):
+            if self._is_failed(page):
                 self._failed.add(index)
             # Kept in memory: a cache that just lost it may lose it again.
             self._spilled[index] = page
@@ -433,6 +456,11 @@ class _Job:
             self._put(CacheLevel.OUTPUT, key, page)
         return page
 
+    def _is_failed(self, page: Page) -> bool:
+        if self._kind is InputKind.PDF:
+            return is_failed_page(page)
+        return self._kind is InputKind.XML and office.is_failed_page(page)
+
     def _key(self, index: int) -> bytes:
         return extraction_key(source_sha256=self._sha256, page_index=index, engine=self._engine)
 
@@ -445,7 +473,11 @@ class _Job:
     def _reextract(self, index: int) -> Page:
         if self._kind is InputKind.IMAGE:
             return extract_page(self._data, self._ocr())
-        pages = extract_pdf(self._data, ocr=self._ocr, start=index)
+        pages = (
+            office.extract_xml(self._data)
+            if self._kind is InputKind.XML
+            else extract_pdf(self._data, ocr=self._ocr, start=index)
+        )
         try:
             return next(pages)
         finally:
@@ -484,6 +516,8 @@ class _OnceOcr:
 def _engine_identity(kind: InputKind) -> str:
     # Library versions change what the engines produce; Sugo's own code and
     # model hashes are already part of every key (ADR-045).
+    if kind is InputKind.XML:
+        return f"{kind.value}:defusedxml={version('defusedxml')}"
     libraries = ["rapidocr", "onnxruntime", "pillow"]
     if kind is InputKind.PDF:
         libraries.insert(0, "pymupdf")
