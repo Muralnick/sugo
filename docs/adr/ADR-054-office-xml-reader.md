@@ -54,7 +54,7 @@ Macro-enabled files are read like the others: macros are never run nor output. T
 | Compression ratio of a part over 1 MB | 200 : 1 | `OFFICE_TOO_LARGE` |
 | XML nesting depth | 256 | `OFFICE_INVALID` / `XML_INVALID` |
 | XML elements | 2 000 000 in one Office part; 1 000 000 in a generic XML file | `OFFICE_TOO_LARGE` / `XML_TOO_LARGE` |
-| Spreadsheet cells read | 2 000 000 in a workbook, 500 000 in one sheet (one sheet is one page: measured, 500 000 numeric cells take 11 s and a 29 MB message, a million 22 s and 59 MB, too close to the 30 s page time and 64 MB message limits) | `OFFICE_TOO_LARGE` |
+| Spreadsheet cells read | 2 000 000 in a workbook, 500 000 in one sheet (maintainer decision; one sheet is one page: measured, 500 000 numeric cells take 11 s and a 29 MB message, a million 22 s and 59 MB, too close to the 30 s page time and 64 MB message limits) | `OFFICE_TOO_LARGE` |
 | Spreadsheet table cells written, empty ones included | 4 000 000, so that a few cells far apart cannot make a huge grid | `OFFICE_TOO_LARGE` |
 | Characters of cell text in one sheet, hidden cells included | 16 000 000, so that one long shared string used by many cells cannot fill the worker or the page message (security review) | `OFFICE_TOO_LARGE` |
 | Workbook whose sheets share a part, or a sheet with more column ranges than Excel has columns | — (Excel never writes them; a part read twice counts once towards the total) | `OFFICE_INVALID` |
