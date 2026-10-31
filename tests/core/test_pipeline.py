@@ -121,9 +121,24 @@ def test_input_is_routed_by_content_not_name(tmp_path: Path) -> None:
 
 
 def test_unsupported_input_is_refused() -> None:
-    with pytest.raises(InputUnsupportedError, match="PDF, PNG, JPEG, WEBP or XML") as caught:
+    with pytest.raises(InputUnsupportedError, match="PDF, DOCX, PNG, JPEG, WEBP or XML") as caught:
         detect_kind(b"PK\x03\x04 a zip or docx file")
     assert caught.value.code == "INPUT_UNSUPPORTED"
+
+
+def test_word_documents_are_converted_and_legacy_ones_refused(cache: PageCache) -> None:
+    from tests.extractors.office.docx_files import docx, p
+
+    from sugo.extractors.office.extract import OfficeUnsupportedError
+    from sugo.extractors.office.package import OLE_SIGNATURE
+
+    data = docx(p("Hello") + p("whisper", run="<w:vanish/>"))
+    assert detect_kind(data) is InputKind.DOCX
+    conversion = convert(data, cache=cache)
+    assert (conversion.kind, conversion.markdown) == (InputKind.DOCX, "Hello")
+    assert conversion.removed == {"hidden_text": 1}
+    with pytest.raises(OfficeUnsupportedError):
+        detect_kind(OLE_SIGNATURE + bytes(512))
 
 
 def test_xml_is_converted_and_cached(cache: PageCache) -> None:

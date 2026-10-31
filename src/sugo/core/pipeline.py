@@ -9,7 +9,7 @@ a time, whatever the document's length.
 
 The input is routed by its content, never by its file name: PDFs to the
 isolated PDF extractor (ADR-043), PNG, JPEG and WEBP to the image pipeline,
-XML to the isolated Office and XML reader (ADR-054).
+Word documents and XML to the isolated Office and XML reader (ADR-054).
 Without a persistent cache the job uses a private temporary one, deleted at
 the end. Extracted pages the cache could not store are kept in memory
 instead, so a full disk loses nothing; memory then grows with the document.
@@ -40,6 +40,7 @@ from sugo.core.chunks import Chunk
 from sugo.core.constants import (
     CHUNK_MIN_TOKENS,
     MAX_IMAGE_FILE_BYTES,
+    MAX_OFFICE_FILE_BYTES,
     MAX_PDF_FILE_BYTES,
     MAX_XML_FILE_BYTES,
 )
@@ -71,7 +72,9 @@ from sugo.storage.paths import StorageDirError
 _log = logging.getLogger(__name__)
 
 # The largest file any extractor accepts; each one applies its own limit.
-_MAX_INPUT_BYTES = max(MAX_PDF_FILE_BYTES, MAX_IMAGE_FILE_BYTES, MAX_XML_FILE_BYTES)
+_MAX_INPUT_BYTES = max(
+    MAX_PDF_FILE_BYTES, MAX_IMAGE_FILE_BYTES, MAX_OFFICE_FILE_BYTES, MAX_XML_FILE_BYTES
+)
 
 
 _Stats = TypeVar("_Stats", contravariant=True)
@@ -105,11 +108,12 @@ class InputKind(StrEnum):
 
     PDF = "pdf"
     IMAGE = "image"
+    DOCX = "docx"
     XML = "xml"
 
 
 class InputUnsupportedError(ValueError):
-    """The input is neither a PDF, a supported image nor XML."""
+    """The input is none of PDF, DOCX, a supported image or XML."""
 
     code: ClassVar[str] = "INPUT_UNSUPPORTED"
 
@@ -158,11 +162,11 @@ def convert_file(
     """Read a file and convert it; ``source`` defaults to the path as given.
 
     Raises:
-        InputUnsupportedError: If the file is neither a PDF, a supported image nor XML.
+        InputUnsupportedError: If the file is none of PDF, DOCX, a supported image or XML.
         OSError: If the file cannot be read.
         sugo.extractors.pymupdf.extract.PdfError: If a PDF is refused.
         sugo.extractors.image.loader.ImageLoadError: If an image is refused.
-        sugo.extractors.office.extract.XmlError: If an XML file is refused.
+        sugo.extractors.office.extract.OfficeError: If a DOCX or XML file is refused.
     """
     return convert(
         read_input(path),
@@ -214,10 +218,10 @@ def convert(
 
     Raises:
         ValueError: If a language has no pack, or ``max_chunk_tokens`` is too small.
-        InputUnsupportedError: If the data is neither a PDF, a supported image nor XML.
+        InputUnsupportedError: If the data is none of PDF, DOCX, a supported image or XML.
         sugo.extractors.pymupdf.extract.PdfError: If a PDF is refused.
         sugo.extractors.image.loader.ImageLoadError: If an image is refused.
-        sugo.extractors.office.extract.XmlError: If an XML file is refused.
+        sugo.extractors.office.extract.OfficeError: If a DOCX or XML file is refused.
     """
     kind = detect_kind(data)
     if max_chunk_tokens is not None and max_chunk_tokens < CHUNK_MIN_TOKENS:
@@ -246,17 +250,22 @@ def detect_kind(data: bytes) -> InputKind:
     """Route the input by its content (magic bytes), never by its name.
 
     Raises:
-        InputUnsupportedError: If the data is neither a PDF, a supported image nor XML.
+        sugo.extractors.office.extract.OfficeUnsupportedError: For a legacy
+            or password-protected Office file.
+        InputUnsupportedError: If the data is none of PDF, DOCX, a supported image or XML.
     """
     if PDF_SIGNATURE in data[:PDF_SIGNATURE_WINDOW]:
         return InputKind.PDF
+    office.check_legacy(data)
+    if office.is_docx(data):
+        return InputKind.DOCX
     try:
         detect_format(data)
     except UnsupportedImageError:
         if office.looks_like_xml(data):
             return InputKind.XML
         raise InputUnsupportedError(
-            _("not a supported input: PDF, PNG, JPEG, WEBP or XML expected")
+            _("not a supported input: PDF, DOCX, PNG, JPEG, WEBP or XML expected")
         ) from None
     return InputKind.IMAGE
 
@@ -394,6 +403,14 @@ class _Job:
                 for page in office.extract_xml(self._data):
                     self._keep(page)
             return 1
+        if self._kind is InputKind.DOCX:
+            # Laid out whole in well under a second: read again rather than
+            # guessing the page count from the cache.
+            count = 0
+            for page in office.extract_docx(self._data):
+                self._keep(page)
+                count = page.index + 1
+            return count
         # Pages cached by an earlier run are neither laid out nor read with
         # OCR again: the extractor starts at the first missing one and skips
         # the cached ones after it.
@@ -459,7 +476,7 @@ class _Job:
     def _is_failed(self, page: Page) -> bool:
         if self._kind is InputKind.PDF:
             return is_failed_page(page)
-        return self._kind is InputKind.XML and office.is_failed_page(page)
+        return self._kind in (InputKind.XML, InputKind.DOCX) and office.is_failed_page(page)
 
     def _key(self, index: int) -> bytes:
         return extraction_key(source_sha256=self._sha256, page_index=index, engine=self._engine)
@@ -473,6 +490,8 @@ class _Job:
     def _reextract(self, index: int) -> Page:
         if self._kind is InputKind.IMAGE:
             return extract_page(self._data, self._ocr())
+        if self._kind is InputKind.DOCX:
+            return next(page for page in office.extract_docx(self._data) if page.index == index)
         pages = (
             office.extract_xml(self._data)
             if self._kind is InputKind.XML
@@ -516,7 +535,7 @@ class _OnceOcr:
 def _engine_identity(kind: InputKind) -> str:
     # Library versions change what the engines produce; Sugo's own code and
     # model hashes are already part of every key (ADR-045).
-    if kind is InputKind.XML:
+    if kind in (InputKind.XML, InputKind.DOCX):
         return f"{kind.value}:defusedxml={version('defusedxml')}"
     libraries = ["rapidocr", "onnxruntime", "pillow"]
     if kind is InputKind.PDF:

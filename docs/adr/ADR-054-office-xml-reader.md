@@ -23,7 +23,7 @@ The libraries ADR-007 had in mind, `python-docx` and `python-pptx`, parse with `
 
 - Sugo reads Office Open XML itself with the standard library's `zipfile` and **`defusedxml` 0.7.1** (PSF-2.0, on the allow-list, pure Python, no dependencies). It is a base dependency: the reader itself needs nothing from the `lite` extra. In v0.1 the pipeline module still loads the `lite` packages for every input, so in practice `sugo[lite]` is installed anyway; loading them only for PDF and images is a later clean-up.
 - Parsing uses `defusedxml.ElementTree.iterparse` with **`forbid_dtd=True`**, entities and external references forbidden. Office parts never carry a DTD. A generic XML file with one (old DocBook, `<!DOCTYPE html>`) is refused with `XML_INVALID`.
-- Office parts are streamed and elements released as soon as they are read, so memory follows the size of a paragraph or a row, not of the file. A generic XML file is held as a tree, since its layout compares sibling records; its limits are lower (below).
+- Each part is held as a tree while it is laid out, since numbering, notes and records refer to each other; the part and element limits below keep that tree well inside the worker's memory cap. A spreadsheet may need streaming in its own PR.
 - `defusedxml` has had no release since 2021. It only wraps the standard library's parser, so it moves with Python's own fixes; if it stops working with a future Python, the same checks can be done with `xml.parsers.expat` handlers in one module, with an ADR.
 
 ### Isolation
@@ -49,11 +49,11 @@ Macro-enabled files are read like the others: macros are never run nor output. T
 |---|---|---|
 | File size | Office: 200 MB, as for PDF. Generic XML: 50 MB, as its tree takes about ten times its size | `OFFICE_TOO_LARGE` / `XML_TOO_LARGE` |
 | ZIP entries | 10 000 | `OFFICE_TOO_LARGE` |
-| Uncompressed size of one part | 100 MB, counted while decompressing (header sizes are not trusted) | `OFFICE_TOO_LARGE` |
+| Uncompressed size of one part | 50 MB, counted while decompressing (header sizes are not trusted) | `OFFICE_TOO_LARGE` |
 | Uncompressed size of all parts read | 300 MB | `OFFICE_TOO_LARGE` |
 | Compression ratio of a part over 1 MB | 200 : 1 | `OFFICE_TOO_LARGE` |
 | XML nesting depth | 256 | `OFFICE_INVALID` / `XML_INVALID` |
-| XML elements | 5 000 000 in one Office part; 1 000 000 in a generic XML file | `OFFICE_TOO_LARGE` / `XML_TOO_LARGE` |
+| XML elements | 2 000 000 in one Office part; 1 000 000 in a generic XML file | `OFFICE_TOO_LARGE` / `XML_TOO_LARGE` |
 | Spreadsheet cells read | 2 000 000 | `OFFICE_TOO_LARGE` |
 | Encrypted ZIP entries, broken archive, missing main part | — | `OFFICE_INVALID` |
 
@@ -76,7 +76,12 @@ Each page is cached like a PDF page (ADR-045); the reader's version is part of t
 - Paragraphs, with headings from the paragraph's outline level or the built-in `Title` and `Heading 1–9` styles; lists from numbering, bullets or numbered, with their level; tables as table blocks (ADR-042), a merged cell's text in its first cell only; hyperlinks as Markdown links; text boxes in document order; fields as their displayed result.
 - Footnotes and endnotes after the page that cites them, with their number.
 - Each section's header and footer once, flagged as running header or footer, so the existing cleaner proposes their removal with a reason (ADR-044).
-- Equations and embedded objects are not guessed: each becomes a block marked not converted.
+- Equations and embedded objects are not guessed: each becomes a block marked not converted. Until the image PR, images are marked the same way.
+- Numbered items keep Word's label ("2.1."); the IR has no list levels, and the label carries the structure. The serializer escapes a label such as "1." that would open a Markdown list inside the item.
+- `mc:AlternateContent` is read from its first choice only; the fallback repeats the same text box for older readers.
+- The whole document is laid out before its first page, since numbering and notes depend on what comes before; a layout error therefore refuses the file (`OFFICE_EXTRACTION_FAILED`) instead of marking one page. A DOCX is laid out again on every run, in well under a second; its cleaned pages are still cached.
+- Recognised in Sugo's own process from the ZIP directory and a byte search in `[Content_Types].xml`, without parsing XML; the worker parses everything else.
+- Measured on o200k_base: a five-article contract with a ten-row table is 1 805 tokens as `document.xml`, 325 as plain extracted text and **314** as Sugo's Markdown, with one hidden instruction removed.
 
 **XLSX**
 - Each sheet becomes one or more tables; empty outer rows and columns are trimmed. A sheet over 200 rows is split into tables of 200 rows; when the first row is all text it is treated as the header and repeated.
@@ -97,7 +102,7 @@ Each page is cached like a PDF page (ADR-045); the reader's version is part of t
 
 What a reader of the document does not see stays in the IR, flagged `hidden`, and a cleaner proposes its removal with a reason; the core applies a soft deletion (principle 3, ADR-041), as for hidden PDF text (ADR-043). Covered:
 
-- DOCX: runs with `vanish` (directly or through their style), text under 2 pt, white text without shading or highlight; comments; deleted text of tracked changes (the output shows the document **with changes accepted**: insertions kept, deletions removed).
+- DOCX: runs with `vanish` (directly or through their style), text under 2 pt, white text without shading or highlight (not in tables, whose styles often paint the cell dark); comments; deleted and moved-away text of tracked changes (the output shows the document **with changes accepted**: insertions kept, deletions removed). A text box anchored in such a run is hidden with everything in it, tables included (security review).
 - XLSX: hidden and very hidden sheets, hidden rows and columns; cell comments and notes.
 - PPTX: hidden slides, speaker notes, comments, shapes marked hidden or placed entirely outside the slide.
 

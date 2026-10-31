@@ -107,3 +107,19 @@ def test_file_that_keeps_crashing_the_worker_is_refused() -> None:
     worker = fake_worker(f"opened({OFFICE_MAX_WORKER_RESTARTS + 5})\nsys.exit(1)\n")
     with pytest.raises(OfficeExtractionError, match="keeps crashing"):
         list(extract_xml(b"<r/>", worker=worker, page_timeout=1))
+
+
+def test_word_documents_are_read_through_the_worker() -> None:
+    from tests.extractors.office.docx_files import docx, p
+
+    data = docx(p("First") + '<w:p><w:r><w:br w:type="page"/></w:r></w:p>' + p("Second"))
+    assert [render(page.blocks) for page in extract.extract_docx(data)] == ["First", "Second"]
+
+
+def test_damaged_and_legacy_office_files_are_refused() -> None:
+    with pytest.raises(extract.OfficeError) as caught:
+        list(extract.extract_docx(b"PK\x03\x04 not a zip"))
+    assert caught.value.code == "OFFICE_INVALID"
+    with pytest.raises(extract.OfficeUnsupportedError):
+        extract.check_legacy(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 100)
+    extract.check_legacy(b"PK\x03\x04")
