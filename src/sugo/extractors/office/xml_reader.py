@@ -66,13 +66,17 @@ def lay_out(root: Element) -> Page:
     return _Layout().page(root)
 
 
-def parse(data: bytes) -> Element:
+def parse(data: bytes, *, max_bytes: int | None = None, max_elements: int | None = None) -> Element:
     """Parse with every XML attack refused and the size limits enforced.
+
+    The limits default to those of a generic XML file; Office parts pass their own.
 
     Raises:
         Refusal: XML_TOO_LARGE or XML_INVALID.
     """
-    if len(data) > MAX_XML_FILE_BYTES:
+    max_bytes = MAX_XML_FILE_BYTES if max_bytes is None else max_bytes
+    max_elements = XML_MAX_ELEMENTS if max_elements is None else max_elements
+    if len(data) > max_bytes:
         raise Refusal("XML_TOO_LARGE", N_("the XML file is too large"))
     root: Element | None = None
     depth = elements = 0
@@ -89,7 +93,7 @@ def parse(data: bytes) -> Element:
             elements += 1
             if depth > XML_MAX_DEPTH:
                 raise Refusal("XML_INVALID", N_("the XML nests too deeply"))
-            if elements > XML_MAX_ELEMENTS:
+            if elements > max_elements:
                 raise Refusal("XML_TOO_LARGE", N_("the XML has too many elements"))
     # ParseError is a SyntaxError; defusedxml's refusals and unknown encodings
     # are ValueError and LookupError. Their text may quote the document.
