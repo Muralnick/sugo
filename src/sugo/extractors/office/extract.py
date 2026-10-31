@@ -1,4 +1,4 @@
-"""Read XML and Word documents into IR pages through the isolated worker (ADR-054).
+"""Read XML, Word documents and Excel workbooks into IR pages through the isolated worker (ADR-054).
 
 The file is recognised by its content, checked for size here, then parsed by
 a worker process (``sugo.extractors.office.worker``) that streams back pages
@@ -24,8 +24,8 @@ from sugo.core.constants import (
     XML_SNIFF_BYTES,
 )
 from sugo.core.models import Block, BlockFlag, BlockType, Page, PageOrigin
-from sugo.extractors.office import docx_reader, xml_reader
-from sugo.extractors.office.package import OLE_SIGNATURE, word_document
+from sugo.extractors.office import docx_reader, xlsx_reader, xml_reader
+from sugo.extractors.office.package import OLE_SIGNATURE, excel_workbook, word_document
 from sugo.extractors.office.protocol import (
     Message,
     Opened,
@@ -50,7 +50,11 @@ _BOMS = (
 )
 
 
-_ENGINES = {"xml": xml_reader.ENGINE_NAME, "docx": docx_reader.ENGINE_NAME}
+_ENGINES = {
+    "xml": xml_reader.ENGINE_NAME,
+    "docx": docx_reader.ENGINE_NAME,
+    "xlsx": xlsx_reader.ENGINE_NAME,
+}
 
 
 class OfficeError(ValueError):
@@ -101,6 +105,11 @@ _REFUSALS: dict[str, type[OfficeError]] = {
 def is_docx(data: bytes) -> bool:
     """Whether the data is a Word document (DOCX, DOTX, DOCM, DOTM), by its content."""
     return word_document(data)
+
+
+def is_xlsx(data: bytes) -> bool:
+    """Whether the data is an Excel workbook (XLSX, XLTX, XLSM, XLTM), by its content."""
+    return excel_workbook(data)
 
 
 def check_legacy(data: bytes) -> None:
@@ -171,6 +180,25 @@ def extract_docx(
             _("Office file exceeds {limit} bytes").format(limit=MAX_OFFICE_FILE_BYTES)
         )
     return _pages(data, "docx", worker, open_timeout, page_timeout)
+
+
+def extract_xlsx(
+    data: bytes,
+    *,
+    worker: Sequence[str] = WORKER_COMMAND,
+    open_timeout: float = OFFICE_OPEN_TIMEOUT_S,
+    page_timeout: float = OFFICE_PAGE_TIMEOUT_S,
+) -> Iterator[Page]:
+    """Yield the pages of an Excel workbook: one per sheet, in workbook order.
+
+    Raises:
+        OfficeError: If the file is refused; subclasses say why.
+    """
+    if len(data) > MAX_OFFICE_FILE_BYTES:
+        raise OfficeTooLargeError(
+            _("Office file exceeds {limit} bytes").format(limit=MAX_OFFICE_FILE_BYTES)
+        )
+    return _pages(data, "xlsx", worker, open_timeout, page_timeout)
 
 
 def is_failed_page(page: Page) -> bool:
