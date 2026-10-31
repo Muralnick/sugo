@@ -29,7 +29,12 @@ enough to count anywhere.
 
 import re
 
-BROTLI_REFUSAL = "the PDF uses Brotli compression, refused until MuPDF fixes CVE-2026-111497"
+from sugo.i18n import N_
+
+# Marked, not translated: the worker sends it as data and the parent translates it.
+# Filled with MAX_PDF_PAGES by the worker; the parent recognises the result.
+PAGES_REFUSAL = N_("the PDF has more than {pages} pages")
+BROTLI_REFUSAL = N_("the PDF uses Brotli compression, refused until MuPDF fixes CVE-2026-111497")
 
 _NAME_ESCAPE = re.compile(rb"#([0-9A-Fa-f]{2})")
 # One unit of PDF whitespace: a whitespace byte (NUL included) or a comment,
@@ -64,7 +69,7 @@ def raw_problem(data: bytes) -> str | None:
     if _BROTLI.search(unescaped):
         return BROTLI_REFUSAL
     if _INDIRECT_FILTER.search(unescaped):
-        return "the PDF names a stream filter indirectly, which Sugo cannot check safely"
+        return N_("the PDF names a stream filter indirectly, which Sugo cannot check safely")
     return None
 
 

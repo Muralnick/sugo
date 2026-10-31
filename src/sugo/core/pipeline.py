@@ -49,6 +49,7 @@ from sugo.extractors.pymupdf.extract import (
     extract_pdf,
     is_failed_page,
 )
+from sugo.i18n import gettext as _
 from sugo.metrics.tokenizer import count_tokens
 from sugo.serializers.markdown import render
 from sugo.storage.page_cache import (
@@ -240,7 +241,7 @@ def detect_kind(data: bytes) -> InputKind:
         detect_format(data)
     except UnsupportedImageError:
         raise InputUnsupportedError(
-            "not a supported input: PDF, PNG, JPEG or WEBP expected"
+            _("not a supported input: PDF, PNG, JPEG or WEBP expected")
         ) from None
     return InputKind.IMAGE
 

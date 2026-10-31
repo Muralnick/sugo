@@ -79,5 +79,5 @@ Error messages come from Sugo's own exceptions, which never quote document text.
 
 - New public contracts: commands, options, the `--json` shape, the exit-code mapping and six error codes (maintainer decision).
 - Base install grows by Typer, Rich and their dependencies, about 3 MB.
-- Messages are English only. Italian (ADR-024) still has to come before the v0.1 release.
+- Messages were English only; the Italian interface came with ADR-052. `--json` output stays English.
 - A file named like a command (`stats`) needs `sugo convert stats` or `sugo ./stats`.

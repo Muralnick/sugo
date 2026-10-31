@@ -398,3 +398,38 @@ ignore_imports = [
     "sugo.setup.** -> sugo._internal.net.**",
 ]
 unmatched_ignore_imports_alerting = "none"
+
+# Interface text is a leaf: every module may mark text, so the catalogs and
+# the language choice depend on nothing else in Sugo and read no network (ADR-052).
+[[tool.importlinter.contracts]]
+name = "Interface languages depend on nothing else"
+type = "forbidden"
+source_modules = ["sugo.i18n"]
+forbidden_modules = [
+    "sugo.core",
+    "sugo.config",
+    "sugo.extractors",
+    "sugo.analyzers",
+    "sugo.cleaners",
+    "sugo.chunkers",
+    "sugo.serializers",
+    "sugo.exporters",
+    "sugo.storage",
+    "sugo.metrics",
+    "sugo.languages",
+    "sugo.ports",
+    "sugo.sources",
+    "sugo.models",
+    "sugo.setup",
+    "sugo._internal.net",
+    "typer",
+    "rich",
+]
+
+# The MCP server always speaks English: it never switches the interface
+# language, which only the sugo command does (ADR-052).
+[[tool.importlinter.contracts]]
+name = "MCP server never switches the interface language"
+type = "forbidden"
+source_modules = ["sugo.ports.mcp"]
+forbidden_modules = ["sugo.ports.cli"]
