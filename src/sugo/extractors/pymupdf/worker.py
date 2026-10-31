@@ -25,9 +25,7 @@ rendered page: drawn invisible or clipped away, smaller than
 is drawn around it (white on white, text under an opaque shape).
 """
 
-import contextlib
 import math
-import os
 import sys
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -64,6 +62,7 @@ from sugo.extractors.pymupdf.protocol import (
     write_frame,
     write_message,
 )
+from sugo.extractors.worker import limit_resources, private_stdout
 from sugo.i18n import N_
 
 Pixels = npt.NDArray[np.uint8]
@@ -83,31 +82,15 @@ _TEXT_FLAGS = pymupdf.TEXT_PRESERVE_WHITESPACE | pymupdf.TEXT_PRESERVE_LIGATURES
 
 def main() -> None:
     """Entry point of the worker process."""
-    _limit_resources()
+    limit_resources(PDF_WORKER_MEMORY_BYTES)
     pymupdf.TOOLS.mupdf_display_errors(False)
     pymupdf.TOOLS.mupdf_display_warnings(False)
     first_page = int(sys.argv[1])
     # Anything but an explicit "trust" checks every stream: the safe default.
     check_streams = sys.argv[2:3] != ["trust"]
     data = sys.stdin.buffer.read(MAX_PDF_FILE_BYTES + 1)
-    with _private_stdout() as out:
+    with private_stdout() as out:
         write_all(out, run(data, first_page, check_streams=check_streams))
-
-
-@contextlib.contextmanager
-def _private_stdout() -> Iterator[IO[bytes]]:
-    """A private copy of stdout for frames; file descriptor 1 goes to the null device.
-
-    MuPDF's C code may print to stdout (it does on decoding errors). Nothing
-    it prints can then corrupt or forge a frame.
-    """
-    sys.stdout.flush()
-    out = os.fdopen(os.dup(1), "wb")
-    null = os.open(os.devnull, os.O_WRONLY)
-    os.dup2(null, 1)
-    os.close(null)
-    with out:
-        yield out
 
 
 def run(
@@ -137,18 +120,6 @@ def run(
             except Exception:  # noqa: BLE001
                 result = PageFailed(index=index), None
             yield result
-
-
-def _limit_resources() -> None:
-    """Disable core dumps and cap the address space where the OS allows it."""
-    try:
-        import resource  # POSIX only
-    except ImportError:  # Windows: isolation is weaker there (ADR-031).
-        return
-    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-    # macOS refuses RLIMIT_AS on some versions; the page timeout still applies.
-    with contextlib.suppress(ValueError, OSError):
-        resource.setrlimit(resource.RLIMIT_AS, (PDF_WORKER_MEMORY_BYTES, PDF_WORKER_MEMORY_BYTES))
 
 
 def _check(document: pymupdf.Document, *, streams: bool) -> Refused | None:
