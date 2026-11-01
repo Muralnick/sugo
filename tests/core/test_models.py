@@ -131,6 +131,18 @@ class TestBlock:
         with pytest.raises(ValidationError):
             make_block(type=BlockType.HEADING, heading_level=level)
 
+    def test_accepts_list_level_on_list_item(self) -> None:
+        assert make_block(type=BlockType.LIST_ITEM, list_level=3).list_level == 3
+
+    def test_rejects_list_level_on_paragraph(self) -> None:
+        with pytest.raises(ValidationError, match="list_level"):
+            make_block(list_level=1)
+
+    @pytest.mark.parametrize("level", [-1, 9])
+    def test_rejects_list_level_outside_powerpoint_range(self, level: int) -> None:
+        with pytest.raises(ValidationError):
+            make_block(type=BlockType.LIST_ITEM, list_level=level)
+
     def test_rejects_table_on_non_table_block(self) -> None:
         with pytest.raises(ValidationError, match="table"):
             make_block(table=Table(n_rows=1, n_cols=1, cells=()))

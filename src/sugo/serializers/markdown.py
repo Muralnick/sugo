@@ -7,8 +7,10 @@ with their reason (principle 3). Blocks that are not removed are always
 rendered, whatever their type, so only cleaners decide what is dropped.
 
 - headings: ``#`` repeated by level, lines joined with a space;
-- list items: ``- text``; chat messages: ``left: text`` or ``right: text``,
-  the neutral side of the bubble (ADR-040); their further lines are indented;
+- list items: ``- text``, indented two spaces per list level but never more
+  than one level below the item above, where deeper indentation would make
+  code; chat messages: ``left: text`` or ``right: text``, the neutral side
+  of the bubble (ADR-040); their further lines are indented;
 - code: a fenced block, text unchanged but for a literal ``[illegible]``;
 - tables: the cheapest faithful format (``sugo.serializers.tables``);
 - illegible blocks: ``[illegible]``, never a guess (principle 4, ADR-026);
@@ -43,27 +45,34 @@ def render(blocks: Iterable[Block]) -> str:
     """Render blocks as Markdown, without a trailing newline."""
     parts: list[str] = []
     previous: BlockType | None = None
+    # Level of the list item just rendered; -1 outside a list.
+    list_level = -1
     for block in blocks:
         if block.removed:
-            continue
-        rendered = _render_block(block)
-        if rendered is None:
             continue
         # Consecutive prefixed blocks of one type are one list or one
         # conversation: no blank line inside. A block without a prefix (a chat
         # message without a speaker) has nothing to set it apart, so it is not.
         run_type = block.type if _prefix(block) is not None else None
+        level = 0
+        if block.type is BlockType.LIST_ITEM:
+            above = list_level if previous is BlockType.LIST_ITEM else -1
+            level = min(block.list_level or 0, above + 1)
+        rendered = _render_block(block, level)
+        if rendered is None:
+            continue
         if parts:
             parts.append("\n" if run_type is not None and run_type is previous else "\n\n")
         parts.append(rendered)
         previous = run_type
+        list_level = level
     return "".join(parts)
 
 
-def _render_block(block: Block) -> str | None:
-    """One block as Markdown, or None if it has nothing to show."""
+def _render_block(block: Block, level: int = 0) -> str | None:
+    """One block as Markdown, or None if it has nothing to show; ``level`` nests a list item."""
     if BlockFlag.ILLEGIBLE in block.flags:
-        return _prefixed(block, [ILLEGIBLE_MARKER])
+        return _prefixed(block, [ILLEGIBLE_MARKER], level)
     if block.type is BlockType.TABLE and block.table is not None:
         return render_table(block.table)
     # First of all: escaping must see the text as it will be printed.
@@ -75,7 +84,7 @@ def _render_block(block: Block) -> str | None:
     if block.type is BlockType.HEADING:
         heading = " ".join(line.strip() for line in text.splitlines() if line.strip())
         return f"{'#' * (block.heading_level or 1)} {escape_heading(heading)}"
-    return _prefixed(block, [escape_line(line) for line in _text_lines(text)])
+    return _prefixed(block, [escape_line(line) for line in _text_lines(text)], level)
 
 
 def _text_lines(text: str) -> list[str]:
@@ -104,12 +113,14 @@ def _prefix(block: Block) -> str | None:
     return None
 
 
-def _prefixed(block: Block, lines: list[str]) -> str:
+def _prefixed(block: Block, lines: list[str], level: int = 0) -> str:
     """Escaped lines with the block's prefix; further lines are indented under it."""
     prefix = _prefix(block)
     if prefix is None:
         return "\n".join(lines)
-    indent = " " * MARKDOWN_CONTINUATION_INDENT
+    # A nested item starts where the text of the item above starts.
+    prefix = " " * (MARKDOWN_CONTINUATION_INDENT * level) + prefix
+    indent = " " * (MARKDOWN_CONTINUATION_INDENT * (level + 1))
     # Empty lines stay empty: indenting them would add whitespace and no content.
     return "\n".join([prefix + lines[0], *(indent + line if line else "" for line in lines[1:])])
 

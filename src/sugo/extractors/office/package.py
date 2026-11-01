@@ -6,14 +6,16 @@ external relationships are recorded but never followed. Each part is
 decompressed in bounded steps and counted as it comes: the sizes written in
 the archive are the attacker's, so they are never trusted.
 
-``word_document`` and ``excel_workbook`` recognise a Word document or an
-Excel workbook from the raw bytes, without parsing XML, so Sugo's own process
-can route a file before the worker reads it. ``stream`` lets a large part be
+``word_document``, ``excel_workbook`` and ``powerpoint_presentation``
+recognise a Word document, an Excel workbook or a PowerPoint presentation
+from the raw bytes, without parsing XML, so Sugo's own process can route a
+file before the worker reads it. ``stream`` lets a large part be
 parsed piece by piece; a part read twice counts once towards the total.
 """
 
 import io
 import posixpath
+import re
 import zipfile
 from dataclasses import dataclass
 from typing import IO
@@ -50,6 +52,19 @@ EXCEL_MAIN_TYPES = (
     b"application/vnd.ms-excel.sheet.macroEnabled.main+xml",
     b"application/vnd.ms-excel.template.macroEnabled.main+xml",
 )
+# Main parts of PowerPoint presentations, templates, slide shows and their
+# macro-enabled forms; the binary .ppt is an OLE file, refused before this.
+POWERPOINT_MAIN_TYPES = (
+    b"application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+    b"application/vnd.openxmlformats-officedocument.presentationml.template.main+xml",
+    b"application/vnd.openxmlformats-officedocument.presentationml.slideshow.main+xml",
+    b"application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml",
+    b"application/vnd.ms-powerpoint.template.macroEnabled.main+xml",
+    b"application/vnd.ms-powerpoint.slideshow.macroEnabled.main+xml",
+)
+# Only these outside addresses become Markdown links; anything else (javascript:,
+# file:, white space or brackets that would break the link) stays plain text.
+SAFE_LINK = re.compile(r"(?:https?://|mailto:)[^\s()<>\[\]]+", re.IGNORECASE)
 _OFFICE_DOCUMENT = "/officeDocument"
 _CHUNK = 64 * 1024
 _ENCRYPTED_FLAG = 0x1
@@ -77,6 +92,11 @@ def word_document(data: bytes) -> bool:
 def excel_workbook(data: bytes) -> bool:
     """Whether the data is a ZIP whose content types name an Excel main part."""
     return _names_main_type(data, EXCEL_MAIN_TYPES)
+
+
+def powerpoint_presentation(data: bytes) -> bool:
+    """Whether the data is a ZIP whose content types name a PowerPoint main part."""
+    return _names_main_type(data, POWERPOINT_MAIN_TYPES)
 
 
 def _names_main_type(data: bytes, main_types: tuple[bytes, ...]) -> bool:

@@ -6,6 +6,10 @@ from typing import Final
 # Markdown has six heading levels (`#` to `######`); deeper levels cannot be rendered.
 MAX_HEADING_LEVEL: Final = 6
 
+# List levels count from 0, the outermost; PowerPoint has nine (0-8), and so
+# does Word's numbering.
+MAX_LIST_LEVEL: Final = 8
+
 # Pages are rotated in quarter turns by PDF viewers and image EXIF orientation alike.
 PAGE_ROTATIONS: Final = frozenset({0, 90, 180, 270})
 
@@ -289,6 +293,24 @@ XLSX_MAX_SHEET_TEXT: Final = 16_000_000
 # Excel's own grid: 1 048 576 rows and 16 384 columns (A to XFD).
 XLSX_MAX_ROWS: Final = 1_048_576
 XLSX_MAX_COLUMNS: Final = 16_384
+
+# Slide positions are in EMU: 12 700 to a point. A presentation that gives no
+# slide size gets PowerPoint's 16:9 default, 13.333 by 7.5 inches.
+PPTX_EMU_PER_POINT: Final = 12_700
+PPTX_DEFAULT_SLIDE_WIDTH_EMU: Final = 12_192_000
+PPTX_DEFAULT_SLIDE_HEIGHT_EMU: Final = 6_858_000
+# Coordinates beyond the standard's range (ST_Coordinate, about 27 million
+# inches) are not positions: such a shape is placed as if it had none.
+PPTX_MAX_COORDINATE: Final = 27_273_042_329_600
+# Table cells written in one presentation, empty ones and those a span covers
+# included: the serializer draws every cell of the grid, so a cell spanning a
+# billion columns must not reach it. As XLSX_MAX_GRID_CELLS; PowerPoint's own
+# tables stop at 75 columns.
+PPTX_MAX_GRID_CELLS: Final = 4_000_000
+# Line height, as a share of the slide's height, from which the XY-cut sets
+# the gaps that separate shapes (LAYOUT_PARAGRAPH_GAP, LAYOUT_COLUMN_GAP):
+# about 11 pt on a 7.5-inch slide, so shapes set slightly apart are split.
+PPTX_LINE_HEIGHT: Final = 0.02
 
 # The worker process, as for PDF (ADR-043): address space on Linux and macOS,
 # seconds to open and check a file and to return one page, restarts after a

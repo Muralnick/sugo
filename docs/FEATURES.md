@@ -44,7 +44,7 @@ Memory and disk figures will be confirmed by benchmarks.
 | PDF | Native, scanned, mixed | PyMuPDF, OCR, Docling, VLM | Per-page routing |
 | Images | PNG, JPEG, WEBP, BMP, TIFF (multi-page), GIF (first frame) | Image pipeline | |
 | Phone photos | HEIC, HEIF | Image pipeline + `pillow-heif` | Default iPhone format |
-| Modern Office | DOCX, PPTX, XLSX | lite: dedicated libraries; normal/quality: Docling | |
+| Modern Office | DOCX, PPTX, XLSX | lite: Sugo's own light reader (ADR-054); normal/quality: Docling | |
 | Legacy Office | DOC, PPT, XLS | LibreOffice conversion | Only if LibreOffice is installed |
 | OpenDocument | ODT, ODS, ODP | Docling | |
 | E-books | EPUB | Docling | |

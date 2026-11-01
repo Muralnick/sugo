@@ -19,6 +19,7 @@ from sugo.core.constants import (
 )
 from sugo.core.models import Page
 from sugo.extractors.office.docx_reader import read_docx
+from sugo.extractors.office.pptx_reader import read_pptx
 from sugo.extractors.office.protocol import (
     Message,
     Opened,
@@ -49,7 +50,8 @@ def run(data: bytes, kind: str, first_page: int) -> Iterator[Message]:
     Every check that can refuse the file runs before the first page: a
     document is laid out whole, since page breaks, numbering and notes depend
     on everything before them; a workbook's sheets are scanned, then each is
-    laid out when its page is sent. A page whose parts turn out broken then
+    laid out when its page is sent, and a presentation's slides are listed,
+    then each is laid out the same way. A page whose parts turn out broken then
     is reported as failed, never dropped.
     """
     if kind not in _READERS:
@@ -75,6 +77,7 @@ _READERS: dict[str, Callable[[bytes], tuple[int, Callable[[int], Page]]]] = {
     "xml": lambda data: _laid_out([lay_out(parse(data))]),
     "docx": lambda data: _laid_out(read_docx(data)),
     "xlsx": read_xlsx,
+    "pptx": read_pptx,
 }
 
 

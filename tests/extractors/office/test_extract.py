@@ -128,6 +128,28 @@ def test_workbooks_are_read_through_the_worker_one_page_per_sheet() -> None:
     ]
 
 
+def test_presentations_are_read_through_the_worker_one_page_per_slide() -> None:
+    from tests.extractors.office.pptx_files import para, pptx, sp
+
+    data = pptx(sp(para("One"), ph="title"), sp(para("Two")))
+    assert extract.is_pptx(data)
+    assert not extract.is_docx(data)
+    assert not extract.is_xlsx(data)
+    assert [render(page.blocks) for page in extract.extract_pptx(data)] == ["# One", "Two"]
+
+
+def test_a_slide_broken_after_the_checks_is_reported_as_failed() -> None:
+    from tests.extractors.office.pptx_files import para, pptx, sp
+
+    from sugo.extractors.office.protocol import Opened, PageFailed, PageRead
+    from sugo.extractors.office.worker import run
+
+    messages = list(run(pptx(sp(para("fine")), "<p:sp><broken></p:sp>"), "pptx", 0))
+    assert isinstance(messages[0], Opened)
+    assert isinstance(messages[1], PageRead)
+    assert messages[2] == PageFailed(index=1)
+
+
 def test_a_sheet_broken_after_the_checks_is_reported_as_failed() -> None:
     from tests.extractors.office.xlsx_files import row, xlsx
 

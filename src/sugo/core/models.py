@@ -20,7 +20,12 @@ from typing import Annotated, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from sugo.core.constants import MAX_HEADING_LEVEL, PAGE_ROTATIONS, SHA256_HEX_LENGTH
+from sugo.core.constants import (
+    MAX_HEADING_LEVEL,
+    MAX_LIST_LEVEL,
+    PAGE_ROTATIONS,
+    SHA256_HEX_LENGTH,
+)
 
 NonEmptyStr = Annotated[str, Field(min_length=1)]
 UnitInterval = Annotated[float, Field(ge=0.0, le=1.0)]
@@ -204,8 +209,8 @@ class Block(_Model):
     - a removed block always records who removed it and why (principle 3);
     - an illegible block carries no text: unreadable content is marked, never
       filled with a guess (principle 4);
-    - heading levels, table grids and chat speakers appear only on blocks of
-      the matching type.
+    - heading levels, list levels, table grids and chat speakers appear only
+      on blocks of the matching type.
     """
 
     id: NonEmptyStr
@@ -217,6 +222,8 @@ class Block(_Model):
     bbox: BBox | None = None
     style: Style | None = None
     heading_level: Annotated[int, Field(ge=1, le=MAX_HEADING_LEVEL)] | None = None
+    # Nesting of a list item, 0 for the outermost; None where the source has none.
+    list_level: Annotated[int, Field(ge=0, le=MAX_LIST_LEVEL)] | None = None
     reading_order: Annotated[int, Field(ge=0)] | None = None
     table: Table | None = None
     speaker: ChatSide | None = None
@@ -245,6 +252,8 @@ class Block(_Model):
             raise ValueError("an illegible block must not carry text")
         if self.heading_level is not None and self.type is not BlockType.HEADING:
             raise ValueError("heading_level is only allowed on heading blocks")
+        if self.list_level is not None and self.type is not BlockType.LIST_ITEM:
+            raise ValueError("list_level is only allowed on list_item blocks")
         if self.table is not None and self.type is not BlockType.TABLE:
             raise ValueError("table is only allowed on table blocks")
         if self.speaker is not None and self.type is not BlockType.CHAT_MESSAGE:
