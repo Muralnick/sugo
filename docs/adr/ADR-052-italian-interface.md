@@ -22,7 +22,14 @@ Typer 0.27 bundles its own copy of Click (`typer._click`). That copy no longer m
 
 ### Choosing the language
 
-`ui.language` decides, through every layer of ADR-051 (`SUGO_UI_LANGUAGE` included). `auto` follows the system's language (`LC_ALL`, `LC_MESSAGES`, `LANG`, then the OS locale, which Windows names "Italian_Italy"); a language without an interface falls back to English. The CLI chooses before parsing the command line, so help and usage errors speak the language too. If the configuration is not valid, the CLI uses the system's language and the command then reports the error. `sugo mcp` reads no configuration for this: it is English. `--json` switches the command to English before anything else.
+`ui.language` decides, through every layer of ADR-051 (`SUGO_UI_LANGUAGE` included). `auto` follows the system's language; a language without an interface falls back to English.
+
+**Maintainer decision, 2026-11-01:** `auto` gives another language than English only on a clear signal, and English otherwise:
+- a locale variable (`LC_ALL`, `LC_MESSAGES`, `LANG`, the first one set);
+- else, on Windows, the language of Windows' own menus (`GetUserDefaultUILanguage`, read through the standard library's `ctypes`);
+- else English. The OS locale is no longer used for the interface: on Windows it is the regional format (dates, numbers), often Italian on an English Windows. It still suggests the default languages of documents (ADR-051).
+
+`sugo doctor` shows the language and where it comes from. A question confirming the language belongs to the guided setup (ADR-021). The CLI chooses before parsing the command line, so help and usage errors speak the language too. If the configuration is not valid, the CLI uses the system's language and the command then reports the error. `sugo mcp` reads no configuration for this: it is English. `--json` switches the command to English before anything else.
 
 ### Mechanism (no new dependency)
 

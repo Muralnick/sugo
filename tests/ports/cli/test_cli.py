@@ -333,6 +333,7 @@ def test_doctor_reports_every_check() -> None:
         "pymupdf",
         "tokenizer",
         "config",
+        "language",
         "cache",
         "clipboard",
     }

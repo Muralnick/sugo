@@ -15,6 +15,7 @@ import errno
 import gettext as _gettext
 import locale
 import os
+import sys
 from functools import cache
 from importlib import resources
 
@@ -24,6 +25,11 @@ from sugo.i18n.catalog import Translations, translations
 LANGUAGES = ("en", "it")
 # "sugo" for Sugo's own text; "typer" for the text Typer marks for translation.
 DOMAINS = ("sugo", "typer")
+
+# Windows language ids: the low ten bits name the language (LANGID primary
+# language), e.g. 0x0410 Italian (Italy) and 0x0810 Italian (Switzerland).
+_WINDOWS_PRIMARY_LANGUAGE = 0x3FF
+_WINDOWS_LANGUAGES = {0x09: "en", 0x10: "it"}
 
 _ENGLISH = _gettext.NullTranslations()
 _active_language = "en"
@@ -89,14 +95,52 @@ def active_language() -> str:
 
 def resolve(setting: str) -> str:
     """The language for a ``ui.language`` setting: ``auto`` follows the system."""
-    if setting in LANGUAGES:
-        return setting
-    system = system_language()
-    return system if system in LANGUAGES else "en"
+    return setting if setting in LANGUAGES else detect_language()[0]
+
+
+def detect_language() -> tuple[str, str]:
+    """The interface language for ``auto``, and where it comes from (ADR-052).
+
+    Another language than English only on a clear signal: a locale variable,
+    or the language of Windows' own menus. Without one, or for a language
+    Sugo has no interface in, English. The Windows regional format (dates,
+    numbers) is not used: it is often Italian on an English Windows.
+
+    Returns:
+        The language and its source: the variable's name (``LC_ALL``,
+        ``LC_MESSAGES``, ``LANG``), ``windows``, or ``none`` without a signal.
+    """
+    for variable in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        value = os.environ.get(variable)
+        if value and value not in ("C", "POSIX"):
+            code = value[:2].lower()
+            return (code if code in LANGUAGES else "en"), variable
+    windows = _windows_display_language()
+    if windows is not None:
+        return windows, "windows"
+    return "en", "none"
+
+
+def _windows_display_language() -> str | None:
+    """The language of Windows' menus, if Sugo has its interface; None elsewhere."""
+    if sys.platform != "win32":
+        return None
+    import ctypes
+
+    try:
+        # Takes nothing and changes nothing: it returns the user's display language id.
+        language_id = ctypes.windll.kernel32.GetUserDefaultUILanguage()
+    except (AttributeError, OSError):
+        return None
+    return _WINDOWS_LANGUAGES.get(int(language_id) & _WINDOWS_PRIMARY_LANGUAGE, "en")
 
 
 def system_language() -> str | None:
-    """The two-letter code of the system's language, if it names one."""
+    """The two-letter code of the system's language, if it names one.
+
+    For the default languages of documents (ADR-051), where the regional
+    format is a fair hint; the interface uses ``detect_language``.
+    """
     for variable in ("LC_ALL", "LC_MESSAGES", "LANG"):
         value = os.environ.get(variable)
         if value and value not in ("C", "POSIX"):

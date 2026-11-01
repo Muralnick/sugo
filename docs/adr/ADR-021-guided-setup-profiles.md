@@ -12,6 +12,8 @@ Installing everything wastes gigabytes, increases attack surface and confuses us
 
 Two-step install: small base, then `sugo setup`. Terminology: level / profile / recipe. Seven official work profiles (`personal`, `dev`, `rag`, `office`, `legal`, `research`, `full`), combinable, most protective wins. Phone-style setup: one toggle per screen with a four-part card (what it does, if yes, if no, good to know) and size; summary with "you will / will not be able to". Profiles and cards are data files; sizes measured in CI. CPU-only PyTorch without an NVIDIA GPU. About eight tested packs; `--advanced` for untested combinations; answers file for companies; just-in-time installs with confirmation, never from MCP.
 
+Note of 2026-11-01 (maintainer, ADR-052): the setup starts in English and its first screen confirms the interface language Sugo found ("Found: Italian. Use Italian?"), saving the answer as `ui.language`.
+
 ## Alternatives considered
 
 | Alternative | Why not |

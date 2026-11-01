@@ -29,6 +29,8 @@ LITE_PACKAGES = {
     "pymupdf": "pymupdf",
     "rapidocr": "rapidocr",
 }
+# Interface languages, named in the interface language.
+_LANGUAGE_NAMES = {"en": N_("English"), "it": N_("Italian")}
 # The first PyMuPDF release whose MuPDF has the 2026 memory-safety fixes (ADR-043).
 _PYMUPDF_SAFE_MAJOR = 2
 
@@ -88,6 +90,7 @@ def run_checks() -> list[Check]:
         [
             _guarded(N_("tokenizer"), _tokenizer),
             _guarded(N_("config"), _config),
+            _guarded(N_("language"), _language),
             _cache(),
             _clipboard(),
         ]
@@ -145,6 +148,29 @@ def _tokenizer() -> Check:
 
     get_encoding()
     return Check("tokenizer", Status.OK, _("o200k_base, SHA-256 verified"))
+
+
+def _language() -> Check:
+    """The interface language and why: the setting, or what the system says (ADR-052)."""
+    from sugo import i18n
+    from sugo.config.settings import ConfigError, load
+
+    setting: str
+    try:
+        setting = load().settings.ui.language
+    except ConfigError:
+        setting = "auto"  # The config check reports the error.
+    language: str
+    if setting != "auto":
+        language, source = setting, _("set in ui.language")
+    else:
+        language, found = i18n.detect_language()
+        sources = {
+            "windows": _("from the Windows display language"),
+            "none": _("the system gives no clear language; English"),
+        }
+        source = sources.get(found) or _("from the variable {name}").format(name=found)
+    return Check("language", Status.OK, f"{i18n.gettext(_LANGUAGE_NAMES[language])}, {source}")
 
 
 def _config() -> Check:

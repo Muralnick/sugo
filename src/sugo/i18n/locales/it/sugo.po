@@ -843,3 +843,20 @@ msgid ""
 msgstr ""
 "Sì: sugo FILE converte, sugo stats FILE mostra i token per provider, e "
 "sugo convert FILE --chunks crea i chunk."
+
+# --- Interface language (ADR-052) -------------------------------------------------
+
+msgid "language"
+msgstr "lingua"
+
+msgid "set in ui.language"
+msgstr "impostata in ui.language"
+
+msgid "from the Windows display language"
+msgstr "dalla lingua di visualizzazione di Windows"
+
+msgid "the system gives no clear language; English"
+msgstr "il sistema non indica una lingua chiara; inglese"
+
+msgid "from the variable {name}"
+msgstr "dalla variabile {name}"
