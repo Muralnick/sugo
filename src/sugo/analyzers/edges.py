@@ -16,6 +16,11 @@ with digit runs masked: "Page 3 of 10" and "Page 4 of 10" share the pattern
 Only text a reader can see counts. Removed and flagged blocks are ignored:
 otherwise hidden copies of a clause on every page could make its one visible
 copy look like a repeated footer, and get it removed (THREAT_MODEL C).
+
+Some documents declare their headers and footers themselves, as Word does:
+the reader types them, without a position and once per section, so there is
+nothing to repeat. ``declared_texts`` gives the cleaners those, with the same
+measure of what is a clause (ADR-054).
 """
 
 import hashlib
@@ -242,13 +247,9 @@ def declared_texts(page: Page) -> list[DeclaredText]:
     """
     found = []
     for block in page.blocks:
-        if block.removed or block.flags or block.type not in _DECLARED_TYPES:
+        if block.type not in _DECLARED_TYPES or block.bbox is not None or not _furniture(block):
             continue
-        if block.bbox is not None or not block.text.strip():
-            continue
-        if len(block.text) > MAX_EDGE_TEXT_CHARS:
-            continue
-        text = " ".join(unicodedata.normalize("NFKC", block.text).casefold().split())
+        text = _normalised(block.text)
         found.append(
             DeclaredText(
                 block_id=block.id,
@@ -270,10 +271,7 @@ def edge_texts(page: Page) -> list[EdgeText]:
     top: list[tuple[float, str, Block]] = []
     bottom: list[tuple[float, str, Block]] = []
     for block in page.blocks:
-        if block.removed or block.flags or block.type not in _EDGE_TYPES:
-            continue
-        # Longer text is a paragraph, never page furniture.
-        if block.bbox is None or not block.text.strip() or len(block.text) > MAX_EDGE_TEXT_CHARS:
+        if block.type not in _EDGE_TYPES or block.bbox is None or not _furniture(block):
             continue
         if block.bbox.y1 <= PAGE_EDGE_BAND:
             top.append((block.bbox.y0, block.id, block))
@@ -286,8 +284,25 @@ def edge_texts(page: Page) -> list[EdgeText]:
     ]
 
 
+def _furniture(block: Block) -> bool:
+    """Whether a block can be page furniture: seen, unflagged, short and not empty.
+
+    Longer text is a paragraph, never page furniture.
+    """
+    return (
+        not block.removed
+        and not block.flags
+        and bool(block.text.strip())
+        and len(block.text) <= MAX_EDGE_TEXT_CHARS
+    )
+
+
+def _normalised(text: str) -> str:
+    return " ".join(unicodedata.normalize("NFKC", text).casefold().split())
+
+
 def _edge_text(block: Block, band: Band) -> EdgeText:
-    text = " ".join(unicodedata.normalize("NFKC", block.text).casefold().split())
+    text = _normalised(block.text)
     # The text between digit runs, encoded unambiguously: masking with a
     # character such as "#" would let "ref # 1" and "ref 1 1" share a
     # pattern with a different count of numbers.
