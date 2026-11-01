@@ -350,7 +350,9 @@ stdio transport, connected to the shared engine.
 
 ### Web UI
 
-Local HTTP server (FastAPI) on `127.0.0.1`, random port, session token in the opening URL, `Host` and `Origin` checks (DNS rebinding and cross-site protection). REST endpoints mirror the operations; progress via Server-Sent Events. Drag-and-drop, side-by-side original/Markdown preview with removals highlighted, token counters per provider.
+Local HTTP server on `127.0.0.1`, random port, session token in the opening URL, `Host` and `Origin` checks (DNS rebinding and cross-site protection). REST endpoints mirror the operations; progress via Server-Sent Events. Drag-and-drop, side-by-side original/Markdown preview with removals highlighted, token counters per provider.
+
+v0.1 (ADR-055, `sugo ui`): Sugo's own small server on the standard library (`http.server`), as the MCP server implements its protocol itself (ADR-049); no new dependency. The token travels in the URL fragment and an `X-Sugo-Token` header. It converts one dropped file at a time and shows the Markdown, the tokens per provider and the removals per cleaner; preview, `explain`, Server-Sent Events, several files and chunks come later. FastAPI may come with the full UI, through its own ADR.
 
 ### Background service
 

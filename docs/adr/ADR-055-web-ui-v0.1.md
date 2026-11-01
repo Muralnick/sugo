@@ -1,10 +1,10 @@
 # ADR-055: Local web interface for v0.1 (`sugo ui`)
 
-**Status:** Proposed  
+**Status:** Accepted (maintainer decisions of 2026-11-01)  
 **Date:** 2026-11-01  
 **Deciders:** project author  
 **Implements:** ADR-015 (ports: local web UI), ADR-022 (web UI contract), ADR-036 (local networking only in ports), THREAT_MODEL E, ARCHITECTURE §12 "Web UI"  
-**Updates:** ROADMAP (a minimal web UI moves into v0.1), ARCHITECTURE §12 if the maintainer chooses the standard library server (decision 1)  
+**Updates:** ROADMAP (a minimal web UI moves into v0.1), ARCHITECTURE §12 (the standard library server, decision 1)  
 **Adds:** CLI command `sugo ui`; error code `WEB_REQUEST_REFUSED`
 
 ## Context
@@ -21,16 +21,18 @@ What is missing is the v0.1 scope, the server library and the exact protections.
 
 ## Decision
 
-### 1. Server library (maintainer decision; recommended: the standard library)
+### 1. Server library (maintainer decision, 2026-11-01: option A, the standard library)
 
 | Option | For | Against |
 |---|---|---|
 | **A. Sugo's own small server on the standard library (`http.server`, `ThreadingHTTPServer`)**, recommended | No new dependency, so no 14-day wait and no new licences. Same choice as the MCP server, which implements its protocol itself (ADR-049). Only what Sugo uses: about five routes, one user, loopback only. | Sugo writes the request checks itself (size, headers, routing); `http.server` is not meant for public servers. Loopback-only use with every check below makes that acceptable. OpenAPI is not generated. |
 | B. FastAPI with Uvicorn, as ARCHITECTURE §12 says | OpenAPI generated from the operations' models, mature request handling. | About six new packages (FastAPI, Starlette, Uvicorn, h11, anyio and their dependencies), each needing the licence and 14-day checks. The server reads uploads through `python-multipart`, one more package. |
 
-With option A, ARCHITECTURE §12 is updated to name the standard library server for v0.1. FastAPI can come with the full UI after v0.1, through its own ADR, if the API grows.
+**Maintainer decision, 2026-11-01:** option A. ARCHITECTURE §12 names the standard library server for v0.1. FastAPI can come with the full UI after v0.1, through its own ADR, if the API grows.
 
-### 2. Scope for v0.1 (maintainer decision; recommended: the list below)
+### 2. Scope for v0.1 (maintainer decision, 2026-11-01: the list below)
+
+**Maintainer decision, 2026-11-01:** the minimal list below, with the items under "Left for later" after v0.1.
 
 `sugo ui` starts the server and opens the page in the default browser (`--no-browser` prints the address instead). The page:
 
@@ -56,7 +58,7 @@ Left for later:
 | DNS rebinding: a site's name made to point at `127.0.0.1` | Every request must carry `Host: 127.0.0.1:<port>` or `localhost:<port>`, else it is refused. API requests must also carry an `Origin` equal to the server's own; requests without one are refused. |
 | Document text turned into code in the page (XSS) | The Markdown, file names, messages and reasons are always inserted as text (`textContent`), never as HTML; v0.1 does not render Markdown as HTML. Every response sends a strict `Content-Security-Policy` (`default-src 'self'`, no inline script, `frame-ancestors 'none'`), `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and `Cache-Control: no-store`. |
 | Reading files from the disk | The API takes only the bytes of the file the user drops. It has no path parameter and lists no folder, so there is no path to traverse, unlike the MCP server's allowed roots. |
-| Oversized uploads | `Content-Length` is required and checked against the file size limits before the body is read (200 MB, as for Office and PDF); chunked uploads are refused. One conversion runs at a time; a second request gets `WEB_REQUEST_REFUSED`. |
+| Oversized uploads | `Content-Length` is required and checked against the file size limits before the body is read (200 MB, as for Office and PDF); chunked uploads are refused. One conversion runs at a time; a second request gets `WEB_REQUEST_REFUSED`. The page also checks the size before sending, so the user sees why. A slow client is cut off by a socket timeout. |
 | Pages loaded from the internet | Page, style and script are files inside the Sugo package, with no CDN, external font or analytics: the page works offline and sends nothing out. |
 | Logs | The server's access log is off. As everywhere, Sugo never logs document content or file names (CLAUDE.md). |
 
@@ -64,7 +66,7 @@ The server stops when the command is stopped (Ctrl+C). An import-linter contract
 
 ### 4. Error model
 
-A refused file answers with the error model of ADR-022: HTTP status and the same JSON as the CLI's `--json` (`code`, `message`, `hint`, `details`). The new stable code `WEB_REQUEST_REFUSED` covers requests refused by the protections above (wrong token, host or origin, a missing size, a second conversion while one is running), with HTTP 403, 411 or 409. Its message never says which check failed, so it gives a probing page no hint.
+A refused file answers with the error model of ADR-022: HTTP status and the same JSON as the CLI's `--json` (`code`, `message`, `hint`, `details`). The new stable code `WEB_REQUEST_REFUSED` covers requests refused by the protections above (wrong token, host or origin, a missing size, a second conversion while one is running), with HTTP 403, 411, 413 (a size over the limit) or 409. Its message never says which check failed, so it gives a probing page no hint.
 
 ### 5. When
 
@@ -82,7 +84,7 @@ After ROADMAP step 8 (benchmarks) and before step 9 (PyPI): about two or three w
 ## Consequences
 
 - New CLI command `sugo ui` (additive) and new error code `WEB_REQUEST_REFUSED`; Italian catalog entries for the page.
-- With option A, no new dependency; with option B, the new packages go through the ADR-043 checks first.
+- No new dependency (option A).
 - A new attack surface, limited to the local user's browser; a security review is required before merging, and THREAT_MODEL E gets the token-in-fragment and preflight details.
 - Residual risks:
   - another program run by the same user can reach the server, as it can read the user's files anyway;

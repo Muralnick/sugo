@@ -56,4 +56,4 @@
 | [052](ADR-052-italian-interface.md) | Italian interface for v0.1 | Accepted |
 | [053](ADR-053-mcp-secret-exclusions.md) | Wider secret exclusions for the MCP server | Proposed |
 | [054](ADR-054-office-xml-reader.md) | Light Office and XML reader | Proposed |
-| [055](ADR-055-web-ui-v0.1.md) | Local web interface for v0.1 (`sugo ui`) | Proposed |
+| [055](ADR-055-web-ui-v0.1.md) | Local web interface for v0.1 (`sugo ui`) | Accepted |

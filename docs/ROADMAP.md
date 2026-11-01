@@ -19,10 +19,11 @@ Scope updated on 2026-10-30 (maintainer decision): Office and XML documents move
 | Detectors: chat and code screenshots | Tables beyond simple ones |
 | Language packs: Italian, Spanish, French, German, English (ADR-050) | Japanese, Chinese; Korean (separate OCR model); language detection |
 | Markdown and JSONL export, chunker | Hybrid image mode, optimizer |
-| Metrics with provider comparison (`sugo stats`) | Web UI, tray, watcher |
+| Metrics with provider comparison (`sugo stats`) | Tray, watcher |
 | CLI one-shot commands, `sugo clip`, `sugo doctor` | Interactive shell, guided setup |
 | MCP server: `convert_document`, `estimate_savings` with allowed roots and token budget | Other MCP tools |
 | Basic TOML configuration | Policies, profiles, recipes |
+| Minimal local web UI, `sugo ui` (ADR-055): one file, Markdown, tokens, removals | Side-by-side preview, removal list, progress events, several files, chunks in the UI |
 | Linux CI on every push, Windows smoke tests | Full platform matrix, Docker images |
 
 ## Development steps
@@ -40,10 +41,12 @@ Scope updated on 2026-10-30 (maintainer decision): Office and XML documents move
 
 Added on 2026-10-30, between steps 7 and 9: the remaining v0.1 pieces (text cleaners, ADR-050; basic TOML configuration; Italian interface; Windows smoke tests), the GitHub pre-release, and the light Office and XML reader.
 
+Added on 2026-11-01 (maintainer decision, ADR-055): a minimal local web UI, `sugo ui`, after step 8 and before step 9.
+
 ## After v0.1
 
 - v0.2: shared engine, interactive shell, Japanese, Chinese, Korean, `normal` level with Docling (complex Office layouts, legacy formats).
 - v0.3: containers (folders, archives, emails), plan-first, guided setup and work profiles.
 - v0.4: `quality` level with VLM and cross-check; GPU benchmarks.
 - v0.5: legal features (anonymization, audit, policies), `sugo-pack-italy`.
-- Later: web UI, background service, web sources and registry (ADR-016), static-site exporter and WordPress migration recipe, audio and video, winget/Homebrew, signed installers.
+- Later: the full web UI, background service, web sources and registry (ADR-016), static-site exporter and WordPress migration recipe, audio and video, winget/Homebrew, signed installers.
