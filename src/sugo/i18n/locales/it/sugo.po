@@ -559,3 +559,96 @@ msgstr "Dividi il documento in file più piccoli."
 
 msgid "Open it in Microsoft Office or LibreOffice and save it as .docx, .xlsx or .pptx, without a password."
 msgstr "Aprilo con Microsoft Office o LibreOffice e salvalo come .docx, .xlsx o .pptx, senza password."
+
+# --- Web interface (sugo ui, ADR-055) -------------------------------------------
+
+msgid ""
+"Open Sugo's page in the browser: drop a file, get its Markdown. The page is "
+"served on this computer only; Ctrl+C stops it."
+msgstr ""
+"Apri la pagina di Sugo nel browser: trascina un file, ottieni il suo Markdown. La "
+"pagina è servita solo da questo computer; Ctrl+C la ferma."
+
+msgid "Print the page's address instead of opening it."
+msgstr "Stampa l'indirizzo della pagina invece di aprirla."
+
+msgid "Opening {url}"
+msgstr "Apro {url}"
+
+msgid "No browser found: open the address above."
+msgstr "Nessun browser trovato: apri l'indirizzo qui sopra."
+
+msgid "Press Ctrl+C to stop."
+msgstr "Premi Ctrl+C per fermare."
+
+msgid "Stopped."
+msgstr "Fermato."
+
+msgid "The request was refused."
+msgstr "La richiesta è stata rifiutata."
+
+msgid "Use the page sugo ui opened, one file at a time, up to {size} MB."
+msgstr "Usa la pagina aperta da sugo ui, un file alla volta, fino a {size} MB."
+
+msgid "Documents, reduced: drop a file to get its compact Markdown."
+msgstr "Documenti, ridotti: trascina un file per avere il suo Markdown compatto."
+
+msgid "Drop a file here"
+msgstr "Trascina qui un file"
+
+msgid "Choose a file"
+msgstr "Scegli un file"
+
+msgid "PDF, DOCX, XLSX, PPTX, PNG, JPEG, WEBP or XML, up to {size} MB."
+msgstr "PDF, DOCX, XLSX, PPTX, PNG, JPEG, WEBP o XML, fino a {size} MB."
+
+msgid "This file is larger than {size} MB."
+msgstr "Questo file supera {size} MB."
+
+msgid "This file is empty."
+msgstr "Questo file è vuoto."
+
+msgid "Converting…"
+msgstr "Conversione in corso…"
+
+msgid "Markdown"
+msgstr "Markdown"
+
+msgid "Copy"
+msgstr "Copia"
+
+msgid "Copied"
+msgstr "Copiato"
+
+msgid "The browser did not allow copying; select the text and copy it."
+msgstr "Il browser non ha permesso di copiare; seleziona il testo e copialo."
+
+msgid "Save as .md"
+msgstr "Salva come .md"
+
+msgid "Tokens"
+msgstr "Token"
+
+msgid "Text before and after cleaning: {before} -> {after} tokens ({saved}% saved)"
+msgstr "Testo prima e dopo la pulizia: {before} -> {after} token ({saved}% risparmiato)"
+
+msgid "Pages: {count}"
+msgstr "Pagine: {count}"
+
+msgid "Pages that could not be read: {pages}"
+msgstr "Pagine che non si sono potute leggere: {pages}"
+
+msgid "Blocks removed, per cleaner"
+msgstr "Blocchi rimossi, per pulitore"
+
+msgid "No blocks removed."
+msgstr "Nessun blocco rimosso."
+
+msgid "Something went wrong; the terminal running sugo ui may say more."
+msgstr "Qualcosa è andato storto; il terminale dove gira sugo ui può dire di più."
+
+msgid "Open the address sugo ui printed in the terminal."
+msgstr "Apri l'indirizzo che sugo ui ha scritto nel terminale."
+
+msgid "Sugo runs on this computer only. To stop it, press Ctrl+C in the terminal."
+msgstr "Sugo funziona solo su questo computer. Per fermarlo, premi Ctrl+C nel terminale."

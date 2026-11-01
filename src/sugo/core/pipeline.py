@@ -40,10 +40,7 @@ from sugo.cleaners.ui_chrome import UiChromeCleaner
 from sugo.core.chunks import Chunk
 from sugo.core.constants import (
     CHUNK_MIN_TOKENS,
-    MAX_IMAGE_FILE_BYTES,
-    MAX_OFFICE_FILE_BYTES,
-    MAX_PDF_FILE_BYTES,
-    MAX_XML_FILE_BYTES,
+    MAX_INPUT_BYTES,
 )
 from sugo.core.decisions import InvalidDecisionError, Proposal, apply_decisions
 from sugo.core.models import BlockFlag, Page
@@ -71,11 +68,6 @@ from sugo.storage.page_cache import (
 from sugo.storage.paths import StorageDirError
 
 _log = logging.getLogger(__name__)
-
-# The largest file any extractor accepts; each one applies its own limit.
-_MAX_INPUT_BYTES = max(
-    MAX_PDF_FILE_BYTES, MAX_IMAGE_FILE_BYTES, MAX_OFFICE_FILE_BYTES, MAX_XML_FILE_BYTES
-)
 
 
 _Stats = TypeVar("_Stats", contravariant=True)
@@ -214,7 +206,7 @@ def read_input(path: Path) -> bytes:
     """
     with path.open("rb") as file:
         # One byte more than the limit lets the extractor report "too large".
-        return file.read(_MAX_INPUT_BYTES + 1)
+        return file.read(MAX_INPUT_BYTES + 1)
 
 
 def convert(

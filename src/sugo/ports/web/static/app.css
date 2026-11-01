@@ -1,0 +1,115 @@
+/* Sugo's local page (ADR-055): system fonts only, nothing loaded from outside. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #fbfaf8;
+  --fg: #1f1d1a;
+  --muted: #6b665e;
+  --line: #d9d4cc;
+  --accent: #a3341f;
+  --accent-fg: #ffffff;
+  --panel: #ffffff;
+  --warn: #8a5a00;
+  --error: #a3001b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #181715;
+    --fg: #ece8e1;
+    --muted: #a39d93;
+    --line: #3b3833;
+    --accent: #e0765f;
+    --accent-fg: #181715;
+    --panel: #22201d;
+    --warn: #e2b04a;
+    --error: #ff7a8a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+h1 { margin: 0; font-size: 2rem; color: var(--accent); }
+h2 { font-size: 1.15rem; margin: 28px 0 8px; }
+header p { margin: 4px 0 20px; }
+
+.muted { color: var(--muted); }
+.warning { color: var(--warn); }
+
+.drop {
+  border: 2px dashed var(--line);
+  border-radius: 12px;
+  padding: 32px 16px;
+  text-align: center;
+  background: var(--panel);
+}
+.drop.over { border-color: var(--accent); }
+.drop.busy { opacity: 0.6; pointer-events: none; }
+.drop-title { font-size: 1.2rem; margin: 0 0 12px; }
+
+.button, button {
+  display: inline-block;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 8px 16px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: inherit;
+  cursor: pointer;
+}
+button { background: transparent; color: var(--accent); }
+.button input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.button:focus-within, button:focus-visible { outline: 3px solid var(--line); outline-offset: 2px; }
+
+.status { min-height: 1.5em; }
+
+.error {
+  border-left: 4px solid var(--error);
+  padding: 4px 12px;
+  background: var(--panel);
+}
+.error strong { color: var(--error); }
+
+.result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.actions { display: flex; gap: 8px; }
+
+textarea {
+  width: 100%;
+  min-height: 360px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--fg);
+  font: 14px/1.45 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  resize: vertical;
+}
+
+table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+caption { text-align: left; font-weight: 600; padding-bottom: 4px; }
+th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; }
+.number { text-align: right; font-variant-numeric: tabular-nums; }
+
+ul { padding-left: 20px; }
+footer { margin-top: 40px; font-size: 0.9rem; }
+
+[hidden] { display: none !important; }

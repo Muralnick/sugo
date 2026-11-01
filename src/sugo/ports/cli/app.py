@@ -1,4 +1,4 @@
-"""The ``sugo`` command: convert, stats, clip and doctor (ADR-022, ADR-048).
+"""The ``sugo`` command: convert, stats, clip, doctor, mcp and ui (ADR-022, ADR-048, ADR-055).
 
 ``sugo FILE`` is short for ``sugo convert FILE``. Results go to stdout,
 messages and progress to stderr; Rich turns colours off when stderr is not a
@@ -546,6 +546,45 @@ def mcp_command(
         from sugo.ports.mcp.server import serve
 
         serve(roots, loaded.settings)
+
+
+# --- ui -----------------------------------------------------------------------
+
+
+@app.command(
+    "ui",
+    cls=TranslatedCommand,
+    help=N_(
+        "Open Sugo's page in the browser: drop a file, get its Markdown. The page is "
+        "served on this computer only; Ctrl+C stops it."
+    ),
+)
+def ui_command(
+    no_browser: Annotated[
+        bool,
+        typer.Option("--no-browser", help=N_("Print the page's address instead of opening it.")),
+    ] = False,
+) -> None:
+    """Serve the web UI; the help text is in the decorator, for translation."""
+    with _failures(json_output=False):
+        settings = _settings(quiet=False)
+        _require_lite()
+        from sugo.ports.web.server import WebServer, converter
+
+        with WebServer(converter(settings)) as server:
+            if no_browser:
+                _write(server.url + "\n")
+            else:
+                import webbrowser
+
+                _stderr.print(Text(_("Opening {url}").format(url=server.url)))
+                if not webbrowser.open(server.url):
+                    _stderr.print(Text(_("No browser found: open the address above.")))
+            _stderr.print(_("Press Ctrl+C to stop."))
+            try:
+                server.serve_forever()
+            except KeyboardInterrupt:
+                _stderr.print(_("Stopped."))
 
 
 # --- shared -------------------------------------------------------------------

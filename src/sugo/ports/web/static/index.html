@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="$lang">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="sugo-texts" content="$texts">
+<title>Sugo</title>
+<link rel="stylesheet" href="/app.css">
+<script src="/app.js" defer></script>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Sugo</h1>
+    <p data-text="tagline"></p>
+  </header>
+
+  <section id="drop" class="drop">
+    <p class="drop-title" data-text="drop"></p>
+    <label class="button">
+      <span data-text="choose"></span>
+      <input id="file" type="file" accept=".pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,.webp,.xml">
+    </label>
+    <p class="muted" data-text="formats"></p>
+  </section>
+
+  <p id="status" class="status" role="status" aria-live="polite"></p>
+
+  <section id="error" class="error" role="alert" hidden>
+    <p><strong id="error-code"></strong> <span id="error-message"></span></p>
+    <p id="error-hint" class="muted"></p>
+  </section>
+
+  <section id="result" hidden>
+    <div class="result-head">
+      <h2 data-text="markdown"></h2>
+      <div class="actions">
+        <button id="copy" type="button" data-text="copy"></button>
+        <button id="save" type="button" data-text="save"></button>
+      </div>
+    </div>
+    <p id="pages" class="muted"></p>
+    <p id="failed" class="warning" hidden></p>
+    <textarea id="markdown" readonly spellcheck="false"></textarea>
+
+    <h2 data-text="tokens"></h2>
+    <p id="text-savings"></p>
+    <table id="images" hidden>
+      <caption data-text="images_title"></caption>
+      <thead>
+        <tr>
+          <th data-text="provider"></th>
+          <th data-text="tier"></th>
+          <th class="number" data-text="image_tokens"></th>
+          <th class="number" data-text="markdown_tokens"></th>
+          <th class="number" data-text="saved"></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h2 data-text="removed_title"></h2>
+    <ul id="removed"></ul>
+  </section>
+
+  <footer class="muted" data-text="local_only"></footer>
+</main>
+</body>
+</html>

@@ -342,6 +342,22 @@ type = "forbidden"
 source_modules = ["sugo.ports.mcp"]
 forbidden_modules = ["http", "socket", "socketserver", "ssl", "sugo._internal.net"]
 
+# The web UI is the only HTTP server: http.server and socketserver stay inside
+# it (ADR-055). import-linter forbids top-level packages only, so "http" as a
+# whole; the network gateway may use http.client (ADR-036).
+[[tool.importlinter.contracts]]
+name = "HTTP server only in the web UI"
+type = "forbidden"
+source_modules = ["sugo"]
+forbidden_modules = ["http", "socketserver"]
+ignore_imports = [
+    "sugo.ports.web -> *",
+    "sugo.ports.web.** -> *",
+    "sugo._internal.net -> *",
+    "sugo._internal.net.** -> *",
+]
+unmatched_ignore_imports_alerting = "none"
+
 # Network boundaries (ADR-036). Each contract ignores the imports made by the
 # modules it allows, which also cuts indirect chains through them; unmatched
 # ignores are expected until those packages exist.

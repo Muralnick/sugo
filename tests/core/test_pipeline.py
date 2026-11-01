@@ -108,7 +108,7 @@ def test_raw_tokens_are_counted_only_when_asked(cache: PageCache) -> None:
 def test_input_is_read_up_to_one_byte_past_the_limit(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(pipeline, "_MAX_INPUT_BYTES", 10)
+    monkeypatch.setattr(pipeline, "MAX_INPUT_BYTES", 10)
     path = tmp_path / "big.bin"
     path.write_bytes(b"x" * 100)
     assert read_input(path) == b"x" * 11
