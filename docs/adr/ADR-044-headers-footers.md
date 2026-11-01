@@ -4,7 +4,7 @@
 **Date:** 2026-10-29  
 **Deciders:** project author  
 **Implements:** ADR-006 (pass 2, analysis), ADR-041 (cleaner decisions), ARCHITECTURE §4 (analyzer contract), THREAT_MODEL C (output poisoning)  
-**Updated by:** ADR-054 (headers and footers a document declares itself, without a position, as Word's: short ones removed, clauses kept)
+**Updated by:** ADR-054 (headers and footers a document declares itself, without a position, as Word's: the first copy kept, later identical copies removed)
 
 ## Context
 

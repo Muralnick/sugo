@@ -128,7 +128,7 @@ def test_unsupported_input_is_refused() -> None:
     assert caught.value.code == "INPUT_UNSUPPORTED"
 
 
-def test_word_headers_go_and_a_clause_in_a_footer_stays(cache: PageCache) -> None:
+def test_word_headers_and_footers_keep_their_first_copy(cache: PageCache) -> None:
     from tests.extractors.office.docx_files import docx, p
 
     section = (
@@ -136,10 +136,13 @@ def test_word_headers_go_and_a_clause_in_a_footer_stays(cache: PageCache) -> Non
         '<w:footerReference w:type="default" r:id="pfooter"/></w:sectPr>'
     )
     clause = "The supplier is liable for all damages caused by delays"
-    data = docx(p("Body text.") + section, parts={"header": p("ACME Ltd"), "footer": p(clause)})
+    # Two sections, each with the same header and footer.
+    body = p("First part.", props=section) + p("Second part.") + section
+    data = docx(body, parts={"header": p("DRAFT"), "footer": p(clause)})
     conversion = convert(data, cache=cache)
-    assert conversion.markdown == f"Body text.\n\n{clause}"
-    assert conversion.removed == {"headers_footers": 1}
+    assert conversion.pages == 2
+    assert conversion.markdown == f"DRAFT\n\nFirst part.\n\n{clause}\n\nSecond part."
+    assert conversion.removed == {"headers_footers": 2}
 
 
 def test_word_documents_are_converted_and_legacy_ones_refused(cache: PageCache) -> None:

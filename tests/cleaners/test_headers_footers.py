@@ -137,23 +137,43 @@ def declared(block_id: str, kind: BlockType, text: str, *flags: BlockFlag) -> Bl
     return Block(id=block_id, type=kind, text=text, origin_engine="t", flags=flags)
 
 
-def test_short_declared_headers_and_footers_go_with_a_reason() -> None:
-    p = page(
-        0,
-        declared("h", BlockType.HEADER, "ACME Ltd"),
-        block("b", "Body", MIDDLE),
-        declared("f", BlockType.FOOTER, "Confidential"),
-    )
-    assert HeaderFooterCleaner().propose(p, analyze([p])) == [
-        Decision(block_id="h", reason="running header declared by the document"),
-        Decision(block_id="f", reason="running footer declared by the document"),
+def test_declared_headers_keep_their_first_copy() -> None:
+    # One copy per section; the first says what the document is, even short.
+    pages = [
+        page(
+            i,
+            declared("h", BlockType.HEADER, "DRAFT - NOT BINDING"),
+            block("b", f"Body {i}", MIDDLE),
+            declared("f", BlockType.FOOTER, CLAUSE),
+        )
+        for i in range(3)
+    ]
+    stats = analyze(pages)
+    assert [HeaderFooterCleaner().propose(p, stats) for p in pages] == [
+        [],
+        *[
+            [
+                Decision(
+                    block_id="h",
+                    reason="running header declared by the document; first copy kept on page 1",
+                ),
+                Decision(
+                    block_id="f",
+                    reason="running footer declared by the document; first copy kept on page 1",
+                ),
+            ]
+        ]
+        * 2,
     ]
 
 
-def test_a_clause_in_a_declared_footer_stays() -> None:
-    # Shown once per section, it is the only copy (THREAT_MODEL C).
-    p = page(0, declared("f", BlockType.FOOTER, CLAUSE))
-    assert HeaderFooterCleaner().propose(p, analyze([p])) == []
+def test_different_declared_headers_each_keep_their_copy() -> None:
+    pages = [
+        page(0, declared("h", BlockType.HEADER, "Part one")),
+        page(1, declared("h", BlockType.HEADER, "Part two")),
+    ]
+    stats = analyze(pages)
+    assert [HeaderFooterCleaner().propose(p, stats) for p in pages] == [[], []]
 
 
 def test_flagged_declared_blocks_are_left_to_their_own_cleaners() -> None:
