@@ -21,7 +21,6 @@ from sugo import i18n
 from sugo.config.settings import Chunking, General, Settings
 from sugo.core.constants import MAX_INPUT_BYTES, WEB_TOKEN_BYTES
 from sugo.core.pipeline import InputUnsupportedError
-from sugo.ports.cli.translation import use_language
 from sugo.ports.web import server as web_server
 from sugo.ports.web.page import render_page
 from sugo.ports.web.server import (
@@ -227,8 +226,7 @@ def page_data(page: bytes) -> Any:
 
 
 def test_texts_reach_the_page_escaped_in_every_language() -> None:
-    use_language("it")
-    page = render_page(Settings())
+    page = render_page(Settings(), "it")
     assert b'<html lang="it">' in page
     data = page_data(page)
     assert data["language"] == "it"
@@ -245,7 +243,7 @@ def test_texts_reach_the_page_escaped_in_every_language() -> None:
 
 def test_the_page_starts_from_the_users_configuration() -> None:
     settings = Settings(general=General(languages=("de", "it")), chunking=Chunking(max_tokens=256))
-    data = page_data(render_page(settings))
+    data = page_data(render_page(settings, "en"))
     assert data["defaults"] == {
         "ui_language": "en",
         "languages": ["de", "it"],
@@ -683,7 +681,39 @@ def test_chunks_are_made_when_asked(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         plain = upload(server, document)
     result = response.json()
     assert result["chunk_tokens"] == 64
-    assert len(result["chunks"]) > 1
-    lines = result["jsonl"].splitlines()
-    assert [json.loads(line)["text"] for line in lines] == [c["text"] for c in result["chunks"]]
-    assert "chunks" not in plain.json()
+    chunks = [json.loads(line) for line in result["jsonl"].splitlines()]
+    assert len(chunks) > 1
+    assert all(chunk["schema_version"] == "1.0" for chunk in chunks)
+    assert "jsonl" not in plain.json()
+
+
+def test_a_conversion_in_another_language_does_not_leak(
+    server: WebServer, recorder: Recorder
+) -> None:
+    # While a conversion speaks Italian, the page and refusals keep the server's language.
+    recorder.release.clear()
+    body = b"%PDF"
+    headers = [*api_headers(server, body), (LANGUAGE_HEADER, "it")]
+    first = threading.Thread(
+        target=lambda: request(server, "POST", CONVERT_PATH, headers=headers, body=body)
+    )
+    first.start()
+    assert recorder.started.wait(5)
+    try:
+        assert i18n.active_language() == "it"
+        assert page_data(request(server).body)["language"] == "en"
+        assert_refused(request(server, host="evil.example"), 403)
+    finally:
+        recorder.release.set()
+        first.join(10)
+    assert upload(server).status == 200
+    assert recorder.options[-1].language == "en"
+
+
+def test_a_refused_setting_still_gets_its_answer_with_a_large_body(
+    server: WebServer, recorder: Recorder
+) -> None:
+    body = b"x" * 4_000_000
+    headers = [*api_headers(server, body), (LANGUAGE_HEADER, "fr")]
+    assert_refused(request(server, "POST", CONVERT_PATH, headers=headers, body=body), 400)
+    assert recorder.calls == []

@@ -146,7 +146,6 @@
     size.max = String(data.chunk_max);
     size.value = String(settings.chunk_tokens);
     size.disabled = !settings.chunks;
-    renderLanguages();
   }
 
   $("ui-language").addEventListener("change", (event) => {
@@ -322,11 +321,12 @@
     const panel = $("chunks-panel");
     const list = $("chunks");
     list.replaceChildren();
-    if (!Array.isArray(result.chunks)) { show(panel, false); return; }
+    if (typeof result.jsonl !== "string") { show(panel, false); return; }
+    const chunks = result.jsonl.split("\n").filter((line) => line).map((line) => JSON.parse(line));
     $("chunks-count").textContent = fill(texts.chunks_count, {
-      count: number(result.chunks.length), tokens: number(result.chunk_tokens),
+      count: number(chunks.length), tokens: number(result.chunk_tokens),
     });
-    result.chunks.forEach((chunk, index) => {
+    chunks.forEach((chunk, index) => {
       const item = document.createElement("li");
       item.className = "chunk";
       const head = document.createElement("div");

@@ -115,6 +115,10 @@ class WebServer(ThreadingHTTPServer):
         super().__init__((LOOPBACK, 0), _Handler)
         self.converter = converter
         self.settings = settings
+        # Fixed at start: a conversion switches the process's language for
+        # its own messages, which other threads must not pick up.
+        self.language = i18n.active_language()
+        self.refusal = {"error": web_request_refused().as_json()}
         self.token = secrets.token_urlsafe(WEB_TOKEN_BYTES)
         port = self.server_address[1]
         self.port = port
@@ -170,7 +174,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._refuse(refused.status)
             return
         if self.path == "/":
-            page = render_page(self.server.settings)
+            page = render_page(self.server.settings, self.server.language)
             self._send(HTTPStatus.OK, page, "text/html; charset=utf-8")
             return
         found = static_file(self.path)
@@ -188,7 +192,12 @@ class _Handler(BaseHTTPRequestHandler):
                 return
             self._check_origin_and_token()
             length = self._content_length()
-            options = self._options()
+            try:
+                options = self._options()
+            except _Refused:
+                # Drained, so the page sees the refusal (see _one_at_a_time).
+                self._read_body(length)
+                raise
             with self._one_at_a_time(length):
                 data = self._read_body(length)
                 if data is None:
@@ -239,7 +248,7 @@ class _Handler(BaseHTTPRequestHandler):
         settings = self.server.settings
         language = self._single(LANGUAGE_HEADER)
         if language is None:
-            language = i18n.active_language()
+            language = self.server.language
         elif language not in i18n.LANGUAGES:
             raise _Refused(HTTPStatus.BAD_REQUEST)
         named = self._single(LANGUAGES_HEADER)
@@ -328,7 +337,7 @@ class _Handler(BaseHTTPRequestHandler):
     def _refuse(self, status: HTTPStatus) -> None:
         # The body may be unread: the connection cannot carry another request.
         self.close_connection = True
-        self._send_json(status, {"error": web_request_refused().as_json()})
+        self._send_json(status, self.server.refusal)
 
     def _send_json(self, status: HTTPStatus, value: object) -> None:
         body = json.dumps(value, ensure_ascii=False).encode("utf-8")
@@ -371,16 +380,8 @@ def converter(settings: Settings) -> Converter:
         }
         if options.chunk_tokens is not None:
             result["chunk_tokens"] = options.chunk_tokens
-            result["chunks"] = [
-                {
-                    "text": chunk.text,
-                    "tokens": chunk.tokens,
-                    "heading_path": list(chunk.heading_path),
-                    "pages": list(chunk.pages),
-                }
-                for chunk in conversion.chunks
-            ]
-            # The file sugo convert --chunks writes, byte for byte.
+            # The file sugo convert --chunks writes, byte for byte; the page
+            # reads the chunks from its lines.
             result["jsonl"] = "".join(jsonl_lines(conversion.chunks))
         return result
 

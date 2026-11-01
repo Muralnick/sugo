@@ -184,29 +184,32 @@ _QUESTIONS = (
 )
 
 
-def render_page(settings: Settings) -> bytes:
-    """The page, with its text in every interface language and the user's settings."""
+def render_page(settings: Settings, language: str) -> bytes:
+    """The page, with its text in every interface language and the user's settings.
+
+    ``language`` is the interface language the server started in.
+    """
     data = {
-        "language": i18n.active_language(),
-        "texts": {language: _texts(language) for language in i18n.LANGUAGES},
-        "defaults": defaults(settings),
+        "language": language,
+        "texts": {name: _texts(name) for name in i18n.LANGUAGES},
+        "defaults": defaults(settings, language),
         "packs": sorted(PACKS),
         "max_bytes": MAX_INPUT_BYTES,
         "chunk_min": CHUNK_MIN_TOKENS,
         "chunk_max": CHUNK_MAX_TOKENS_LIMIT,
     }
     page = Template(_resource("index.html").decode("utf-8")).substitute(
-        lang=i18n.active_language(),
+        lang=language,
         # Escaped for an attribute: quotes and angle brackets become entities.
         data=html.escape(json.dumps(data), quote=True),
     )
     return page.encode("utf-8")
 
 
-def defaults(settings: Settings) -> dict[str, Any]:
+def defaults(settings: Settings, language: str) -> dict[str, Any]:
     """The options a conversion uses when the page sends none: the user's configuration."""
     return {
-        "ui_language": i18n.active_language(),
+        "ui_language": language,
         "languages": list(settings.languages),
         "strip_tracking_urls": settings.cleaning.strip_tracking_urls,
         "chunks": False,
