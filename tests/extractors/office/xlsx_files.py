@@ -102,6 +102,6 @@ def xlsx(
     entries.update(extra or {})
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        for name, content in entries.items():
-            archive.writestr(name, content)
+        for entry, data in entries.items():
+            archive.writestr(entry, data)
     return buffer.getvalue()
