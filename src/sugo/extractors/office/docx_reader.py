@@ -34,7 +34,7 @@ from sugo.core.constants import (
     OFFICE_TABLE_MAX_ROWS,
 )
 from sugo.core.models import Block, BlockFlag, BlockType, Page, PageOrigin, Table, TableCell
-from sugo.extractors.office.package import SAFE_LINK, Package, Relationship
+from sugo.extractors.office.package import SAFE_LINK, Package, Relationship, chosen_content
 from sugo.extractors.office.xml_reader import Element, local_name
 
 ENGINE_NAME = "docx"
@@ -372,7 +372,7 @@ class _Reader:
                 if content is not None:
                     self._body(content, top=top, hidden=hidden)
             elif _ns(element.tag) == _MC and local_name(element.tag) == "AlternateContent":
-                choice = next((c for c in element if local_name(c.tag) == "Choice"), None)
+                choice = chosen_content(element)
                 if choice is not None:
                     self._body(choice, top=top, hidden=hidden)
 
@@ -455,7 +455,7 @@ class _Reader:
                     parts.not_converted += 1
                 continue
             if namespace == _MC and name == "AlternateContent":
-                choice = next((c for c in child if local_name(c.tag) == "Choice"), None)
+                choice = chosen_content(child)
                 if choice is not None:
                     self._inline(choice, parts, look, hidden=hidden)
                 continue
@@ -477,7 +477,7 @@ class _Reader:
         concealed = hidden or look.hidden(shaded=parts.shaded)
         for item in run:
             if _ns(item.tag) == _MC and local_name(item.tag) == "AlternateContent":
-                choice = next((c for c in item if local_name(c.tag) == "Choice"), None)
+                choice = chosen_content(item)
                 if choice is not None:
                     self._drawing(choice, parts, hidden=concealed)
                 continue

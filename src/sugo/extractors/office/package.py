@@ -28,8 +28,15 @@ from sugo.core.constants import (
     OFFICE_MAX_RATIO,
     OFFICE_MAX_TOTAL_BYTES,
     OFFICE_RATIO_MIN_BYTES,
+    OFFICE_UNDERSTOOD_NAMESPACES,
 )
-from sugo.extractors.office.xml_reader import Element, Refusal, local_name, parse
+from sugo.extractors.office.xml_reader import (
+    REQUIRED_NAMESPACES,
+    Element,
+    Refusal,
+    local_name,
+    parse,
+)
 from sugo.i18n import N_
 
 ZIP_SIGNATURE = b"PK\x03\x04"
@@ -70,6 +77,7 @@ _MAIN_TYPES = (
 # Only these outside addresses become Markdown links; anything else (javascript:,
 # file:, white space or brackets that would break the link) stays plain text.
 SAFE_LINK = re.compile(r"(?:https?://|mailto:)[^\s()<>\[\]]+", re.IGNORECASE)
+_MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
 _OFFICE_DOCUMENT = "/officeDocument"
 _CHUNK = 64 * 1024
 _ENCRYPTED_FLAG = 0x1
@@ -123,6 +131,27 @@ def excel_workbook(data: bytes) -> bool:
 def powerpoint_presentation(data: bytes) -> bool:
     """Whether the data is a ZIP whose content types name a PowerPoint main part."""
     return office_kind(data) == "pptx"
+
+
+def chosen_content(alternate: Element) -> Element | None:
+    """The branch of an ``mc:AlternateContent`` that Office shows, or None.
+
+    The first ``mc:Choice`` whose required namespaces Office all understands,
+    else the ``mc:Fallback``. A Choice requiring a namespace Office does not
+    know is never shown by Office, so it is never read: otherwise a crafted
+    file could show a person the fallback and give the LLM other text.
+    """
+    for branch in alternate:
+        if not branch.tag.startswith(f"{{{_MC}}}"):
+            continue
+        name = local_name(branch.tag)
+        if name == "Choice":
+            required = branch.attrib.get(REQUIRED_NAMESPACES, "").split()
+            if all(uri in OFFICE_UNDERSTOOD_NAMESPACES for uri in required):
+                return branch
+        elif name == "Fallback":
+            return branch
+    return None
 
 
 class Package:
@@ -203,6 +232,7 @@ class Package:
                 self.read(name),
                 max_bytes=OFFICE_MAX_PART_BYTES,
                 max_elements=OFFICE_MAX_PART_ELEMENTS,
+                office=True,
             )
         except Refusal as refusal:
             if refusal.code.startswith("OFFICE_"):

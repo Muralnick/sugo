@@ -57,7 +57,7 @@ from sugo.core.models import (
     Table,
 )
 from sugo.extractors.office.docx_reader import counter_text, table_grid
-from sugo.extractors.office.package import SAFE_LINK, Package, Relationship
+from sugo.extractors.office.package import SAFE_LINK, Package, Relationship, chosen_content
 from sugo.extractors.office.xml_reader import Element, Refusal, local_name
 from sugo.extractors.reading_order import text_rows, xy_cut
 from sugo.i18n import N_
@@ -172,17 +172,15 @@ def _int(value: str | None) -> int | None:
         return None
 
 
-def _choice(element: Element) -> Element | None:
-    """The first choice of an ``mc:AlternateContent``; its fallback repeats it for old readers."""
-    return next((child for child in element if local_name(child.tag) == "Choice"), None)
-
-
 def _is_alternate(element: Element) -> bool:
     return _ns(element.tag) == _MC and local_name(element.tag) == "AlternateContent"
 
 
 def _texts(element: Element) -> Iterator[str]:
-    """Text of every DrawingML ``a:t`` and PresentationML ``p:text`` inside, in order."""
+    """Text of every DrawingML ``a:t`` and PresentationML ``p:text`` inside, in order.
+
+    Used only for comments, which are hidden whatever they hold.
+    """
     stack = [element]
     while stack:
         current = stack.pop()
@@ -237,20 +235,27 @@ class _Map:
 def _offset_extent(
     transform: Element | None, *, offset: str = "off", extent: str = "ext"
 ) -> _Box | None:
+    """A position from ``a:off`` and ``a:ext``; None without an offset.
+
+    A missing size is no size: the shape is still where its offset says, on
+    the slide or off it. Values beyond the standard's range are brought just
+    past it, so a shape placed absurdly far stays off the slide.
+    """
     position = _child(transform, _A, offset)
+    if position is None:
+        return None
     size = _child(transform, _A, extent)
-    if position is None or size is None:
+    x, y = _int(position.attrib.get("x")), _int(position.attrib.get("y"))
+    if x is None or y is None:
         return None
-    values = (
-        _int(position.attrib.get("x")),
-        _int(position.attrib.get("y")),
-        _int(size.attrib.get("cx")),
-        _int(size.attrib.get("cy")),
-    )
-    if any(value is None or abs(value) > PPTX_MAX_COORDINATE for value in values):
-        return None
-    x, y, width, height = (float(value or 0) for value in values)
-    return _Box(x, y, max(width, 0.0), max(height, 0.0))
+    width = 0 if size is None else _int(size.attrib.get("cx")) or 0
+    height = 0 if size is None else _int(size.attrib.get("cy")) or 0
+    limit = PPTX_MAX_COORDINATE + 1
+
+    def bounded(value: int) -> float:
+        return float(min(max(value, -limit), limit))
+
+    return _Box(bounded(x), bounded(y), max(bounded(width), 0.0), max(bounded(height), 0.0))
 
 
 @dataclass(frozen=True)
@@ -515,7 +520,7 @@ class _Deck:
     def _shapes(self, slide: _Slide, tree: Element, mapping: _Map, *, hidden: bool) -> None:
         for shape in tree:
             if _is_alternate(shape):
-                choice = _choice(shape)
+                choice = chosen_content(shape)
                 if choice is not None:
                     self._shapes(slide, choice, mapping, hidden=hidden)
                 continue
@@ -695,7 +700,8 @@ class _Deck:
             elif kind in ("node", "asst"):
                 body = _child(point, _DGM, "t")
                 if body is not None:
-                    lines = ("".join(_texts(p)) for p in body if _is(p, _A, "p"))
+                    # Only the runs, as for shapes: text in extensions is never shown.
+                    lines = (_run_text(p, {}) for p in body if _is(p, _A, "p"))
                     text = " ".join(" ".join(lines).split())
                     if text:
                         texts[model_id] = text
@@ -745,7 +751,7 @@ class _Deck:
                 stack.extend(list(shape)[::-1])
                 continue
             if _is_alternate(shape):
-                choice = _choice(shape)
+                choice = chosen_content(shape)
                 stack.extend(_kids(choice)[::-1])
                 continue
             if not _is(shape, _P, "sp"):
@@ -756,7 +762,7 @@ class _Deck:
             body = _child(shape, _P, "txBody")
             for paragraph in _kids(body):
                 if _is(paragraph, _A, "p"):
-                    line = " ".join("".join(_texts(paragraph)).split())
+                    line = " ".join(_run_text(paragraph, {}).split())
                     if line:
                         lines.append(line)
         return "\n".join(lines)
@@ -791,7 +797,8 @@ def _place(
     if box is not None and not all(
         math.isfinite(value) for value in (box.x, box.y, box.width, box.height)
     ):
-        box = None  # Scaled out of range by nested groups: no position.
+        # Scaled out of range by nested groups: nowhere a person can see.
+        box, hidden = None, True
     if box is not None:
         # A shape of no size still shows its text where it is anchored.
         outside = (

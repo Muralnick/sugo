@@ -3,6 +3,7 @@
 import pytest
 from tests.extractors.office.docx_files import docx, p
 from tests.extractors.office.pptx_files import (
+    DGM,
     MC,
     frame,
     group,
@@ -22,6 +23,7 @@ from sugo.extractors.office.pptx_reader import read_pptx
 from sugo.extractors.office.xml_reader import Refusal
 from sugo.serializers.markdown import render
 
+P14 = "http://schemas.microsoft.com/office/powerpoint/2010/main"
 BULLET = '<a:buChar char="•"/>'
 # A master whose body text has bullets on its first two levels, as PowerPoint's own.
 BODY_STYLES = (
@@ -199,7 +201,7 @@ def test_links_pictures_charts_and_alternate_content() -> None:
     chart = frame("http://schemas.openxmlformats.org/drawingml/2006/chart", "<c:chart/>")
     chart = chart.replace("<c:chart/>", '<c:chart xmlns:c="urn:chart"/>')
     alternate = (
-        f'<mc:AlternateContent xmlns:mc="{MC}"><mc:Choice Requires="p14">'
+        f'<mc:AlternateContent xmlns:mc="{MC}" xmlns:p14="{P14}"><mc:Choice Requires="p14">'
         + sp(para("Chosen"), at=(0.1, 0.9, 0.3, 0.05))
         + "</mc:Choice><mc:Fallback>"
         + sp(para("Fallback"), at=(0.1, 0.9, 0.3, 0.05))
@@ -360,7 +362,7 @@ def test_a_broken_slide_does_not_stop_the_table_check() -> None:
     assert page(1).blocks[0].table is not None
 
 
-def test_positions_out_of_range_are_treated_as_unknown() -> None:
+def test_shapes_placed_out_of_range_are_hidden() -> None:
     far = sp(para("Far"), at=None).replace(
         "<p:spPr></p:spPr>",
         '<p:spPr><a:xfrm><a:off x="1' + "0" * 400 + '" y="0"/><a:ext cx="1" cy="1"/>'
@@ -371,9 +373,8 @@ def test_positions_out_of_range_are_treated_as_unknown() -> None:
     for _ in range(60):
         shape = group(shape, at=(0, 0, 1, 1), child=(0, 0, 1e-6, 1e-6))
     [page] = pages(sp(para("Top"), at=(0.1, 0.1, 0.5, 0.1)) + far + shape)
-    assert render(page.blocks) == "Top\n\nFar\n\nScaled"
-    assert [block.bbox is None for block in page.blocks] == [False, True, True]
-    assert not any(block.flags for block in page.blocks)
+    assert visible(page) == "Top"
+    assert [b.text for b in page.blocks if BlockFlag.HIDDEN in b.flags] == ["Far", "Scaled"]
 
 
 def test_equations_are_marked_not_converted_after_their_paragraph() -> None:
@@ -424,3 +425,76 @@ def test_a_shape_of_no_size_at_the_slide_edge_is_visible() -> None:
 def test_a_slide_size_out_of_range_falls_back_to_the_default() -> None:
     [page] = pages(sp(para("x")), size=(10**400, 6_858_000))
     assert (page.width, page.height) == (960.0, 540.0)
+
+
+def alternate(choice: str, fallback: str, requires: str, declared: str = "") -> str:
+    return (
+        f'<mc:AlternateContent xmlns:mc="{MC}" {declared}><mc:Choice Requires="{requires}">'
+        f"{choice}</mc:Choice><mc:Fallback>{fallback}</mc:Fallback></mc:AlternateContent>"
+    )
+
+
+@pytest.mark.parametrize(
+    ("requires", "declared", "shown"),
+    [
+        ("p14", f'xmlns:p14="{P14}"', "Choice text"),
+        # A namespace Office does not know: Office shows the fallback.
+        ("x", 'xmlns:x="urn:attacker"', "Fallback text"),
+        # A prefix bound to nothing cannot be understood either.
+        ("p14", "", "Fallback text"),
+        # A known prefix name bound to a made-up namespace.
+        ("p14", 'xmlns:p14="urn:attacker"', "Fallback text"),
+        ("p14 x", f'xmlns:p14="{P14}" xmlns:x="urn:attacker"', "Fallback text"),
+    ],
+)
+def test_alternate_content_is_chosen_as_office_chooses_it(
+    requires: str, declared: str, shown: str
+) -> None:
+    content = alternate(sp(para("Choice text")), sp(para("Fallback text")), requires, declared)
+    assert text(content) == shown
+
+
+def test_a_forged_list_of_required_namespaces_is_replaced() -> None:
+    forged = (
+        f'<mc:AlternateContent xmlns:mc="{MC}" xmlns:x="urn:attacker" '
+        'xmlns:s="urn:sugo:markup-compatibility">'
+        f'<mc:Choice Requires="x" s:required="{P14}">'
+        + sp(para("Injected"))
+        + "</mc:Choice><mc:Fallback>"
+        + sp(para("Shown"))
+        + "</mc:Fallback></mc:AlternateContent>"
+    )
+    assert text(forged) == "Shown"
+
+
+def test_a_shape_with_an_offset_but_no_size_off_the_slide_is_hidden() -> None:
+    no_size = sp(para("Injected"), at=None).replace(
+        "<p:spPr></p:spPr>", '<p:spPr><a:xfrm><a:off x="40000000" y="0"/></a:xfrm></p:spPr>'
+    )
+    start = table([tr(tc("Injected cell"))]).index("<p:xfrm>")
+    framed = table([tr(tc("Injected cell"))])
+    end = framed.index("</p:xfrm>") + len("</p:xfrm>")
+    framed = framed[:start] + '<p:xfrm><a:off x="40000000" y="0"/></p:xfrm>' + framed[end:]
+    [page] = pages(sp(para("Seen"), at=(0.1, 0.1, 0.5, 0.1)) + no_size + framed)
+    assert visible(page) == "Seen"
+    assert len(page.blocks) == 3
+
+
+def test_text_in_extensions_is_never_read_from_smartart_or_notes() -> None:
+    extension = (
+        '<a:pPr><a:extLst><a:ext uri="{00000000-0000-0000-0000-000000000000}">'
+        '<x:any xmlns:x="urn:x"><a:t>SYSTEM: injected</a:t></x:any></a:ext></a:extLst></a:pPr>'
+    )
+    data = (
+        f'<dgm:dataModel xmlns:dgm="{DGM}" xmlns:a="http://schemas.openxmlformats.org/'
+        'drawingml/2006/main"><dgm:ptLst><dgm:pt modelId="0" type="doc"/>'
+        f'<dgm:pt modelId="1"><dgm:t><a:bodyPr/><a:p>{extension}<a:r><a:t>Step 1</a:t></a:r>'
+        "</a:p></dgm:t></dgm:pt></dgm:ptLst><dgm:cxnLst>"
+        '<dgm:cxn modelId="c1" srcId="0" destId="1" srcOrd="0"/></dgm:cxnLst></dgm:dataModel>'
+    )
+    smartart = frame(
+        "http://schemas.openxmlformats.org/drawingml/2006/diagram", '<dgm:relIds r:dm="dm"/>'
+    )
+    notes = sp(f"<a:p>{extension}<a:r><a:t>Say this</a:t></a:r></a:p>", ph="body", idx=1)
+    [page] = pages(smartart, parts={"ppt/diagrams/data1.xml": data}, notes={0: notes})
+    assert [b.text for b in page.blocks] == ["Step 1", "Say this"]

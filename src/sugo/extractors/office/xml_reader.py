@@ -14,6 +14,12 @@ line again, so the indentation that follows still reads as nested.
 
 An element or attribute whose name says it holds credentials flags its block
 ``secret`` (ADR-053); the text stays, for the person converting their file.
+
+The parsed tree keeps no namespace prefixes, yet Office's alternate content
+names the namespaces a choice requires by prefix. While parsing an Office
+part, each ``mc:Choice`` is therefore given the namespaces its ``Requires`` names, under
+``REQUIRED_NAMESPACES`` (any value already there is the document's and is
+replaced), so the Office readers can choose as Office does (ADR-054).
 """
 
 import io
@@ -37,6 +43,11 @@ from sugo.core.models import Block, BlockFlag, BlockType, Page, PageOrigin, Tabl
 from sugo.i18n import N_
 
 ENGINE_NAME = "xml"
+# Set on every mc:Choice while parsing: the namespaces its Requires names,
+# separated by spaces; a prefix bound to no namespace gives UNBOUND_PREFIX.
+REQUIRED_NAMESPACES = "{urn:sugo:markup-compatibility}required"
+UNBOUND_PREFIX = "#unbound"
+_MC_CHOICE = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Choice"
 _INDENT = "  "
 _INVALID = N_("the file is not well-formed XML, or it uses a DTD or entities")
 
@@ -66,10 +77,17 @@ def lay_out(root: Element) -> Page:
     return _Layout().page(root)
 
 
-def parse(data: bytes, *, max_bytes: int | None = None, max_elements: int | None = None) -> Element:
+def parse(
+    data: bytes,
+    *,
+    max_bytes: int | None = None,
+    max_elements: int | None = None,
+    office: bool = False,
+) -> Element:
     """Parse with every XML attack refused and the size limits enforced.
 
-    The limits default to those of a generic XML file; Office parts pass their own.
+    The limits default to those of a generic XML file; Office parts pass their
+    own, and ``office`` to have each ``mc:Choice`` given its required namespaces.
 
     Raises:
         Refusal: XML_TOO_LARGE or XML_INVALID.
@@ -80,14 +98,29 @@ def parse(data: bytes, *, max_bytes: int | None = None, max_elements: int | None
         raise Refusal("XML_TOO_LARGE", N_("the XML file is too large"))
     root: Element | None = None
     depth = elements = 0
+    # Prefixes in scope, one mapping per open element; declarations seen
+    # before an element's start belong to it.
+    scopes: list[dict[str, str]] = [{}]
+    declared: dict[str, str] = {}
     try:
         events = DefusedElementTree.iterparse(
-            io.BytesIO(data), events=("start", "end"), forbid_dtd=True
+            io.BytesIO(data), events=("start-ns", "start", "end"), forbid_dtd=True
         )
         for event, element in events:
+            if event == "start-ns":
+                prefix, uri = element
+                declared[prefix] = uri
+                continue
             if event == "end":
                 depth -= 1
+                scopes.pop()
                 continue
+            scopes.append({**scopes[-1], **declared} if declared else scopes[-1])
+            declared = {}
+            if office and element.tag == _MC_CHOICE:
+                prefixes = element.attrib.get("Requires", "").split()
+                required = (scopes[-1].get(prefix, UNBOUND_PREFIX) for prefix in prefixes)
+                element.set(REQUIRED_NAMESPACES, " ".join(required))
             root = element if root is None else root
             depth += 1
             elements += 1

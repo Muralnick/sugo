@@ -276,6 +276,74 @@ OFFICE_MAX_PART_ELEMENTS: Final = 2_000_000
 # lists a few dozen parts; a larger one is not a document Sugo reads.
 OFFICE_MAX_CONTENT_TYPES_BYTES: Final = 1024 * 1024
 
+# Namespaces Office understands when it chooses among alternate content
+# (mc:AlternateContent, ISO/IEC 29500-3): it shows the first mc:Choice whose
+# Requires names only namespaces it knows, else the mc:Fallback. The readers
+# choose the same way, so a Choice requiring a made-up namespace, which Office
+# never shows, is never read either. Office's own extension namespaces that
+# documents put in Requires; one missing here makes the readers take the
+# Fallback where Office shows the Choice (ADR-054, residual risks).
+OFFICE_UNDERSTOOD_NAMESPACES: Final = frozenset(
+    {
+        # The standard's own, transitional and strict, and VML.
+        "http://schemas.openxmlformats.org/markup-compatibility/2006",
+        "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "http://purl.oclc.org/ooxml/presentationml/main",
+        "http://schemas.openxmlformats.org/drawingml/2006/main",
+        "http://purl.oclc.org/ooxml/drawingml/main",
+        "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+        "http://purl.oclc.org/ooxml/wordprocessingml/main",
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        "http://purl.oclc.org/ooxml/officeDocument/relationships",
+        "http://schemas.openxmlformats.org/officeDocument/2006/math",
+        "http://purl.oclc.org/ooxml/officeDocument/math",
+        "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+        "http://schemas.openxmlformats.org/drawingml/2006/picture",
+        "http://schemas.openxmlformats.org/drawingml/2006/chart",
+        "http://schemas.openxmlformats.org/drawingml/2006/diagram",
+        "urn:schemas-microsoft-com:vml",
+        "urn:schemas-microsoft-com:office:office",
+        "urn:schemas-microsoft-com:office:word",
+        # PowerPoint.
+        "http://schemas.microsoft.com/office/powerpoint/2010/main",
+        "http://schemas.microsoft.com/office/powerpoint/2012/main",
+        "http://schemas.microsoft.com/office/powerpoint/2015/09/main",
+        "http://schemas.microsoft.com/office/powerpoint/2015/10/main",
+        "http://schemas.microsoft.com/office/powerpoint/2017/3/main",
+        "http://schemas.microsoft.com/office/powerpoint/2017/10/main",
+        "http://schemas.microsoft.com/office/powerpoint/2018/8/main",
+        # DrawingML.
+        "http://schemas.microsoft.com/office/drawing/2007/8/2/chart",
+        "http://schemas.microsoft.com/office/drawing/2010/main",
+        "http://schemas.microsoft.com/office/drawing/2012/main",
+        "http://schemas.microsoft.com/office/drawing/2014/main",
+        "http://schemas.microsoft.com/office/drawing/2014/chartex",
+        "http://schemas.microsoft.com/office/drawing/2015/9/8/chartex",
+        "http://schemas.microsoft.com/office/drawing/2015/10/21/chartex",
+        "http://schemas.microsoft.com/office/drawing/2016/5/9/chartex",
+        "http://schemas.microsoft.com/office/drawing/2016/5/10/chartex",
+        "http://schemas.microsoft.com/office/drawing/2016/5/11/chartex",
+        "http://schemas.microsoft.com/office/drawing/2016/5/12/chartex",
+        "http://schemas.microsoft.com/office/drawing/2016/5/13/chartex",
+        "http://schemas.microsoft.com/office/drawing/2016/5/14/chartex",
+        "http://schemas.microsoft.com/office/drawing/2016/ink",
+        "http://schemas.microsoft.com/office/drawing/2017/model3d",
+        # Word.
+        "http://schemas.microsoft.com/office/word/2010/wordml",
+        "http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing",
+        "http://schemas.microsoft.com/office/word/2010/wordprocessingShape",
+        "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup",
+        "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas",
+        "http://schemas.microsoft.com/office/word/2010/wordprocessingInk",
+        "http://schemas.microsoft.com/office/word/2012/wordml",
+        "http://schemas.microsoft.com/office/word/2015/wordml/symex",
+        "http://schemas.microsoft.com/office/word/2016/wordml/cid",
+        "http://schemas.microsoft.com/office/word/2018/wordml",
+        "http://schemas.microsoft.com/office/word/2018/wordml/cex",
+        "http://schemas.microsoft.com/office/word/2020/wordml/sdtdatahash",
+    }
+)
+
 # Text under this size, in half-points (2 pt), cannot be read on the page.
 DOCX_MIN_VISIBLE_HALF_POINTS: Final = 4
 
