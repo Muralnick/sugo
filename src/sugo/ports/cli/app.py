@@ -67,7 +67,10 @@ class _DefaultConvert(TranslatedGroup):
 app = typer.Typer(
     cls=_DefaultConvert,
     name="sugo",
-    help=N_("Documents, reduced: convert PDFs and images into compact Markdown, locally."),
+    help=N_(
+        "Documents, reduced: convert PDFs, Office files, images and XML into compact "
+        "Markdown, locally."
+    ),
     add_completion=False,
     no_args_is_help=True,
     pretty_exceptions_enable=False,

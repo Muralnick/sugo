@@ -13,8 +13,8 @@ msgstr ""
 
 # --- Command line: help -------------------------------------------------------
 
-msgid "Documents, reduced: convert PDFs and images into compact Markdown, locally."
-msgstr "Documenti, ridotti: converti PDF e immagini in Markdown compatto, in locale."
+msgid "Documents, reduced: convert PDFs, Office files, images and XML into compact Markdown, locally."
+msgstr "Documenti, ridotti: converti PDF, file Office, immagini e XML in Markdown compatto, in locale."
 
 msgid "Show the version and exit."
 msgstr "Mostra la versione ed esci."
