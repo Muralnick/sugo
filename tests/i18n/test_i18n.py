@@ -187,6 +187,8 @@ def test_translate_picks_a_language_without_switching() -> None:
         ({"LANG": "en_US.UTF-8", "LC_ALL": "it_CH.UTF-8"}, ("it", "LC_ALL")),
         ({"LANG": "de_DE.UTF-8"}, ("en", "LANG")),
         ({"LANG": "C.UTF-8"}, ("en", "LANG")),
+        ({"LANG": "it_IT.UTF-8", "LC_ALL": "C"}, ("en", "LC_ALL")),
+        ({"LANG": "it_IT.UTF-8", "LC_MESSAGES": "POSIX"}, ("en", "LC_MESSAGES")),
     ],
 )
 def test_a_locale_variable_is_a_clear_signal(
@@ -223,3 +225,7 @@ def test_the_windows_display_language_is_read_only_on_windows() -> None:
         assert found in i18n.LANGUAGES
     else:
         assert found is None
+
+
+def test_every_interface_language_has_a_name() -> None:
+    assert set(i18n.LANGUAGE_NAMES) == set(i18n.LANGUAGES)

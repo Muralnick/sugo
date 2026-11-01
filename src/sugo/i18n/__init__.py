@@ -31,6 +31,8 @@ DOMAINS = ("sugo", "typer")
 _WINDOWS_PRIMARY_LANGUAGE = 0x3FF
 _WINDOWS_LANGUAGES = {0x09: "en", 0x10: "it"}
 
+_NO_LOCALE = ("C", "POSIX")
+
 _ENGLISH = _gettext.NullTranslations()
 _active_language = "en"
 _active: dict[str, _gettext.NullTranslations] = {}
@@ -75,6 +77,10 @@ def N_(message: str) -> str:  # noqa: N802 - the name translation tools look for
     return message
 
 
+# The interface languages' names, translated where they are shown.
+LANGUAGE_NAMES = {"en": N_("English"), "it": N_("Italian")}
+
+
 def activate(language: str) -> None:
     """Make ``language`` the interface language of this process.
 
@@ -110,15 +116,25 @@ def detect_language() -> tuple[str, str]:
         The language and its source: the variable's name (``LC_ALL``,
         ``LC_MESSAGES``, ``LANG``), ``windows``, or ``none`` without a signal.
     """
-    for variable in ("LC_ALL", "LC_MESSAGES", "LANG"):
-        value = os.environ.get(variable)
-        if value and value not in ("C", "POSIX"):
-            code = value[:2].lower()
-            return (code if code in LANGUAGES else "en"), variable
+    found = _locale_variable()
+    if found is not None:
+        variable, value = found
+        # "C" and "POSIX" ask for no localisation at all: English.
+        code = "en" if value in _NO_LOCALE else value[:2].lower()
+        return (code if code in LANGUAGES else "en"), variable
     windows = _windows_display_language()
     if windows is not None:
         return windows, "windows"
     return "en", "none"
+
+
+def _locale_variable() -> tuple[str, str] | None:
+    """The first locale variable set, as POSIX reads them: its name and value."""
+    for variable in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        value = os.environ.get(variable)
+        if value:
+            return variable, value
+    return None
 
 
 def _windows_display_language() -> str | None:
@@ -141,10 +157,9 @@ def system_language() -> str | None:
     For the default languages of documents (ADR-051), where the regional
     format is a fair hint; the interface uses ``detect_language``.
     """
-    for variable in ("LC_ALL", "LC_MESSAGES", "LANG"):
-        value = os.environ.get(variable)
-        if value and value not in ("C", "POSIX"):
-            return value[:2].lower()
+    found = _locale_variable()
+    if found is not None and found[1] not in _NO_LOCALE:
+        return found[1][:2].lower()
     name = locale.getlocale()[0]
     if not name:
         return None

@@ -29,8 +29,6 @@ LITE_PACKAGES = {
     "pymupdf": "pymupdf",
     "rapidocr": "rapidocr",
 }
-# Interface languages, named in the interface language.
-_LANGUAGE_NAMES = {"en": N_("English"), "it": N_("Italian")}
 # The first PyMuPDF release whose MuPDF has the 2026 memory-safety fixes (ADR-043).
 _PYMUPDF_SAFE_MAJOR = 2
 
@@ -170,7 +168,7 @@ def _language() -> Check:
             "none": _("the system gives no clear language; English"),
         }
         source = sources.get(found) or _("from the variable {name}").format(name=found)
-    return Check("language", Status.OK, f"{i18n.gettext(_LANGUAGE_NAMES[language])}, {source}")
+    return Check("language", Status.OK, f"{i18n.gettext(i18n.LANGUAGE_NAMES[language])}, {source}")
 
 
 def _config() -> Check:
