@@ -215,6 +215,51 @@ class EdgeAnalyzer:
         return EdgeStats(repeated=MappingProxyType(repeated), page_numbers=page_numbers)
 
 
+@dataclass(frozen=True)
+class DeclaredText:
+    """A header, footer or page number the document declares itself, with no place on the page.
+
+    Word keeps headers and footers apart from the body, so the reader types
+    them and shows each once per section; there is no position for the edge
+    rules, and no repetition to count.
+    """
+
+    block_id: str
+    type: BlockType
+    # Long enough to be a clause rather than boilerplate: then it stays.
+    substantive: bool
+    # Whether the whole text is a page number.
+    page_number: bool
+
+
+_DECLARED_TYPES = frozenset({BlockType.HEADER, BlockType.FOOTER, BlockType.PAGE_NUMBER})
+
+
+def declared_texts(page: Page) -> list[DeclaredText]:
+    """Return the headers, footers and page numbers a page declares without a position.
+
+    Skipped like edge texts: removed, flagged, empty or long blocks.
+    """
+    found = []
+    for block in page.blocks:
+        if block.removed or block.flags or block.type not in _DECLARED_TYPES:
+            continue
+        if block.bbox is not None or not block.text.strip():
+            continue
+        if len(block.text) > MAX_EDGE_TEXT_CHARS:
+            continue
+        text = " ".join(unicodedata.normalize("NFKC", block.text).casefold().split())
+        found.append(
+            DeclaredText(
+                block_id=block.id,
+                type=block.type,
+                substantive=_substantive(text),
+                page_number=_page_number(text) is not None,
+            )
+        )
+    return found
+
+
 def edge_texts(page: Page) -> list[EdgeText]:
     """Return the text blocks inside the top and bottom bands of a page, nearest the edge first.
 

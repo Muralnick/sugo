@@ -128,6 +128,20 @@ def test_unsupported_input_is_refused() -> None:
     assert caught.value.code == "INPUT_UNSUPPORTED"
 
 
+def test_word_headers_go_and_a_clause_in_a_footer_stays(cache: PageCache) -> None:
+    from tests.extractors.office.docx_files import docx, p
+
+    section = (
+        '<w:sectPr><w:headerReference w:type="default" r:id="pheader"/>'
+        '<w:footerReference w:type="default" r:id="pfooter"/></w:sectPr>'
+    )
+    clause = "The supplier is liable for all damages caused by delays"
+    data = docx(p("Body text.") + section, parts={"header": p("ACME Ltd"), "footer": p(clause)})
+    conversion = convert(data, cache=cache)
+    assert conversion.markdown == f"Body text.\n\n{clause}"
+    assert conversion.removed == {"headers_footers": 1}
+
+
 def test_word_documents_are_converted_and_legacy_ones_refused(cache: PageCache) -> None:
     from tests.extractors.office.docx_files import docx, p
 

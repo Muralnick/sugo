@@ -8,9 +8,9 @@ removal as a soft deletion with the reason below (principle 3, ADR-041).
 
 from typing import ClassVar
 
-from sugo.analyzers.edges import EdgeStats, edge_texts
+from sugo.analyzers.edges import EdgeStats, declared_texts, edge_texts
 from sugo.core.decisions import Decision
-from sugo.core.models import Page
+from sugo.core.models import BlockType, Page
 
 REASON = "page number"
 
@@ -21,9 +21,19 @@ class PageNumberCleaner:
     name: ClassVar[str] = "page_numbers"
 
     def propose(self, page: Page, stats: EdgeStats) -> list[Decision]:
-        """Return one removal decision per page number in the document's sequence."""
-        return [
+        """Return one removal decision per page number in the document's sequence.
+
+        A page number the document declares itself, with no place on the page
+        (a slide number placeholder), goes when its text is a page number.
+        """
+        decisions = [
             Decision(block_id=text.block_id, reason=REASON)
             for text in edge_texts(page)
             if stats.is_page_number(text, page.index)
         ]
+        decisions.extend(
+            Decision(block_id=declared.block_id, reason=REASON)
+            for declared in declared_texts(page)
+            if declared.type is BlockType.PAGE_NUMBER and declared.page_number
+        )
+        return decisions
