@@ -333,13 +333,11 @@ def test_a_broken_slide_is_refused_only_when_its_page_is_read() -> None:
         page(1)
 
 
-def test_a_cell_spanning_a_huge_grid_is_refused_before_the_serializer_draws_it() -> None:
+def test_a_cell_spanning_a_huge_grid_refuses_the_file_before_any_page() -> None:
     huge = tr(tc("Wide", ' gridSpan="1000000000"'))
-    data = pptx(sp(para("fine")), table([huge]), table([tr(tc("later"))]))
-    _, page = read_pptx(data)
-    assert render(page(0).blocks) == "fine"
+    data = pptx(sp(para("fine")), table([huge]))
     with pytest.raises(Refusal) as caught:
-        page(1)
+        read_pptx(data)
     assert caught.value.code == "OFFICE_TOO_LARGE"
 
 
@@ -348,12 +346,18 @@ def test_tables_count_towards_one_limit_for_the_whole_presentation(
 ) -> None:
     from sugo.extractors.office import pptx_reader
 
-    monkeypatch.setattr(pptx_reader, "PPTX_MAX_GRID_CELLS", 5)
     two_by_two = table([tr(tc("a"), tc("b")), tr(tc("c"), tc("d"))])
-    _, page = read_pptx(pptx(two_by_two, two_by_two))
-    assert page(0).blocks[0].table is not None
+    monkeypatch.setattr(pptx_reader, "PPTX_MAX_GRID_CELLS", 8)
+    assert len(pages(two_by_two, two_by_two)) == 2
+    monkeypatch.setattr(pptx_reader, "PPTX_MAX_GRID_CELLS", 7)
     with pytest.raises(Refusal):
-        page(1)
+        read_pptx(pptx(two_by_two, two_by_two))
+
+
+def test_a_broken_slide_does_not_stop_the_table_check() -> None:
+    count, page = read_pptx(pptx("<p:sp><broken></p:sp>", table([tr(tc("ok"))])))
+    assert count == 2
+    assert page(1).blocks[0].table is not None
 
 
 def test_positions_out_of_range_are_treated_as_unknown() -> None:
@@ -370,3 +374,53 @@ def test_positions_out_of_range_are_treated_as_unknown() -> None:
     assert render(page.blocks) == "Top\n\nFar\n\nScaled"
     assert [block.bbox is None for block in page.blocks] == [False, True, True]
     assert not any(block.flags for block in page.blocks)
+
+
+def test_equations_are_marked_not_converted_after_their_paragraph() -> None:
+    equation = (
+        f'<mc:AlternateContent xmlns:mc="{MC}"><mc:Choice Requires="a14">'
+        '<a14:m xmlns:a14="http://schemas.microsoft.com/office/drawing/2010/main"/>'
+        "</mc:Choice><mc:Fallback><a:r><a:t>E = mc2 picture</a:t></a:r></mc:Fallback>"
+        "</mc:AlternateContent>"
+    )
+    body = sp(
+        "<a:p><a:r><a:t>Energy:</a:t></a:r>" + equation + "</a:p>",
+        "<a:p>" + equation + "</a:p>",
+        para("After"),
+    )
+    [page] = pages(body)
+    assert [(b.type, b.text) for b in page.blocks] == [
+        (BlockType.PARAGRAPH, "Energy:"),
+        (BlockType.FORMULA, ""),
+        (BlockType.FORMULA, ""),
+        (BlockType.PARAGRAPH, "After"),
+    ]
+    assert render(page.blocks) == "Energy:\n\n[illegible]\n\n[illegible]\n\nAfter"
+
+
+def test_ink_is_marked_not_converted_where_it_is_drawn() -> None:
+    p14 = "http://schemas.microsoft.com/office/powerpoint/2010/main"
+    ink = (
+        f'<p14:contentPart xmlns:p14="{p14}" r:id="ink">'
+        '<p14:nvContentPartPr><p14:cNvPr id="7" name="ink"{}/><p14:cNvContentPartPr/>'
+        "<p14:nvPr/></p14:nvContentPartPr>"
+        '<p14:xfrm><a:off x="0" y="0"/><a:ext cx="100" cy="100"/></p14:xfrm></p14:contentPart>'
+    )
+    slide = sp(para("Below"), at=(0.1, 0.5, 0.5, 0.1)) + ink.format("")
+    [page] = pages(slide)
+    assert [(b.type, b.bbox is not None) for b in page.blocks] == [
+        (BlockType.IMAGE, True),
+        (BlockType.PARAGRAPH, True),
+    ]
+    [hidden] = pages(ink.format(' hidden="1"'))
+    assert BlockFlag.HIDDEN in hidden.blocks[0].flags
+
+
+def test_a_shape_of_no_size_at_the_slide_edge_is_visible() -> None:
+    [page] = pages(sp(para("Anchored"), at=(0.0, 0.0, 0.0, 0.0)))
+    assert visible(page) == "Anchored"
+
+
+def test_a_slide_size_out_of_range_falls_back_to_the_default() -> None:
+    [page] = pages(sp(para("x")), size=(10**400, 6_858_000))
+    assert (page.width, page.height) == (960.0, 540.0)

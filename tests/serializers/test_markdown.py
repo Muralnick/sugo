@@ -14,7 +14,7 @@ from sugo.core.decisions import apply_decisions
 from sugo.core.models import Block, BlockFlag, BlockType, ChatSide, Table, TableCell
 from sugo.extractors.image.extract import extract_page
 from sugo.extractors.image.ocr_engine import OcrEngine, bundled_models
-from sugo.serializers.markdown import render
+from sugo.serializers.markdown import render, render_widest
 
 
 def block(kind: BlockType, text: str = "", block_id: str = "b", **extra: object) -> Block:
@@ -276,3 +276,10 @@ def test_chat_screenshot_to_markdown() -> None:
     page = apply_decisions(page, cleaner.propose(page), cleaner=cleaner.name)
     expected = "\n".join(f"{side}: {text}" for side, text in bubbles * 2)
     assert render(page.blocks) == expected
+
+
+def test_render_widest_shows_a_nested_item_at_its_own_level() -> None:
+    item = block(BlockType.LIST_ITEM, "deep\nmore", list_level=2)
+    assert render([item]) == "- deep\n  more"
+    assert render_widest(item) == "    - deep\n      more"
+    assert render_widest(item.mark_removed("test", "gone")) == ""

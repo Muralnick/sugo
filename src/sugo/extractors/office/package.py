@@ -6,9 +6,8 @@ external relationships are recorded but never followed. Each part is
 decompressed in bounded steps and counted as it comes: the sizes written in
 the archive are the attacker's, so they are never trusted.
 
-``word_document``, ``excel_workbook`` and ``powerpoint_presentation``
-recognise a Word document, an Excel workbook or a PowerPoint presentation
-from the raw bytes, without parsing XML, so Sugo's own process can route a
+``office_kind`` recognises a Word document, an Excel workbook or a
+PowerPoint presentation from the raw bytes, without parsing XML, so Sugo's own process can route a
 file before the worker reads it. ``stream`` lets a large part be
 parsed piece by piece; a part read twice counts once towards the total.
 """
@@ -62,6 +61,12 @@ POWERPOINT_MAIN_TYPES = (
     b"application/vnd.ms-powerpoint.template.macroEnabled.main+xml",
     b"application/vnd.ms-powerpoint.slideshow.macroEnabled.main+xml",
 )
+# In the order a file naming several main parts is taken for one of them.
+_MAIN_TYPES = (
+    ("docx", WORD_MAIN_TYPES),
+    ("xlsx", EXCEL_MAIN_TYPES),
+    ("pptx", POWERPOINT_MAIN_TYPES),
+)
 # Only these outside addresses become Markdown links; anything else (javascript:,
 # file:, white space or brackets that would break the link) stays plain text.
 SAFE_LINK = re.compile(r"(?:https?://|mailto:)[^\s()<>\[\]]+", re.IGNORECASE)
@@ -81,39 +86,43 @@ class Relationship:
     external: bool
 
 
-def word_document(data: bytes) -> bool:
-    """Whether the data is a ZIP whose content types name a Word main part.
+def office_kind(data: bytes) -> str | None:
+    """ "docx", "xlsx" or "pptx" if the data is a ZIP whose content types name that main part.
 
-    Reads the ZIP directory and one small entry; parses no XML.
+    Reads the ZIP directory and one small entry, once; parses no XML.
     """
-    return _names_main_type(data, WORD_MAIN_TYPES)
-
-
-def excel_workbook(data: bytes) -> bool:
-    """Whether the data is a ZIP whose content types name an Excel main part."""
-    return _names_main_type(data, EXCEL_MAIN_TYPES)
-
-
-def powerpoint_presentation(data: bytes) -> bool:
-    """Whether the data is a ZIP whose content types name a PowerPoint main part."""
-    return _names_main_type(data, POWERPOINT_MAIN_TYPES)
-
-
-def _names_main_type(data: bytes, main_types: tuple[bytes, ...]) -> bool:
     if not data.startswith(ZIP_SIGNATURE):
-        return False
+        return None
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             info = archive.getinfo(CONTENT_TYPES)
             if info.flag_bits & _ENCRYPTED_FLAG or info.file_size > OFFICE_MAX_CONTENT_TYPES_BYTES:
-                return False
+                return None
             with archive.open(info) as entry:
                 types = entry.read(OFFICE_MAX_CONTENT_TYPES_BYTES + 1)
     except (zipfile.BadZipFile, KeyError, OSError, ValueError, EOFError, NotImplementedError):
-        return False
-    return len(types) <= OFFICE_MAX_CONTENT_TYPES_BYTES and any(
-        main in types for main in main_types
-    )
+        return None
+    if len(types) > OFFICE_MAX_CONTENT_TYPES_BYTES:
+        return None
+    for kind, main_types in _MAIN_TYPES:
+        if any(main in types for main in main_types):
+            return kind
+    return None
+
+
+def word_document(data: bytes) -> bool:
+    """Whether the data is a ZIP whose content types name a Word main part."""
+    return office_kind(data) == "docx"
+
+
+def excel_workbook(data: bytes) -> bool:
+    """Whether the data is a ZIP whose content types name an Excel main part."""
+    return office_kind(data) == "xlsx"
+
+
+def powerpoint_presentation(data: bytes) -> bool:
+    """Whether the data is a ZIP whose content types name a PowerPoint main part."""
+    return office_kind(data) == "pptx"
 
 
 class Package:

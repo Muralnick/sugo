@@ -611,7 +611,9 @@ class _Reader:
         size = max(1, OFFICE_TABLE_MAX_ROWS - len(header))
         parts_of_body = [body[start : start + size] for start in range(0, len(body), size)] or [[]]
         for part in parts_of_body:
-            self._add(_Pending(BlockType.TABLE, table=_grid(header + part, width, len(header))))
+            self._add(
+                _Pending(BlockType.TABLE, table=table_grid(header + part, width, len(header)))
+            )
 
     # --- Pages and sections -------------------------------------------------
 
@@ -685,7 +687,11 @@ def _paragraph_style(paragraph: Element) -> str | None:
     return _val(_child(_child(paragraph, "pPr"), "pStyle"))
 
 
-def _grid(rows: list[list[tuple[str, int]]], width: int, header_rows: int) -> Table:
+def table_grid(rows: list[list[tuple[str, int]]], width: int, header_rows: int) -> Table:
+    """A table from rows of (text, columns spanned); a span past the width is cut.
+
+    Also used for PowerPoint tables, whose cells are read the same way.
+    """
     cells: list[TableCell] = []
     for row_index, row in enumerate(rows):
         column = 0

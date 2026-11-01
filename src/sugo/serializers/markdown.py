@@ -69,6 +69,18 @@ def render(blocks: Iterable[Block]) -> str:
     return "".join(parts)
 
 
+def render_widest(block: Block) -> str:
+    """One block as wide as it can render in any list: a list item at its own level.
+
+    Alone, a nested item renders at level 0; after the items above it, at
+    most at its own level. The chunker counts tokens with this, so its
+    estimates never fall below what the chunk renders.
+    """
+    if block.removed:
+        return ""
+    return _render_block(block, block.list_level or 0) or ""
+
+
 def _render_block(block: Block, level: int = 0) -> str | None:
     """One block as Markdown, or None if it has nothing to show; ``level`` nests a list item."""
     if BlockFlag.ILLEGIBLE in block.flags:

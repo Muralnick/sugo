@@ -271,12 +271,9 @@ def detect_kind(data: bytes) -> InputKind:
     if PDF_SIGNATURE in data[:PDF_SIGNATURE_WINDOW]:
         return InputKind.PDF
     office.check_legacy(data)
-    if office.is_docx(data):
-        return InputKind.DOCX
-    if office.is_xlsx(data):
-        return InputKind.XLSX
-    if office.is_pptx(data):
-        return InputKind.PPTX
+    office_kind = office.kind_of(data)
+    if office_kind is not None:
+        return InputKind(office_kind)
     try:
         detect_format(data)
     except UnsupportedImageError:

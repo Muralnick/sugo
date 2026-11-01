@@ -23,11 +23,13 @@ never read. External relationships are never followed.
 What a reader does not see is kept but flagged ``hidden``, so the hidden text
 cleaner removes it with a reason: hidden slides (every block), speaker notes,
 comments, and shapes marked hidden or placed entirely outside the slide.
-Pictures, charts, media and embedded objects are not guessed: each becomes a
-block marked illegible ("not converted").
+Pictures, charts, media, ink, equations and embedded objects are not
+guessed: each becomes a block marked illegible ("not converted").
 
-Each slide is laid out when its page is asked for; a slide whose parts turn
-out broken is reported as failed, never dropped.
+Every slide's tables are counted when the file is opened, so a table that
+would make the serializer draw a huge grid refuses the file before its first
+page. Each slide is then laid out when its page is asked for; a slide whose
+parts turn out broken is reported as failed, never dropped.
 """
 
 import math
@@ -53,9 +55,8 @@ from sugo.core.models import (
     Page,
     PageOrigin,
     Table,
-    TableCell,
 )
-from sugo.extractors.office.docx_reader import counter_text
+from sugo.extractors.office.docx_reader import counter_text, table_grid
 from sugo.extractors.office.package import SAFE_LINK, Package, Relationship
 from sugo.extractors.office.xml_reader import Element, Refusal, local_name
 from sugo.extractors.reading_order import text_rows, xy_cut
@@ -86,6 +87,8 @@ _DGM = frozenset(
         "http://purl.oclc.org/ooxml/drawingml/diagram",
     }
 )
+# PowerPoint 2010's own elements, such as ink.
+_P14 = frozenset({"http://schemas.microsoft.com/office/powerpoint/2010/main"})
 _MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
 _DAMAGED = N_("the Office file is damaged, or too large to read safely")
 _TOO_LARGE = N_("the Office file is too large to read safely")
@@ -134,6 +137,11 @@ def _child(element: Element | None, namespaces: frozenset[str], name: str) -> El
     if element is None:
         return None
     return next((child for child in element if _is(child, namespaces, name)), None)
+
+
+def _local_child(element: Element | None, name: str) -> Element | None:
+    """The first child with this local name, in any namespace."""
+    return next((child for child in _kids(element) if local_name(child.tag) == name), None)
 
 
 def _kids(element: Element | None) -> list[Element]:
@@ -324,6 +332,8 @@ class _Paragraph:
     level: int
     # None: no bullet; "": a bullet; "2.": a numbered paragraph's label.
     label: str | None
+    # Equations in the paragraph, each marked not converted after its text.
+    formulas: int = 0
 
 
 class _Deck:
@@ -335,8 +345,11 @@ class _Deck:
         size = _child(presentation, _P, "sldSz")
         width = _int(None if size is None else size.attrib.get("cx"))
         height = _int(None if size is None else size.attrib.get("cy"))
-        self._width = float(width if width and width > 0 else PPTX_DEFAULT_SLIDE_WIDTH_EMU)
-        self._height = float(height if height and height > 0 else PPTX_DEFAULT_SLIDE_HEIGHT_EMU)
+        if not (width and 0 < width <= PPTX_MAX_COORDINATE):
+            width = PPTX_DEFAULT_SLIDE_WIDTH_EMU
+        if not (height and 0 < height <= PPTX_MAX_COORDINATE):
+            height = PPTX_DEFAULT_SLIDE_HEIGHT_EMU
+        self._width, self._height = float(width), float(height)
         self.slides: list[str] = []
         seen: set[str] = set()
         for slide_id in _kids(_path(presentation, (_P, "sldIdLst"))):
@@ -355,8 +368,34 @@ class _Deck:
             seen.add(relationship.target.casefold())
             self.slides.append(relationship.target)
         self._templates: dict[str, _Template] = {}
-        # Table cells written so far, against PPTX_MAX_GRID_CELLS.
-        self._grid_cells = 0
+        self._check_tables()
+
+    def _check_tables(self) -> None:
+        """Refuse the file, before its first page, if its tables would draw too many cells.
+
+        A slide that turns out broken here is left to its page, which is
+        then marked illegible.
+
+        Raises:
+            Refusal: OFFICE_TOO_LARGE.
+        """
+        cells = 0
+        for part in self.slides:
+            try:
+                root = self._package.xml(part)
+            except Refusal as refusal:
+                if refusal.code == "OFFICE_TOO_LARGE":
+                    raise
+                continue
+            stack = [root]
+            while stack:
+                element = stack.pop()
+                if _is(element, _A, "tbl"):
+                    cells += _grid_size(*_table_cells(element))
+                    if cells > PPTX_MAX_GRID_CELLS:
+                        raise Refusal("OFFICE_TOO_LARGE", _TOO_LARGE)
+                else:
+                    stack.extend(element)
 
     # --- Layouts and masters ------------------------------------------------
 
@@ -412,8 +451,7 @@ class _Deck:
         """Lay out one slide as a page.
 
         Raises:
-            Refusal: OFFICE_INVALID or OFFICE_TOO_LARGE if the slide's parts are broken,
-                or its tables take the presentation past PPTX_MAX_GRID_CELLS.
+            Refusal: OFFICE_INVALID or OFFICE_TOO_LARGE if the slide's parts are broken.
         """
         if not self.slides:
             return self._page(index, [])
@@ -481,9 +519,18 @@ class _Deck:
                 if choice is not None:
                     self._shapes(slide, choice, mapping, hidden=hidden)
                 continue
+            name = local_name(shape.tag)
+            if name == "contentPart" and _ns(shape.tag) in _P | _P14:
+                # Ink. PowerPoint 2010 writes it in its own namespace.
+                info = _local_child(shape, "nvContentPartPr")
+                box = _offset_extent(_local_child(shape, "xfrm"))
+                ink = _Pending(BlockType.IMAGE, flags=(BlockFlag.ILLEGIBLE,))
+                _place(
+                    slide, [ink], box, mapping, hidden=hidden or _marked_hidden(info, local=True)
+                )
+                continue
             if _ns(shape.tag) not in _P:
                 continue
-            name = local_name(shape.tag)
             if name == "sp":
                 self._shape(slide, shape, mapping, hidden=hidden)
             elif name == "grpSp":
@@ -493,7 +540,7 @@ class _Deck:
                 self._shapes(slide, shape, inner, hidden=concealed)
             elif name == "graphicFrame":
                 self._frame(slide, shape, mapping, hidden=hidden)
-            elif name in ("pic", "contentPart"):
+            elif name == "pic":
                 info = _child(shape, _P, "nvPicPr")
                 box = _offset_extent(_path(shape, (_P, "spPr"), (_A, "xfrm")))
                 image = _Pending(BlockType.IMAGE, flags=(BlockFlag.ILLEGIBLE,))
@@ -506,8 +553,8 @@ class _Deck:
         box = _offset_extent(_path(shape, (_P, "spPr"), (_A, "xfrm")))
         styles = [_child(body, _A, "lstStyle")]
         kind = None if ph is None else ph.attrib.get("type", "obj")
-        if kind is not None:
-            idx = ph.attrib.get("idx") if ph is not None else None
+        if ph is not None and kind is not None:
+            idx = ph.attrib.get("idx")
             layout = None if slide.layout is None else slide.layout.find(kind, idx)
             inherited = kind if layout is None else layout.type
             master = None if slide.master is None else slide.master.find_family(inherited)
@@ -525,14 +572,23 @@ class _Deck:
         paragraphs = self._paragraphs(body, styles, slide.rels)
         if not paragraphs:
             return
-        blocks: list[_Pending]
+        blocks: list[_Pending] = []
         if kind in _TITLES:
-            text = " ".join(" ".join(p.text.split()) for p in paragraphs)
-            blocks = [_Pending(BlockType.HEADING, text, heading_level=1)]
+            text = " ".join(" ".join(p.text.split()) for p in paragraphs if p.text)
+            if text:
+                blocks.append(_Pending(BlockType.HEADING, text, heading_level=1))
         elif kind in _MARGINS:
-            blocks = [_Pending(_MARGINS[kind], "\n".join(p.text for p in paragraphs))]
+            text = "\n".join(p.text for p in paragraphs if p.text)
+            if text:
+                blocks.append(_Pending(_MARGINS[kind], text))
+        if blocks or kind in _TITLES or kind in _MARGINS:
+            blocks.extend(_formula() for p in paragraphs for _ in range(p.formulas))
         else:
-            blocks = [_paragraph_block(paragraph) for paragraph in paragraphs]
+            # Each paragraph's equations follow its text.
+            for paragraph in paragraphs:
+                if paragraph.text:
+                    blocks.append(_paragraph_block(paragraph))
+                blocks.extend(_formula() for _ in range(paragraph.formulas))
         _place(slide, blocks, box, mapping, hidden=hidden or _marked_hidden(info))
 
     def _frame(self, slide: _Slide, frame: Element, mapping: _Map, *, hidden: bool) -> None:
@@ -572,7 +628,12 @@ class _Deck:
             level = _int(None if properties is None else properties.attrib.get("lvl")) or 0
             level = min(max(level, 0), MAX_LIST_LEVEL)
             text = _run_text(paragraph, rels)
+            # PowerPoint writes an equation as alternate content (a14:m, with
+            # a picture of it as the fallback); neither is text.
+            formulas = sum(1 for item in paragraph if _is_alternate(item))
             if not text.strip():
+                if formulas:
+                    paragraphs.append(_Paragraph("", level, None, formulas))
                 continue
             bullet = _bullet(properties, level, styles)
             for deeper in [key for key in counters if key > level]:
@@ -590,51 +651,30 @@ class _Deck:
             else:
                 counters.pop(level, None)
                 label = ""
-            paragraphs.append(_Paragraph(text, level, label))
+            paragraphs.append(_Paragraph(text, level, label, formulas))
         return paragraphs
 
     def _table(self, table: Element, rels: dict[str, Relationship]) -> list[_Pending]:
-        properties = _child(table, _A, "tblPr")
-        header = (
-            1
-            if (
-                properties is not None and properties.attrib.get("firstRow", "").casefold() in _TRUE
-            )
-            else 0
-        )
+        header, cells_by_row = _table_cells(table)
         rows: list[list[tuple[str, int]]] = []
-        for row in table:
-            if not _is(row, _A, "tr"):
-                continue
-            cells: list[tuple[str, int]] = []
-            for cell in row:
-                if not _is(cell, _A, "tc"):
-                    continue
-                if cell.attrib.get("hMerge", "").casefold() in _TRUE:
-                    continue  # Covered by the span of a cell to its left.
-                span = max(1, _int(cell.attrib.get("gridSpan")) or 1)
+        for cells in cells_by_row:
+            row: list[tuple[str, int]] = []
+            for cell, span in cells:
                 body = _child(cell, _A, "txBody")
-                lines = (
-                    [] if body is None else [_run_text(p, rels) for p in body if _is(p, _A, "p")]
-                )
+                lines = [_run_text(p, rels) for p in _kids(body) if _is(p, _A, "p")]
                 text = " ".join(" ".join(lines).split())
                 if cell.attrib.get("vMerge", "").casefold() in _TRUE:
                     text = ""  # Its text is in the first cell of the merge.
-                cells.append((text, span))
-            if cells:
-                rows.append(cells)
+                row.append((text, span))
+            rows.append(row)
         if not any(text for cells in rows for text, _ in cells):
             return []
-        header = min(header, len(rows))
         width = max(sum(span for _, span in cells) for cells in rows)
         head, body_rows = rows[:header], rows[header:]
         size = max(1, OFFICE_TABLE_MAX_ROWS - len(head))
         parts = [body_rows[start : start + size] for start in range(0, len(body_rows), size)]
-        self._grid_cells += sum(len(head + part) for part in parts or [[]]) * width
-        if self._grid_cells > PPTX_MAX_GRID_CELLS:
-            raise Refusal("OFFICE_TOO_LARGE", _TOO_LARGE)
         return [
-            _Pending(BlockType.TABLE, table=_grid(head + part, width, len(head)))
+            _Pending(BlockType.TABLE, table=table_grid(head + part, width, len(head)))
             for part in parts or [[]]
         ]
 
@@ -731,9 +771,12 @@ class _Deck:
         return comments
 
 
-def _marked_hidden(info: Element | None) -> bool:
-    """Whether a shape's non-visual properties (``p:cNvPr``) mark it hidden."""
-    properties = _child(info, _P, "cNvPr")
+def _marked_hidden(info: Element | None, *, local: bool = False) -> bool:
+    """Whether a shape's non-visual properties (``p:cNvPr``) mark it hidden.
+
+    ``local`` finds them whatever their namespace, as for PowerPoint 2010's ink.
+    """
+    properties = _local_child(info, "cNvPr") if local else _child(info, _P, "cNvPr")
     return properties is not None and properties.attrib.get("hidden", "").casefold() in _TRUE
 
 
@@ -750,9 +793,10 @@ def _place(
     ):
         box = None  # Scaled out of range by nested groups: no position.
     if box is not None:
+        # A shape of no size still shows its text where it is anchored.
         outside = (
-            box.x + box.width <= 0
-            or box.y + box.height <= 0
+            box.x + max(box.width, 1.0) <= 0
+            or box.y + max(box.height, 1.0) <= 0
             or box.x >= slide.width
             or box.y >= slide.height
         )
@@ -815,6 +859,44 @@ def _label(scheme: str, number: int) -> str:
     return text if punctuation == "Plain" else f"{text}."
 
 
+def _table_cells(table: Element) -> tuple[int, list[list[tuple[Element, int]]]]:
+    """A table's header rows and, row by row, its cells with the columns each spans.
+
+    A cell covered by the span of one to its left is left out; rows without
+    cells are dropped.
+    """
+    properties = _child(table, _A, "tblPr")
+    first_row = properties is not None and properties.attrib.get("firstRow", "").casefold()
+    rows: list[list[tuple[Element, int]]] = []
+    for row in table:
+        if not _is(row, _A, "tr"):
+            continue
+        cells = [
+            (cell, max(1, _int(cell.attrib.get("gridSpan")) or 1))
+            for cell in row
+            if _is(cell, _A, "tc") and cell.attrib.get("hMerge", "").casefold() not in _TRUE
+        ]
+        if cells:
+            rows.append(cells)
+    header = 1 if first_row in _TRUE and rows else 0
+    return header, rows
+
+
+def _grid_size(header: int, rows: list[list[tuple[Element, int]]]) -> int:
+    """Cells the serializer draws for a table: its rows, the header repeated, times its width."""
+    if not rows:
+        return 0
+    width = max(sum(span for _, span in cells) for cells in rows)
+    body = len(rows) - header
+    parts = max(1, -(-body // max(1, OFFICE_TABLE_MAX_ROWS - header)))
+    return (body + parts * header) * width
+
+
+def _formula() -> _Pending:
+    """An equation, marked not converted: never guessed from its picture."""
+    return _Pending(BlockType.FORMULA, flags=(BlockFlag.ILLEGIBLE,))
+
+
 def _paragraph_block(paragraph: _Paragraph) -> _Pending:
     if paragraph.label is None:
         return _Pending(BlockType.PARAGRAPH, paragraph.text)
@@ -854,16 +936,3 @@ def _run_text(paragraph: Element, rels: dict[str, Relationship]) -> str:
         f"[{text}]({target})" if target is not None and text.strip() else text
         for text, target in merged
     )
-
-
-def _grid(rows: list[list[tuple[str, int]]], width: int, header_rows: int) -> Table:
-    cells: list[TableCell] = []
-    for row_index, row in enumerate(rows):
-        column = 0
-        for text, span in row:
-            span = min(span, width - column)
-            if span < 1:
-                break
-            cells.append(TableCell(row=row_index, col=column, text=text, col_span=span))
-            column += span
-    return Table(n_rows=len(rows), n_cols=width, header_rows=header_rows, cells=tuple(cells))

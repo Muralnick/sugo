@@ -31,6 +31,7 @@ from sugo.extractors.office import docx_reader, pptx_reader, xlsx_reader, xml_re
 from sugo.extractors.office.package import (
     OLE_SIGNATURE,
     excel_workbook,
+    office_kind,
     powerpoint_presentation,
     word_document,
 )
@@ -109,6 +110,11 @@ _REFUSALS: dict[str, type[OfficeError]] = {
     "OFFICE_TOO_LARGE": OfficeTooLargeError,
     "OFFICE_UNSUPPORTED": OfficeUnsupportedError,
 }
+
+
+def kind_of(data: bytes) -> str | None:
+    """ "docx", "xlsx" or "pptx" for an Office document, by its content; None otherwise."""
+    return office_kind(data)
 
 
 def is_docx(data: bytes) -> bool:
