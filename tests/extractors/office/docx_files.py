@@ -24,11 +24,13 @@ def docx(
     parts: dict[str, str] | None = None,
     links: dict[str, str] | None = None,
     main_type: str = _MAIN,
+    images: dict[str, bytes] | None = None,
 ) -> bytes:
     """A DOCX whose body is ``body``; ``parts`` adds styles, notes, header (rId "h1")...
 
     Every part's text is wrapped in its root element with the ``w`` and ``r``
-    namespaces declared. ``links`` maps relationship ids to external URLs.
+    namespaces declared. ``links`` maps relationship ids to external URLs;
+    ``images`` maps relationship ids to the bytes of pictures in ``word/media``.
     """
     parts = parts or {}
     roots = {
@@ -48,6 +50,10 @@ def docx(
     rels += [
         f'<Relationship Id="{rid}" Type="{_REL}/hyperlink" Target="{url}" TargetMode="External"/>'
         for rid, url in (links or {}).items()
+    ]
+    rels += [
+        f'<Relationship Id="{rid}" Type="{_REL}/image" Target="media/{rid}.png"/>'
+        for rid in images or {}
     ]
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
@@ -71,6 +77,8 @@ def docx(
         archive.writestr(
             "word/document.xml", f"<w:document {declared}><w:body>{body}</w:body></w:document>"
         )
+        for rid, image in (images or {}).items():
+            archive.writestr(f"word/media/{rid}.png", image)
         for name, text in parts.items():
             root = roots[name]
             archive.writestr(_PARTS[name], f"<w:{root} {declared}>{text}</w:{root}>")

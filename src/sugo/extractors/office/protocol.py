@@ -17,6 +17,8 @@ from sugo.extractors.worker import ProtocolError
 _MAX_PAGES = 100_000
 
 PageIndex = Annotated[int, Field(ge=0, lt=_MAX_PAGES)]
+# Longer than any part name a ZIP entry in a package can reasonably have.
+_MAX_PART_NAME = 1024
 
 
 class Opened(_Model):
@@ -36,11 +38,23 @@ class Refused(_Model):
     message: NonEmptyStr
 
 
+class ImageRef(_Model):
+    """A picture marked not converted on a page, and the package part that holds it.
+
+    Sugo's process reads the part with OCR (ADR-054); the worker never loads
+    the image stack.
+    """
+
+    block: NonEmptyStr
+    part: Annotated[str, Field(min_length=1, max_length=_MAX_PART_NAME)]
+
+
 class PageRead(_Model):
-    """One page, laid out."""
+    """One page, laid out, with the pictures on it."""
 
     kind: Literal["page"] = "page"
     page: Page
+    images: tuple[ImageRef, ...] = ()
 
 
 class PageFailed(_Model):

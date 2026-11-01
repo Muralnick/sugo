@@ -5,7 +5,7 @@
 **Deciders:** project author  
 **Implements:** ROADMAP v0.1 "Office (DOCX, XLSX, PPTX) and XML through a light reader", ADR-007 (`lite` level), ADR-018 (process isolation), THREAT_MODEL (XXE, hidden text)  
 **Updates:** ADR-007 ("Office via lightweight dedicated libraries" becomes Sugo's own reader), ADR-046 (routing by content), ADR-043 (its worker plumbing becomes shared)  
-**Amends:** IR (ADR-005): new `secret` flag; new `list_level` field on list items (maintainer decision, 2026-11-01)  
+**Amends:** IR (ADR-005): new `secret` and `decorative` flags; new `list_level` field on list items (maintainer decision, 2026-11-01)  
 **Requires:** ADR-053 merged first  
 **Adds error codes:** `OFFICE_INVALID`, `OFFICE_UNSUPPORTED`, `OFFICE_TOO_LARGE`, `XML_INVALID`, `XML_TOO_LARGE`, `OFFICE_EXTRACTION_FAILED`
 
@@ -126,7 +126,16 @@ What a reader of the document does not see stays in the IR, flagged `hidden`, an
 - With `sugo[lite]` installed, embedded PNG, JPEG and WEBP images (recognised by content) go through the same OCR pipeline as image files, with its pixel and size limits, at the position where they are anchored. At most 200 images per document; the rest are marked not converted.
 - Images under 32 × 32 pixels are decoration: flagged and removed with a reason.
 - Without `sugo[lite]`, and for other formats (EMF, WMF, GIF, TIFF), each image becomes a block marked not converted. Nothing is ever described or guessed.
-- OCR runs in Sugo's process as for image files, not in the Office worker, which never loads the image stack.
+- OCR runs in Sugo's process as for image files, not in the Office worker, which never loads the image stack (an import-linter contract checks it).
+
+How it is done (implementation, 2026-11-01):
+
+- The worker marks each picture not converted, as before, and names the package part that holds it, in the page message (`images`: block id and part). Only internal parts are named: linked pictures are never followed. Sugo checks that each name points at an image block marked not converted, else the page is treated as the worker's failure.
+- Sugo's process opens the package itself, with the same limits (part size and compression ratio counted while decompressing, the 300 MB total), and recognises the picture by its content. Pillow's header gives the size; a picture under 32 × 32 pixels on both sides gets the new `decorative` flag, and the new `decorative_images` cleaner removes it with a reason.
+- Other pictures go through the image file pipeline (classification, preprocessing, OCR, layout) with its limits. The blocks found take the picture's place in reading order. On a slide they keep their place inside the picture; in a document or a sheet they have no position, since a picture's coordinates are not the page's. A picture's `hidden` flag passes to its text: text in a hidden picture stays hidden.
+- A picture without text, in another format or damaged stays marked not converted. A picture used many times (a logo) is read once; at most 200 pictures are read per document. Without `sugo[lite]` nothing is read.
+- Pages already in the page cache are not read with OCR again on the next run. The engine identity of DOCX, XLSX and PPTX pages now includes the OCR libraries' versions.
+- Measured: a slide whose picture holds four lines of results gives those four lines, exactly, in 1.1 s on the reference machine (before: one "not converted" marker); a 16 × 16 dot beside it is removed as decoration.
 
 ## Alternatives considered
 

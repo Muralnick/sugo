@@ -34,7 +34,14 @@ from sugo.core.constants import (
     OFFICE_TABLE_MAX_ROWS,
 )
 from sugo.core.models import Block, BlockFlag, BlockType, Page, PageOrigin, Table, TableCell
-from sugo.extractors.office.package import SAFE_LINK, Package, Relationship, chosen_content
+from sugo.extractors.office.package import (
+    SAFE_LINK,
+    LaidOut,
+    Package,
+    Relationship,
+    chosen_content,
+    embedded_image,
+)
 from sugo.extractors.office.xml_reader import Element, local_name
 
 ENGINE_NAME = "docx"
@@ -71,6 +78,15 @@ _ROMAN_LIMIT = 4000
 
 def read_docx(data: bytes) -> list[Page]:
     """Lay out a Word document as pages.
+
+    Raises:
+        Refusal: OFFICE_TOO_LARGE or OFFICE_INVALID.
+    """
+    return [page for page, _ in lay_out_docx(data)]
+
+
+def lay_out_docx(data: bytes) -> list[LaidOut]:
+    """Lay out a Word document as pages, each with the parts of its pictures.
 
     Raises:
         Refusal: OFFICE_TOO_LARGE or OFFICE_INVALID.
@@ -211,7 +227,9 @@ class _Paragraph:
     visible: list[str] = field(default_factory=list)
     hidden: list[str] = field(default_factory=list)
     comments: list[str] = field(default_factory=list)
-    not_converted: int = 0
+    # Pictures, equations and objects drawn here, each marked not converted:
+    # the picture's part (None for anything else) and whether it is hidden.
+    figures: list[tuple[str | None, bool]] = field(default_factory=list)
     # Text boxes to lay out after the paragraph, and whether they are hidden
     # (anchored in a hidden or deleted run): hidden boxes stay hidden.
     boxes: list[tuple[Element, bool]] = field(default_factory=list)
@@ -231,6 +249,8 @@ class _Pending:
     flags: tuple[BlockFlag, ...] = ()
     heading_level: int | None = None
     table: Table | None = None
+    # The part of a picture marked not converted, for OCR in Sugo's process.
+    image: str | None = None
 
 
 class _Reader:
@@ -349,7 +369,7 @@ class _Reader:
 
     # --- Body ---------------------------------------------------------------
 
-    def pages(self) -> list[Page]:
+    def pages(self) -> list[LaidOut]:
         body = _child(self._document, "body")
         if body is None:
             return [self._page(0, [])]
@@ -391,8 +411,8 @@ class _Reader:
             self._add(_Pending(BlockType.PARAGRAPH, concealed, (BlockFlag.HIDDEN,)))
         for comment in parts.comments:
             self._add(_Pending(BlockType.PARAGRAPH, comment, (BlockFlag.HIDDEN,)))
-        for _ in range(parts.not_converted):
-            self._add(_Pending(BlockType.IMAGE, flags=(BlockFlag.ILLEGIBLE,)))
+        for part, figure_hidden in parts.figures:
+            self._add(_figure(part, hidden=figure_hidden))
         for box, box_hidden in parts.boxes:
             self._body(box, hidden=box_hidden)
         if top and (parts.page_break or _child(properties, "sectPr") is not None):
@@ -452,7 +472,7 @@ class _Reader:
             namespace, name = _ns(child.tag), local_name(child.tag)
             if namespace in _MATH:
                 if name in ("oMath", "oMathPara"):
-                    parts.not_converted += 1
+                    parts.figures.append((None, hidden))
                 continue
             if namespace == _MC and name == "AlternateContent":
                 choice = chosen_content(child)
@@ -512,7 +532,7 @@ class _Reader:
         if boxes:
             parts.boxes.extend((box, hidden) for box in boxes)
         else:
-            parts.not_converted += 1
+            parts.figures.append((embedded_image(item, self._rels, self._package), hidden))
 
     def _hyperlink(self, link: Element, parts: _Paragraph, look: _RunLook, *, hidden: bool) -> None:
         inner = _Paragraph(shaded=parts.shaded)
@@ -531,7 +551,7 @@ class _Reader:
             parts.visible.extend(inner.visible)
         parts.hidden.extend(inner.hidden)
         parts.comments.extend(inner.comments)
-        parts.not_converted += inner.not_converted
+        parts.figures.extend(inner.figures)
         parts.boxes.extend(inner.boxes)
         parts.page_break |= inner.page_break
 
@@ -565,7 +585,7 @@ class _Reader:
         rows: list[list[tuple[str, int]]] = []
         header_rows = 0
         concealed: list[str] = []
-        not_converted = 0
+        figures: list[tuple[str | None, bool]] = []
         boxes: list[tuple[Element, bool]] = []
         for row in _children(table, "tr"):
             row_properties = _child(row, "trPr")
@@ -587,7 +607,7 @@ class _Reader:
                 text = " ".join("".join(parts.visible).split())
                 cells.append(("" if continued else text, span))
                 concealed.extend(parts.hidden + parts.comments)
-                not_converted += parts.not_converted
+                figures.extend(parts.figures)
                 boxes.extend(parts.boxes)
             if cells:
                 rows.append(cells)
@@ -598,8 +618,8 @@ class _Reader:
         if any(text.strip() for text in concealed):
             text = "\n".join(text for text in concealed if text.strip())
             self._add(_Pending(BlockType.PARAGRAPH, text, (BlockFlag.HIDDEN,)))
-        for _ in range(not_converted):
-            self._add(_Pending(BlockType.IMAGE, flags=(BlockFlag.ILLEGIBLE,)))
+        for part, figure_hidden in figures:
+            self._add(_figure(part, hidden=figure_hidden))
         for box, box_hidden in boxes:
             self._body(box, hidden=box_hidden)
 
@@ -660,7 +680,8 @@ class _Reader:
             return ""
         return self._plain(self._package.xml(relationship.target))
 
-    def _page(self, index: int, pending: Iterable[_Pending]) -> Page:
+    def _page(self, index: int, pending: Iterable[_Pending]) -> LaidOut:
+        pending = list(pending)
         blocks = tuple(
             Block(
                 id=f"b{number}",
@@ -674,7 +695,15 @@ class _Reader:
             )
             for number, item in enumerate(pending)
         )
-        return Page(index=index, width=1.0, height=1.0, origin=PageOrigin.NATIVE, blocks=blocks)
+        page = Page(index=index, width=1.0, height=1.0, origin=PageOrigin.NATIVE, blocks=blocks)
+        images = {f"b{n}": item.image for n, item in enumerate(pending) if item.image is not None}
+        return page, images
+
+
+def _figure(part: str | None, *, hidden: bool) -> _Pending:
+    """A picture, equation or object marked not converted; a picture keeps its part."""
+    flags = (BlockFlag.ILLEGIBLE, BlockFlag.HIDDEN) if hidden else (BlockFlag.ILLEGIBLE,)
+    return _Pending(BlockType.IMAGE, flags=flags, image=part)
 
 
 def _shaded(properties: Element | None) -> bool:

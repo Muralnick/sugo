@@ -45,7 +45,7 @@ from sugo.core.constants import (
     XML_MAX_DEPTH,
 )
 from sugo.core.models import Block, BlockFlag, BlockType, Page, PageOrigin, Table, TableCell
-from sugo.extractors.office.package import Package
+from sugo.extractors.office.package import LaidOut, Package
 from sugo.extractors.office.xml_reader import Element, Refusal, local_name
 from sugo.i18n import N_
 
@@ -96,6 +96,16 @@ _FAKE_LEAP_DAY = 60
 
 def read_xlsx(data: bytes) -> tuple[int, Callable[[int], Page]]:
     """Check a workbook and return its number of pages and a function that reads one.
+
+    Raises:
+        Refusal: OFFICE_TOO_LARGE or OFFICE_INVALID, here or from the page function.
+    """
+    count, laid_out = lay_out_xlsx(data)
+    return count, lambda index: laid_out(index)[0]
+
+
+def lay_out_xlsx(data: bytes) -> tuple[int, Callable[[int], LaidOut]]:
+    """As ``read_xlsx``, each page with the parts of its pictures.
 
     Every sheet is scanned here, so the limits refuse the file before its
     first page; each page is laid out only when asked for.
@@ -336,14 +346,16 @@ class _Book:
 
     # --- Pages --------------------------------------------------------------
 
-    def page(self, index: int) -> Page:
-        """Lay out one sheet as a page.
+    def page(self, index: int) -> LaidOut:
+        """Lay out one sheet as a page, with the parts of its pictures.
 
         Raises:
             Refusal: OFFICE_INVALID or OFFICE_TOO_LARGE if the sheet's parts are broken.
         """
         sheet = self.sheets[index]
         blocks: list[tuple[BlockType, str, Table | None, tuple[BlockFlag, ...]]] = []
+        # The part of each picture marked not converted, by block number.
+        images: dict[int, str] = {}
         if sheet.name:
             blocks.append((BlockType.HEADING, sheet.name, None, ()))
         if sheet.part is None:
@@ -360,14 +372,16 @@ class _Book:
                 blocks.append(
                     (BlockType.PARAGRAPH, "\n".join(concealed), None, (BlockFlag.HIDDEN,))
                 )
-            not_converted = self._not_converted(sheet.part)
-            blocks.extend([(BlockType.IMAGE, "", None, (BlockFlag.ILLEGIBLE,))] * not_converted)
+            for image in self._not_converted(sheet.part):
+                if image is not None:
+                    images[len(blocks)] = image
+                blocks.append((BlockType.IMAGE, "", None, (BlockFlag.ILLEGIBLE,)))
         if sheet.hidden:
             blocks = [
                 (kind, text, table, (*flags, BlockFlag.HIDDEN))
                 for kind, text, table, flags in blocks
             ]
-        return Page(
+        page = Page(
             index=index,
             width=1.0,
             height=1.0,
@@ -386,6 +400,7 @@ class _Book:
                 for number, (kind, text, table, flags) in enumerate(blocks)
             ),
         )
+        return page, {f"b{number}": part for number, part in images.items()}
 
     def _read(
         self, grid: _Grid, level: int, element: Element, parent: Element, *, last_row: list[int]
@@ -460,13 +475,16 @@ class _Book:
                     found.append(content)
         return found
 
-    def _not_converted(self, part: str) -> int:
-        """Charts, images and pivot tables of a sheet: one block each, never guessed."""
-        count = sum(1 for _ in self._related(part, "/pivotTable"))
+    def _not_converted(self, part: str) -> list[str | None]:
+        """Charts, images and pivot tables of a sheet, one each, never guessed.
+
+        An image is given by its part, read with OCR in Sugo's process; the others by None.
+        """
+        found: list[str | None] = [None for _ in self._related(part, "/pivotTable")]
         for drawing in self._related(part, "/drawing"):
-            count += sum(1 for _ in self._related(drawing, "/chart"))
-            count += sum(1 for _ in self._related(drawing, "/image"))
-        return count
+            found.extend(None for _ in self._related(drawing, "/chart"))
+            found.extend(self._related(drawing, "/image"))
+        return found
 
 
 def _is_row(level: int, element: Element, parent: Element) -> bool:

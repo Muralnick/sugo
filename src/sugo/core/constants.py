@@ -344,6 +344,12 @@ OFFICE_UNDERSTOOD_NAMESPACES: Final = frozenset(
     }
 )
 
+# Pictures inside Office files read with OCR (ADR-054): at most this many in
+# one document, each OCR run taking a second or more; a picture smaller than
+# this many pixels on both sides is decoration (a bullet, a rule, an icon).
+OFFICE_MAX_PICTURES: Final = 200
+OFFICE_DECORATION_PIXELS: Final = 32
+
 # Text under this size, in half-points (2 pt), cannot be read on the page.
 DOCX_MIN_VISIBLE_HALF_POINTS: Final = 4
 

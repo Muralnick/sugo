@@ -28,7 +28,8 @@ def pptx(
     modern_comments: dict[int, str] | None = None,
     hidden: Iterable[int] = (),
     links: dict[str, str] | None = None,
-    parts: dict[str, str] | None = None,
+    parts: dict[str, str | bytes] | None = None,
+    images: dict[str, str] | None = None,
     size: tuple[int, int] | None = (WIDTH, HEIGHT),
     slide_targets: list[str] | None = None,
     main_type: str = MAIN,
@@ -42,6 +43,8 @@ def pptx(
     ids to external URLs, on every slide; ``parts`` adds parts by name
     (diagram data, rId "dm" on every slide points to ``ppt/diagrams/data1.xml``).
     ``slide_targets`` replaces the slide parts the presentation lists.
+    ``images`` maps relationship ids to picture parts (``../media/x.png``), on
+    every slide; their bytes go in ``parts``.
     """
     hidden = set(hidden)
     output = io.BytesIO()
@@ -69,6 +72,7 @@ def pptx(
                 "lay": ("slideLayout", "../slideLayouts/slideLayout1.xml"),
                 "dm": ("diagramData", "../diagrams/data1.xml"),
             }
+            rels.update({rid: ("image", target) for rid, target in (images or {}).items()})
             if notes and n in notes:
                 rels["notes"] = ("notesSlide", f"../notesSlides/notesSlide{n + 1}.xml")
                 archive.writestr(

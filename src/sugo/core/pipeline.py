@@ -22,7 +22,7 @@ from collections import Counter
 from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from types import MappingProxyType
 from typing import ClassVar, Protocol, TypeVar
@@ -30,6 +30,7 @@ from typing import ClassVar, Protocol, TypeVar
 from sugo.analyzers.edges import EdgeAnalyzer, EdgeStats
 from sugo.analyzers.lexicon import Lexicon, LexiconAnalyzer
 from sugo.chunkers.sections import SectionChunker
+from sugo.cleaners.decorative_images import DecorativeImageCleaner
 from sugo.cleaners.headers_footers import HeaderFooterCleaner
 from sugo.cleaners.hidden_text import HiddenTextCleaner
 from sugo.cleaners.page_numbers import PageNumberCleaner
@@ -94,6 +95,7 @@ class Cleaner(Protocol[_Stats]):
 # numbers before running headers, which leave page-number text to them.
 CLEANERS: tuple[Cleaner[EdgeStats], ...] = (
     HiddenTextCleaner(),
+    DecorativeImageCleaner(),
     UiChromeCleaner(),
     PageNumberCleaner(),
     HeaderFooterCleaner(),
@@ -116,7 +118,7 @@ class InputKind(StrEnum):
 
 _OFFICE_KINDS = frozenset({InputKind.XML, InputKind.DOCX, InputKind.XLSX, InputKind.PPTX})
 # Office documents with any number of pages, and the extractor of each.
-_PAGED_OFFICE: dict[InputKind, Callable[[bytes], Iterator[Page]]] = {
+_PAGED_OFFICE: dict[InputKind, Callable[..., Iterator[Page]]] = {
     InputKind.DOCX: office.extract_docx,
     InputKind.XLSX: office.extract_xlsx,
     InputKind.PPTX: office.extract_pptx,
@@ -423,9 +425,15 @@ class _Job:
             # a document is laid out whole in well under a second, a
             # workbook's limits are checked on all its sheets anyway, and a
             # slide is laid out in milliseconds.
+            # Pictures of pages already cached are not read with OCR again.
+            def uncached(index: int) -> bool:
+                return self._get(CacheLevel.EXTRACTION, self._key(index)) is None
+
             count = 0
-            for page in _PAGED_OFFICE[self._kind](self._data):
-                self._keep(page)
+            extract = _PAGED_OFFICE[self._kind]
+            for page in extract(self._data, ocr=self._ocr, pictures_for=uncached):
+                if uncached(page.index):
+                    self._keep(page)
                 count = page.index + 1
             return count
         # Pages cached by an earlier run are neither laid out nor read with
@@ -509,7 +517,8 @@ class _Job:
             return extract_page(self._data, self._ocr())
         if self._kind in _PAGED_OFFICE:
             extract = _PAGED_OFFICE[self._kind]
-            return next(page for page in extract(self._data) if page.index == index)
+            pages = extract(self._data, ocr=self._ocr, pictures_for=lambda i: i == index)
+            return next(page for page in pages if page.index == index)
         pages = (
             office.extract_xml(self._data)
             if self._kind is InputKind.XML
@@ -550,11 +559,22 @@ class _OnceOcr:
         return self._engine
 
 
+def _version(name: str) -> str:
+    try:
+        return version(name)
+    except PackageNotFoundError:
+        return "absent"
+
+
 def _engine_identity(kind: InputKind) -> str:
     # Library versions change what the engines produce; Sugo's own code and
     # model hashes are already part of every key (ADR-045).
-    if kind in _OFFICE_KINDS:
+    if kind is InputKind.XML:
         return f"{kind.value}:defusedxml={version('defusedxml')}"
+    if kind in _OFFICE_KINDS:
+        # Pictures inside are read with OCR when sugo[lite] is installed.
+        libraries = ["defusedxml", "rapidocr", "onnxruntime", "pillow"]
+        return f"{kind.value}:" + ";".join(f"{name}={_version(name)}" for name in libraries)
     libraries = ["rapidocr", "onnxruntime", "pillow"]
     if kind is InputKind.PDF:
         libraries.insert(0, "pymupdf")

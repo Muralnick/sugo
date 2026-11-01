@@ -326,6 +326,14 @@ source_modules = ["sugo"]
 forbidden_modules = ["pymupdf", "fitz"]
 ignore_imports = ["sugo.extractors.pymupdf.worker -> pymupdf"]
 
+# The Office worker parses untrusted XML only: pictures are read with OCR in
+# Sugo's process, so the worker never loads the image stack (ADR-054).
+[[tool.importlinter.contracts]]
+name = "Office worker never loads the image stack"
+type = "forbidden"
+source_modules = ["sugo.extractors.office.worker"]
+forbidden_modules = ["sugo.extractors.image", "PIL", "numpy", "rapidocr", "onnxruntime"]
+
 # The MCP server speaks over stdio only; it never opens a socket or reaches
 # the network gateway (ADR-049).
 [[tool.importlinter.contracts]]

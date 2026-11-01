@@ -30,6 +30,7 @@ from sugo.core.constants import (
     OFFICE_RATIO_MIN_BYTES,
     OFFICE_UNDERSTOOD_NAMESPACES,
 )
+from sugo.core.models import Page
 from sugo.extractors.office.xml_reader import (
     REQUIRED_NAMESPACES,
     Element,
@@ -78,11 +79,25 @@ _MAIN_TYPES = (
 # file:, white space or brackets that would break the link) stays plain text.
 SAFE_LINK = re.compile(r"(?:https?://|mailto:)[^\s()<>\[\]]+", re.IGNORECASE)
 _MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+_RELATIONSHIP_NAMESPACES = frozenset(
+    {
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        "http://purl.oclc.org/ooxml/officeDocument/relationships",
+    }
+)
+# Elements that draw a picture from a part: DrawingML's a:blip (r:embed) and
+# VML's v:imagedata (r:id).
+_PICTURE_ELEMENTS = {"blip": "embed", "imagedata": "id"}
 _OFFICE_DOCUMENT = "/officeDocument"
 _CHUNK = 64 * 1024
 _ENCRYPTED_FLAG = 0x1
 _DAMAGED = N_("the Office file is damaged, or too large to read safely")
 _TOO_LARGE = N_("the Office file is too large to read safely")
+
+
+# A page as a reader lays it out, with the part of each picture marked not
+# converted, by block id: Sugo's process reads them with OCR (ADR-054).
+type LaidOut = tuple[Page, dict[str, str]]
 
 
 @dataclass(frozen=True)
@@ -131,6 +146,28 @@ def excel_workbook(data: bytes) -> bool:
 def powerpoint_presentation(data: bytes) -> bool:
     """Whether the data is a ZIP whose content types name a PowerPoint main part."""
     return office_kind(data) == "pptx"
+
+
+def embedded_image(
+    drawing: Element, relationships: dict[str, Relationship], package: "Package"
+) -> str | None:
+    """The part holding the picture a drawing shows, if it is inside the package.
+
+    Linked pictures (external relationships) are never followed: None.
+    """
+    stack = [drawing]
+    while stack:
+        element = stack.pop()
+        attribute = _PICTURE_ELEMENTS.get(local_name(element.tag))
+        if attribute is not None:
+            for key, value in element.attrib.items():
+                namespace = key[1:].split("}", 1)[0] if key.startswith("{") else ""
+                if local_name(key) == attribute and namespace in _RELATIONSHIP_NAMESPACES:
+                    target = relationships.get(value)
+                    if target is not None and not target.external and package.has(target.target):
+                        return target.target
+        stack.extend(list(element)[::-1])
+    return None
 
 
 def chosen_content(alternate: Element) -> Element | None:

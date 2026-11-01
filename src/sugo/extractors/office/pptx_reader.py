@@ -57,7 +57,14 @@ from sugo.core.models import (
     Table,
 )
 from sugo.extractors.office.docx_reader import counter_text, table_grid
-from sugo.extractors.office.package import SAFE_LINK, Package, Relationship, chosen_content
+from sugo.extractors.office.package import (
+    SAFE_LINK,
+    LaidOut,
+    Package,
+    Relationship,
+    chosen_content,
+    embedded_image,
+)
 from sugo.extractors.office.xml_reader import Element, Refusal, local_name
 from sugo.extractors.reading_order import text_rows, xy_cut
 from sugo.i18n import N_
@@ -117,6 +124,16 @@ _FORMATS = {
 
 def read_pptx(data: bytes) -> tuple[int, Callable[[int], Page]]:
     """Check a presentation and return its number of pages and a function that reads one.
+
+    Raises:
+        Refusal: OFFICE_TOO_LARGE or OFFICE_INVALID, here or from the page function.
+    """
+    count, laid_out = lay_out_pptx(data)
+    return count, lambda index: laid_out(index)[0]
+
+
+def lay_out_pptx(data: bytes) -> tuple[int, Callable[[int], LaidOut]]:
+    """As ``read_pptx``, each page with the parts of its pictures.
 
     Raises:
         Refusal: OFFICE_TOO_LARGE or OFFICE_INVALID, here or from the page function.
@@ -307,6 +324,8 @@ class _Pending:
     list_level: int | None = None
     table: Table | None = None
     bbox: BBox | None = None
+    # The part of a picture marked not converted, for OCR in Sugo's process.
+    image: str | None = None
 
 
 @dataclass
@@ -452,8 +471,8 @@ class _Deck:
 
     # --- Slides -------------------------------------------------------------
 
-    def page(self, index: int) -> Page:
-        """Lay out one slide as a page.
+    def page(self, index: int) -> LaidOut:
+        """Lay out one slide as a page, with the parts of its pictures.
 
         Raises:
             Refusal: OFFICE_INVALID or OFFICE_TOO_LARGE if the slide's parts are broken.
@@ -493,7 +512,7 @@ class _Deck:
                 block.flags = (*block.flags, BlockFlag.HIDDEN)
         return self._page(index, blocks)
 
-    def _page(self, index: int, pending: list[_Pending]) -> Page:
+    def _page(self, index: int, pending: list[_Pending]) -> LaidOut:
         blocks = tuple(
             Block(
                 id=f"b{number}",
@@ -509,13 +528,15 @@ class _Deck:
             )
             for number, item in enumerate(pending)
         )
-        return Page(
+        page = Page(
             index=index,
             width=self._width / PPTX_EMU_PER_POINT,
             height=self._height / PPTX_EMU_PER_POINT,
             origin=PageOrigin.NATIVE,
             blocks=blocks,
         )
+        images = {f"b{n}": item.image for n, item in enumerate(pending) if item.image is not None}
+        return page, images
 
     def _shapes(self, slide: _Slide, tree: Element, mapping: _Map, *, hidden: bool) -> None:
         for shape in tree:
@@ -548,7 +569,9 @@ class _Deck:
             elif name == "pic":
                 info = _child(shape, _P, "nvPicPr")
                 box = _offset_extent(_path(shape, (_P, "spPr"), (_A, "xfrm")))
-                image = _Pending(BlockType.IMAGE, flags=(BlockFlag.ILLEGIBLE,))
+                fill = _child(shape, _P, "blipFill")
+                part = None if fill is None else embedded_image(fill, slide.rels, self._package)
+                image = _Pending(BlockType.IMAGE, flags=(BlockFlag.ILLEGIBLE,), image=part)
                 _place(slide, [image], box, mapping, hidden=hidden or _marked_hidden(info))
 
     def _shape(self, slide: _Slide, shape: Element, mapping: _Map, *, hidden: bool) -> None:
