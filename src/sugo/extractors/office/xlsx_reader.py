@@ -34,8 +34,10 @@ from typing import Protocol
 from defusedxml import ElementTree as DefusedElementTree  # type: ignore[import-untyped]
 
 from sugo.core.constants import (
+    OFFICE_EMU_PER_POINT,
     OFFICE_MAX_PART_ELEMENTS,
     OFFICE_TABLE_MAX_ROWS,
+    PPTX_MAX_COORDINATE,
     XLSX_MAX_CELLS,
     XLSX_MAX_COLUMNS,
     XLSX_MAX_GRID_CELLS,
@@ -45,7 +47,7 @@ from sugo.core.constants import (
     XML_MAX_DEPTH,
 )
 from sugo.core.models import Block, BlockFlag, BlockType, Page, PageOrigin, Table, TableCell
-from sugo.extractors.office.package import LaidOut, Package
+from sugo.extractors.office.package import LaidOut, Package, Picture, pictures_in
 from sugo.extractors.office.xml_reader import Element, Refusal, local_name
 from sugo.i18n import N_
 
@@ -354,8 +356,8 @@ class _Book:
         """
         sheet = self.sheets[index]
         blocks: list[tuple[BlockType, str, Table | None, tuple[BlockFlag, ...]]] = []
-        # The part of each picture marked not converted, by block number.
-        images: dict[int, str] = {}
+        # Each picture marked not converted, by block number.
+        images: dict[int, Picture] = {}
         if sheet.name:
             blocks.append((BlockType.HEADING, sheet.name, None, ()))
         if sheet.part is None:
@@ -372,10 +374,15 @@ class _Book:
                 blocks.append(
                     (BlockType.PARAGRAPH, "\n".join(concealed), None, (BlockFlag.HIDDEN,))
                 )
-            for image in self._not_converted(sheet.part):
+            for image, image_hidden in self._not_converted(sheet.part):
                 if image is not None:
                     images[len(blocks)] = image
-                blocks.append((BlockType.IMAGE, "", None, (BlockFlag.ILLEGIBLE,)))
+                flags = (
+                    (BlockFlag.ILLEGIBLE, BlockFlag.HIDDEN)
+                    if image_hidden
+                    else (BlockFlag.ILLEGIBLE,)
+                )
+                blocks.append((BlockType.IMAGE, "", None, flags))
         if sheet.hidden:
             blocks = [
                 (kind, text, table, (*flags, BlockFlag.HIDDEN))
@@ -475,16 +482,53 @@ class _Book:
                     found.append(content)
         return found
 
-    def _not_converted(self, part: str) -> list[str | None]:
-        """Charts, images and pivot tables of a sheet, one each, never guessed.
+    def _not_converted(self, part: str) -> list[tuple[Picture | None, bool]]:
+        """Pivot tables, then the charts and pictures a sheet's drawings anchor, in their order.
 
-        An image is given by its part, read with OCR in Sugo's process; the others by None.
+        Each is marked not converted, never guessed; a picture is given with
+        its part, read with OCR in Sugo's process, and whether it is hidden.
         """
-        found: list[str | None] = [None for _ in self._related(part, "/pivotTable")]
+        found: list[tuple[Picture | None, bool]] = [
+            (None, False) for _ in self._related(part, "/pivotTable")
+        ]
         for drawing in self._related(part, "/drawing"):
-            found.extend(None for _ in self._related(drawing, "/chart"))
-            found.extend(self._related(drawing, "/image"))
+            relationships = self._package.relationships(drawing)
+            for anchor in self._package.xml(drawing):
+                height = _anchor_height(anchor)
+                stack = [anchor]
+                while stack:
+                    element = stack.pop()
+                    name = local_name(element.tag)
+                    if name in ("pic", "graphicFrame"):
+                        hidden = _drawn_hidden(element)
+                        pictures: list[Picture | None] = []
+                        if name == "pic":
+                            pictures.extend(
+                                pictures_in(element, relationships, self._package, height=height)
+                            )
+                        found.extend((picture, hidden) for picture in pictures or [None])
+                    else:
+                        stack.extend(list(element)[::-1])
         return found
+
+
+def _anchor_height(anchor: Element) -> float | None:
+    """The height a one-cell or absolute anchor gives its drawing, in points (``xdr:ext``)."""
+    size = next((child for child in anchor if local_name(child.tag) == "ext"), None)
+    height = None if size is None else _int(size.attrib.get("cy"))
+    if height is None or not 0 < height <= PPTX_MAX_COORDINATE:
+        return None
+    return height / OFFICE_EMU_PER_POINT
+
+
+def _drawn_hidden(drawn: Element) -> bool:
+    """Whether a picture or chart in a drawing is marked hidden (``cNvPr hidden``)."""
+    for properties in drawn:
+        if local_name(properties.tag).startswith("nv"):
+            for item in properties:
+                if local_name(item.tag) == "cNvPr":
+                    return _true(item.attrib.get("hidden"))
+    return False
 
 
 def _is_row(level: int, element: Element, parent: Element) -> bool:

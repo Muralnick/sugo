@@ -31,16 +31,19 @@ from dataclasses import dataclass, field
 from sugo.core.constants import (
     DOCX_MIN_VISIBLE_HALF_POINTS,
     MAX_HEADING_LEVEL,
+    OFFICE_EMU_PER_POINT,
     OFFICE_TABLE_MAX_ROWS,
+    PPTX_MAX_COORDINATE,
 )
 from sugo.core.models import Block, BlockFlag, BlockType, Page, PageOrigin, Table, TableCell
 from sugo.extractors.office.package import (
     SAFE_LINK,
     LaidOut,
     Package,
+    Picture,
     Relationship,
     chosen_content,
-    embedded_image,
+    pictures_in,
 )
 from sugo.extractors.office.xml_reader import Element, local_name
 
@@ -229,7 +232,7 @@ class _Paragraph:
     comments: list[str] = field(default_factory=list)
     # Pictures, equations and objects drawn here, each marked not converted:
     # the picture's part (None for anything else) and whether it is hidden.
-    figures: list[tuple[str | None, bool]] = field(default_factory=list)
+    figures: list[tuple[Picture | None, bool]] = field(default_factory=list)
     # Text boxes to lay out after the paragraph, and whether they are hidden
     # (anchored in a hidden or deleted run): hidden boxes stay hidden.
     boxes: list[tuple[Element, bool]] = field(default_factory=list)
@@ -250,7 +253,7 @@ class _Pending:
     heading_level: int | None = None
     table: Table | None = None
     # The part of a picture marked not converted, for OCR in Sugo's process.
-    image: str | None = None
+    image: Picture | None = None
 
 
 class _Reader:
@@ -527,12 +530,13 @@ class _Reader:
                 self._drawing(item, parts, hidden=concealed)
 
     def _drawing(self, item: Element, parts: _Paragraph, *, hidden: bool) -> None:
-        """A text box is read; anything else drawn is marked not converted."""
+        """Text boxes are read and pictures kept for OCR; anything else is marked not converted."""
         boxes = list(_descendants(item, "txbxContent"))
-        if boxes:
-            parts.boxes.extend((box, hidden) for box in boxes)
-        else:
-            parts.figures.append((embedded_image(item, self._rels, self._package), hidden))
+        parts.boxes.extend((box, hidden) for box in boxes)
+        pictures = pictures_in(item, self._rels, self._package, height=_shown_height(item))
+        parts.figures.extend((picture, hidden) for picture in pictures)
+        if not boxes and not pictures:
+            parts.figures.append((None, hidden))
 
     def _hyperlink(self, link: Element, parts: _Paragraph, look: _RunLook, *, hidden: bool) -> None:
         inner = _Paragraph(shaded=parts.shaded)
@@ -585,7 +589,7 @@ class _Reader:
         rows: list[list[tuple[str, int]]] = []
         header_rows = 0
         concealed: list[str] = []
-        figures: list[tuple[str | None, bool]] = []
+        figures: list[tuple[Picture | None, bool]] = []
         boxes: list[tuple[Element, bool]] = []
         for row in _children(table, "tr"):
             row_properties = _child(row, "trPr")
@@ -700,10 +704,24 @@ class _Reader:
         return page, images
 
 
-def _figure(part: str | None, *, hidden: bool) -> _Pending:
+def _figure(part: Picture | None, *, hidden: bool) -> _Pending:
     """A picture, equation or object marked not converted; a picture keeps its part."""
     flags = (BlockFlag.ILLEGIBLE, BlockFlag.HIDDEN) if hidden else (BlockFlag.ILLEGIBLE,)
     return _Pending(BlockType.IMAGE, flags=flags, image=part)
+
+
+def _shown_height(drawing: Element) -> float | None:
+    """The height a DrawingML drawing is shown at, in points (``wp:extent``), if given."""
+    stack = [drawing]
+    while stack:
+        element = stack.pop()
+        if local_name(element.tag) == "extent":
+            height = _int(element.attrib.get("cy"))
+            if height is None or not 0 < height <= PPTX_MAX_COORDINATE:
+                return None
+            return height / OFFICE_EMU_PER_POINT
+        stack.extend(list(element)[::-1])
+    return None
 
 
 def _shaded(properties: Element | None) -> bool:

@@ -31,6 +31,7 @@ from sugo.extractors.office import docx_reader, pptx_reader, xlsx_reader, xml_re
 from sugo.extractors.office.package import (
     OLE_SIGNATURE,
     LaidOut,
+    Picture,
     excel_workbook,
     office_kind,
     powerpoint_presentation,
@@ -328,7 +329,7 @@ def _page(worker: "_Worker", index: int, engine: str, timeout: float) -> LaidOut
     if any(block.origin_engine != engine for block in message.page.blocks):
         raise WorkerError
     blocks = {block.id: block for block in message.page.blocks}
-    parts = {image.block: image.part for image in message.images}
+    parts = {image.block: Picture(image.part, image.crop, image.height) for image in message.images}
     # A picture names an image block marked not converted, nothing else.
     if not all(block in blocks and is_picture(blocks[block]) for block in parts):
         raise WorkerError

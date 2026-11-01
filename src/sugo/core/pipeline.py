@@ -117,8 +117,20 @@ class InputKind(StrEnum):
 
 
 _OFFICE_KINDS = frozenset({InputKind.XML, InputKind.DOCX, InputKind.XLSX, InputKind.PPTX})
+
+
+class _OfficeExtractor(Protocol):
+    def __call__(
+        self,
+        data: bytes,
+        *,
+        ocr: Callable[[], OcrEngine] | None = None,
+        pictures_for: Callable[[int], bool] | None = None,
+    ) -> Iterator[Page]: ...
+
+
 # Office documents with any number of pages, and the extractor of each.
-_PAGED_OFFICE: dict[InputKind, Callable[..., Iterator[Page]]] = {
+_PAGED_OFFICE: dict[InputKind, _OfficeExtractor] = {
     InputKind.DOCX: office.extract_docx,
     InputKind.XLSX: office.extract_xlsx,
     InputKind.PPTX: office.extract_pptx,

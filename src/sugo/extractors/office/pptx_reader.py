@@ -39,10 +39,10 @@ from dataclasses import dataclass, field
 
 from sugo.core.constants import (
     MAX_LIST_LEVEL,
+    OFFICE_EMU_PER_POINT,
     OFFICE_TABLE_MAX_ROWS,
     PPTX_DEFAULT_SLIDE_HEIGHT_EMU,
     PPTX_DEFAULT_SLIDE_WIDTH_EMU,
-    PPTX_EMU_PER_POINT,
     PPTX_LINE_HEIGHT,
     PPTX_MAX_COORDINATE,
     PPTX_MAX_GRID_CELLS,
@@ -61,9 +61,10 @@ from sugo.extractors.office.package import (
     SAFE_LINK,
     LaidOut,
     Package,
+    Picture,
     Relationship,
     chosen_content,
-    embedded_image,
+    pictures_in,
 )
 from sugo.extractors.office.xml_reader import Element, Refusal, local_name
 from sugo.extractors.reading_order import text_rows, xy_cut
@@ -325,7 +326,7 @@ class _Pending:
     table: Table | None = None
     bbox: BBox | None = None
     # The part of a picture marked not converted, for OCR in Sugo's process.
-    image: str | None = None
+    image: Picture | None = None
 
 
 @dataclass
@@ -530,8 +531,8 @@ class _Deck:
         )
         page = Page(
             index=index,
-            width=self._width / PPTX_EMU_PER_POINT,
-            height=self._height / PPTX_EMU_PER_POINT,
+            width=self._width / OFFICE_EMU_PER_POINT,
+            height=self._height / OFFICE_EMU_PER_POINT,
             origin=PageOrigin.NATIVE,
             blocks=blocks,
         )
@@ -570,8 +571,17 @@ class _Deck:
                 info = _child(shape, _P, "nvPicPr")
                 box = _offset_extent(_path(shape, (_P, "spPr"), (_A, "xfrm")))
                 fill = _child(shape, _P, "blipFill")
-                part = None if fill is None else embedded_image(fill, slide.rels, self._package)
-                image = _Pending(BlockType.IMAGE, flags=(BlockFlag.ILLEGIBLE,), image=part)
+                shown = None if box is None else mapping.box(box).height / OFFICE_EMU_PER_POINT
+                if shown is not None and not (math.isfinite(shown) and shown > 0):
+                    shown = None
+                found = (
+                    []
+                    if fill is None
+                    else pictures_in(fill, slide.rels, self._package, height=shown)
+                )
+                image = _Pending(
+                    BlockType.IMAGE, flags=(BlockFlag.ILLEGIBLE,), image=found[0] if found else None
+                )
                 _place(slide, [image], box, mapping, hidden=hidden or _marked_hidden(info))
 
     def _shape(self, slide: _Slide, shape: Element, mapping: _Map, *, hidden: bool) -> None:

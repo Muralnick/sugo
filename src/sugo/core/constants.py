@@ -349,6 +349,9 @@ OFFICE_UNDERSTOOD_NAMESPACES: Final = frozenset(
 # this many pixels on both sides is decoration (a bullet, a rule, an icon).
 OFFICE_MAX_PICTURES: Final = 200
 OFFICE_DECORATION_PIXELS: Final = 32
+# Text a picture shows smaller than this, in points, cannot be read on the
+# page: hidden, as for text in a document (DOCX_MIN_VISIBLE_HALF_POINTS).
+OFFICE_MIN_VISIBLE_POINTS: Final = 2.0
 
 # Text under this size, in half-points (2 pt), cannot be read on the page.
 DOCX_MIN_VISIBLE_HALF_POINTS: Final = 4
@@ -368,9 +371,9 @@ XLSX_MAX_SHEET_TEXT: Final = 16_000_000
 XLSX_MAX_ROWS: Final = 1_048_576
 XLSX_MAX_COLUMNS: Final = 16_384
 
-# Slide positions are in EMU: 12 700 to a point. A presentation that gives no
-# slide size gets PowerPoint's 16:9 default, 13.333 by 7.5 inches.
-PPTX_EMU_PER_POINT: Final = 12_700
+# Office positions and sizes are in EMU: 12 700 to a point. A presentation
+# that gives no slide size gets PowerPoint's 16:9 default, 13.333 by 7.5 inches.
+OFFICE_EMU_PER_POINT: Final = 12_700
 PPTX_DEFAULT_SLIDE_WIDTH_EMU: Final = 12_192_000
 PPTX_DEFAULT_SLIDE_HEIGHT_EMU: Final = 6_858_000
 # Coordinates beyond the standard's range (ST_Coordinate, about 27 million

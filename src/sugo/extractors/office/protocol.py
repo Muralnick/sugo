@@ -17,6 +17,7 @@ from sugo.extractors.worker import ProtocolError
 _MAX_PAGES = 100_000
 
 PageIndex = Annotated[int, Field(ge=0, lt=_MAX_PAGES)]
+Share = Annotated[float, Field(ge=0.0, le=1.0)]
 # Longer than any part name a ZIP entry in a package can reasonably have.
 _MAX_PART_NAME = 1024
 
@@ -47,6 +48,9 @@ class ImageRef(_Model):
 
     block: NonEmptyStr
     part: Annotated[str, Field(min_length=1, max_length=_MAX_PART_NAME)]
+    # Shares cut off the left, top, right and bottom, and the height shown, in points.
+    crop: tuple[Share, Share, Share, Share] = (0.0, 0.0, 0.0, 0.0)
+    height: Annotated[float, Field(gt=0, allow_inf_nan=False)] | None = None
 
 
 class PageRead(_Model):
