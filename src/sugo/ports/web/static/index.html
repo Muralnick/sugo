@@ -4,67 +4,149 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta name="sugo-texts" content="$texts">
+<meta name="sugo-data" content="$data">
 <title>Sugo</title>
 <link rel="stylesheet" href="/app.css">
 <script src="/app.js" defer></script>
 </head>
 <body>
-<main>
-  <header>
-    <h1>Sugo</h1>
-    <p data-text="tagline"></p>
-  </header>
-
-  <section id="drop" class="drop">
-    <p class="drop-title" data-text="drop"></p>
-    <label class="button">
-      <span data-text="choose"></span>
-      <input id="file" type="file" accept=".pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,.webp,.xml">
-    </label>
-    <p class="muted" data-text="formats"></p>
-  </section>
-
-  <p id="status" class="status" role="status" aria-live="polite"></p>
-
-  <section id="error" class="error" role="alert" hidden>
-    <p><strong id="error-code"></strong> <span id="error-message"></span></p>
-    <p id="error-hint" class="muted"></p>
-  </section>
-
-  <section id="result" hidden>
-    <div class="result-head">
-      <h2 data-text="markdown"></h2>
-      <div class="actions">
-        <button id="copy" type="button" data-text="copy"></button>
-        <button id="save" type="button" data-text="save"></button>
-      </div>
+<header class="bar">
+  <div class="bar-inner">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <span class="brand-name">Sugo</span>
     </div>
-    <p id="pages" class="muted"></p>
-    <p id="failed" class="warning" hidden></p>
-    <textarea id="markdown" readonly spellcheck="false"></textarea>
+    <nav class="tabs" role="tablist">
+      <button type="button" role="tab" id="tab-convert" aria-controls="view-convert" data-view="convert" data-text="tab_convert"></button>
+      <button type="button" role="tab" id="tab-settings" aria-controls="view-settings" data-view="settings" data-text="tab_settings"></button>
+      <button type="button" role="tab" id="tab-questions" aria-controls="view-questions" data-view="questions" data-text="tab_questions"></button>
+    </nav>
+  </div>
+</header>
 
-    <h2 data-text="tokens"></h2>
-    <p id="text-savings"></p>
-    <table id="images" hidden>
-      <caption data-text="images_title"></caption>
-      <thead>
-        <tr>
-          <th data-text="provider"></th>
-          <th data-text="tier"></th>
-          <th class="number" data-text="image_tokens"></th>
-          <th class="number" data-text="markdown_tokens"></th>
-          <th class="number" data-text="saved"></th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+<main>
+  <section id="view-convert" class="view" role="tabpanel" aria-labelledby="tab-convert">
+    <p class="tagline" data-text="tagline"></p>
 
-    <h2 data-text="removed_title"></h2>
-    <ul id="removed"></ul>
+    <div id="drop" class="drop">
+      <div class="drop-icon" aria-hidden="true"></div>
+      <p class="drop-title" data-text="drop"></p>
+      <label class="button primary">
+        <span data-text="choose"></span>
+        <input id="file" type="file" accept=".pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,.webp,.xml">
+      </label>
+      <p class="muted small" data-text="formats"></p>
+      <p id="file-name" class="file-name"></p>
+    </div>
+
+    <div id="status" class="status" role="status" aria-live="polite">
+      <span class="spinner" aria-hidden="true"></span>
+      <span id="status-text"></span>
+    </div>
+
+    <section id="error" class="error" role="alert" hidden>
+      <p><strong id="error-code"></strong> <span id="error-message"></span></p>
+      <p id="error-hint" class="muted"></p>
+    </section>
+
+    <section id="result" hidden>
+      <div class="cards">
+        <div class="card"><span class="card-label" data-text="tokens_before"></span><span id="card-before" class="card-value"></span></div>
+        <div class="card"><span class="card-label" data-text="tokens_after"></span><span id="card-after" class="card-value"></span></div>
+        <div class="card accent"><span class="card-label" data-text="tokens_saved"></span><span id="card-saved" class="card-value"></span></div>
+        <div class="card"><span class="card-label" data-text="pages_label"></span><span id="card-pages" class="card-value"></span></div>
+      </div>
+      <div class="meter" aria-hidden="true"><div id="meter-after" class="meter-after"></div></div>
+      <p id="text-savings" class="muted small"></p>
+      <p id="failed" class="warning" hidden></p>
+
+      <div class="columns">
+        <div class="panel markdown-panel">
+          <div class="panel-head">
+            <h2 data-text="markdown"></h2>
+            <div class="actions">
+              <button id="copy" type="button" data-text="copy"></button>
+              <button id="save" type="button" data-text="save"></button>
+            </div>
+          </div>
+          <textarea id="markdown" readonly spellcheck="false"></textarea>
+        </div>
+
+        <div class="side">
+          <div class="panel">
+            <h2 data-text="removed_title"></h2>
+            <ul id="removed" class="removed"></ul>
+          </div>
+          <div id="images-panel" class="panel" hidden>
+            <h2 data-text="images_title"></h2>
+            <table id="images">
+              <thead>
+                <tr>
+                  <th data-text="provider"></th>
+                  <th data-text="tier"></th>
+                  <th class="number" data-text="image_tokens"></th>
+                  <th class="number" data-text="markdown_tokens"></th>
+                  <th class="number" data-text="saved"></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="chunks-panel" class="panel" hidden>
+        <div class="panel-head">
+          <h2 data-text="chunks_title"></h2>
+          <button id="save-jsonl" type="button" data-text="save_jsonl"></button>
+        </div>
+        <p id="chunks-count" class="muted small"></p>
+        <ol id="chunks" class="chunks"></ol>
+      </div>
+    </section>
   </section>
 
-  <footer class="muted" data-text="local_only"></footer>
+  <section id="view-settings" class="view" role="tabpanel" aria-labelledby="tab-settings" hidden>
+    <p class="muted" data-text="settings_intro"></p>
+    <div class="panel settings">
+      <label class="field">
+        <span class="field-label" data-text="ui_language"></span>
+        <select id="ui-language">
+          <option value="it" data-text="lang_it"></option>
+          <option value="en" data-text="lang_en"></option>
+        </select>
+      </label>
+
+      <fieldset class="field">
+        <legend class="field-label" data-text="text_languages"></legend>
+        <div id="text-languages" class="checks"></div>
+        <p class="muted small" data-text="text_languages_help"></p>
+      </fieldset>
+
+      <label class="check">
+        <input id="strip-tracking" type="checkbox">
+        <span data-text="strip_tracking"></span>
+      </label>
+
+      <label class="check">
+        <input id="make-chunks" type="checkbox">
+        <span data-text="make_chunks"></span>
+      </label>
+
+      <label class="field">
+        <span class="field-label" data-text="chunk_size"></span>
+        <input id="chunk-tokens" type="number" step="1" inputmode="numeric">
+      </label>
+
+      <button id="reset" type="button" data-text="reset"></button>
+    </div>
+  </section>
+
+  <section id="view-questions" class="view" role="tabpanel" aria-labelledby="tab-questions" hidden>
+    <div id="questions" class="questions"></div>
+  </section>
+
+  <footer class="muted small" data-text="local_only"></footer>
 </main>
 </body>
 </html>

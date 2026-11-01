@@ -17,13 +17,24 @@ from typing import Any
 
 import pytest
 
-from sugo.config.settings import Settings
+from sugo import i18n
+from sugo.config.settings import Chunking, General, Settings
 from sugo.core.constants import MAX_INPUT_BYTES, WEB_TOKEN_BYTES
 from sugo.core.pipeline import InputUnsupportedError
 from sugo.ports.cli.translation import use_language
 from sugo.ports.web import server as web_server
 from sugo.ports.web.page import render_page
-from sugo.ports.web.server import CONVERT_PATH, TOKEN_HEADER, WebServer, converter
+from sugo.ports.web.server import (
+    CHUNKS_HEADER,
+    CONVERT_PATH,
+    LANGUAGE_HEADER,
+    LANGUAGES_HEADER,
+    TOKEN_HEADER,
+    TRACKING_HEADER,
+    Options,
+    WebServer,
+    converter,
+)
 from sugo.storage.paths import CACHE_DIR_ENV
 
 STATIC = Path(web_server.__file__).parent / "static"
@@ -46,13 +57,15 @@ class Recorder:
 
     def __init__(self) -> None:
         self.calls: list[bytes] = []
+        self.options: list[Options] = []
         self.release = threading.Event()
         self.release.set()
         self.started = threading.Event()
         self.raises: Exception | None = None
 
-    def __call__(self, data: bytes) -> dict[str, Any]:
+    def __call__(self, data: bytes, options: Options) -> dict[str, Any]:
         self.calls.append(data)
+        self.options.append(options)
         self.started.set()
         assert self.release.wait(10)
         if self.raises is not None:
@@ -60,8 +73,10 @@ class Recorder:
         return {"markdown": "# Title", "size": len(data)}
 
 
-def running(convert: Callable[[bytes], dict[str, Any]]) -> Iterator[WebServer]:
-    server = WebServer(convert)
+def running(
+    convert: Callable[[bytes, Options], dict[str, Any]], settings: Settings | None = None
+) -> Iterator[WebServer]:
+    server = WebServer(convert, settings or Settings())
     thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05})
     thread.start()
     try:
@@ -151,7 +166,7 @@ def assert_refused(response: Response, status: int) -> None:
 
 
 def test_the_server_listens_on_loopback_with_a_fresh_token(recorder: Recorder) -> None:
-    first, second = WebServer(recorder), WebServer(recorder)
+    first, second = WebServer(recorder, Settings()), WebServer(recorder, Settings())
     try:
         assert first.server_address[0] == "127.0.0.1"
         assert first.port != 0
@@ -205,16 +220,40 @@ def test_the_script_never_inserts_html() -> None:
     assert "new Function" not in script
 
 
-def test_texts_reach_the_page_escaped_and_translated() -> None:
-    use_language("it")
-    page = render_page().decode("utf-8")
-    assert '<html lang="it">' in page
-    match = re.search(r'<meta name="sugo-texts" content="([^"]*)">', page)
+def page_data(page: bytes) -> Any:
+    match = re.search(r'<meta name="sugo-data" content="([^"]*)">', page.decode("utf-8"))
     assert match is not None
-    texts = json.loads(unescape(match.group(1)))
-    assert texts["choose"] == "Scegli un file"
-    assert texts["max_bytes"] == MAX_INPUT_BYTES
-    assert "{size}" not in texts["formats"]
+    return json.loads(unescape(match.group(1)))
+
+
+def test_texts_reach_the_page_escaped_in_every_language() -> None:
+    use_language("it")
+    page = render_page(Settings())
+    assert b'<html lang="it">' in page
+    data = page_data(page)
+    assert data["language"] == "it"
+    assert data["texts"]["it"]["choose"] == "Scegli un file"
+    assert data["texts"]["en"]["choose"] == "Choose a file"
+    assert data["max_bytes"] == MAX_INPUT_BYTES
+    for texts in data["texts"].values():
+        assert "{large}" not in texts["formats"]
+        assert "{min}" not in texts["chunk_size"]
+        assert len(texts["questions"]) >= 5
+        assert all(question and answer for question, answer in texts["questions"])
+        assert all("{" not in answer for _, answer in texts["questions"])
+
+
+def test_the_page_starts_from_the_users_configuration() -> None:
+    settings = Settings(general=General(languages=("de", "it")), chunking=Chunking(max_tokens=256))
+    data = page_data(render_page(settings))
+    assert data["defaults"] == {
+        "ui_language": "en",
+        "languages": ["de", "it"],
+        "strip_tracking_urls": True,
+        "chunks": False,
+        "chunk_tokens": 256,
+    }
+    assert data["packs"] == ["de", "en", "es", "fr", "it"]
 
 
 # --- Host, Origin and token ----------------------------------------------------------
@@ -476,6 +515,65 @@ def test_a_trickled_upload_is_dropped_at_the_deadline(
     assert upload(server).status == 200
 
 
+# --- The page's settings ------------------------------------------------------------
+
+
+def test_without_settings_the_configuration_applies(server: WebServer, recorder: Recorder) -> None:
+    assert upload(server).status == 200
+    assert recorder.options == [
+        Options(language="en", languages=("en",), strip_tracking_urls=True, chunk_tokens=None)
+    ]
+
+
+def test_the_page_settings_reach_the_conversion(server: WebServer, recorder: Recorder) -> None:
+    body = b"%PDF"
+    headers = [
+        *api_headers(server, body),
+        (LANGUAGE_HEADER, "it"),
+        (LANGUAGES_HEADER, "it,fr,it"),
+        (TRACKING_HEADER, "false"),
+        (CHUNKS_HEADER, "256"),
+    ]
+    assert request(server, "POST", CONVERT_PATH, headers=headers, body=body).status == 200
+    assert recorder.options == [
+        Options(language="it", languages=("fr", "it"), strip_tracking_urls=False, chunk_tokens=256)
+    ]
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        (LANGUAGE_HEADER, "fr"),
+        (LANGUAGE_HEADER, ""),
+        (LANGUAGES_HEADER, ""),
+        (LANGUAGES_HEADER, "it,,en"),
+        (LANGUAGES_HEADER, "xx"),
+        (LANGUAGES_HEADER, "it, en"),
+        (TRACKING_HEADER, "yes"),
+        (TRACKING_HEADER, "True"),
+        (CHUNKS_HEADER, "31"),
+        (CHUNKS_HEADER, "8193"),
+        (CHUNKS_HEADER, "-64"),
+        (CHUNKS_HEADER, "9" * 5_000),
+        (CHUNKS_HEADER, "abc"),
+    ],
+)
+def test_an_unknown_setting_is_refused(
+    server: WebServer, recorder: Recorder, name: str, value: str
+) -> None:
+    body = b"%PDF"
+    headers = [*api_headers(server, body), (name, value)]
+    assert_refused(request(server, "POST", CONVERT_PATH, headers=headers, body=body), 400)
+    assert recorder.calls == []
+
+
+def test_a_repeated_setting_is_refused(server: WebServer, recorder: Recorder) -> None:
+    body = b"%PDF"
+    headers = [*api_headers(server, body), (LANGUAGE_HEADER, "it"), (LANGUAGE_HEADER, "en")]
+    assert_refused(request(server, "POST", CONVERT_PATH, headers=headers, body=body), 400)
+    assert recorder.calls == []
+
+
 # --- One conversion at a time -------------------------------------------------------
 
 
@@ -558,3 +656,34 @@ def test_a_refused_document_end_to_end(tmp_path: Path, monkeypatch: pytest.Monke
         response = upload(server, b"just some plain text")
     assert response.status == 422
     assert response.json()["error"]["code"] == "INPUT_UNSUPPORTED"
+
+
+def test_messages_follow_the_page_language(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(CACHE_DIR_ENV, str(tmp_path / "cache"))
+    body = b"just some plain text"
+    for server in running(converter(Settings())):
+        headers = [*api_headers(server, body), (LANGUAGE_HEADER, "it")]
+        response = request(server, "POST", CONVERT_PATH, headers=headers, body=body)
+    error = response.json()["error"]
+    assert error["code"] == "INPUT_UNSUPPORTED"
+    assert error["hint"].startswith("Sugo legge file PDF")
+    # The process goes back to its own language afterwards.
+    assert i18n.active_language() == "en"
+
+
+def test_chunks_are_made_when_asked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(CACHE_DIR_ENV, str(tmp_path / "cache"))
+    rows = "".join(
+        f"<item><name>Item {n}</name><note>Line {n} of the list.</note></item>" for n in range(200)
+    )
+    document = f"<catalog>{rows}</catalog>".encode()
+    for server in running(converter(Settings())):
+        headers = [*api_headers(server, document), (CHUNKS_HEADER, "64")]
+        response = request(server, "POST", CONVERT_PATH, headers=headers, body=document)
+        plain = upload(server, document)
+    result = response.json()
+    assert result["chunk_tokens"] == 64
+    assert len(result["chunks"]) > 1
+    lines = result["jsonl"].splitlines()
+    assert [json.loads(line)["text"] for line in lines] == [c["text"] for c in result["chunks"]]
+    assert "chunks" not in plain.json()

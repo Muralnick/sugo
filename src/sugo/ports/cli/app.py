@@ -573,7 +573,7 @@ def ui_command(
 
         # Ctrl+C is the normal way to stop, even while the browser is opening.
         try:
-            with WebServer(converter(settings)) as server:
+            with WebServer(converter(settings), settings) as server:
                 if no_browser:
                     _write(server.url + "\n")
                 else:

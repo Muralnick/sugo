@@ -7,7 +7,9 @@ the server's own ``Origin`` and carry the session token in ``X-Sugo-Token``,
 compared in constant time: the token reaches the page only in the URL
 fragment, and a custom header forces a CORS preflight, which the server never
 answers with CORS headers. Uploads need a ``Content-Length`` within the size
-limits, checked before reading; one conversion runs at a time.
+limits, checked before reading; one conversion runs at a time. The page's
+settings come as one header each, checked against the known values; the
+server keeps nothing between conversions and writes nothing to disk.
 
 Every refusal is ``WEB_REQUEST_REFUSED``, with one message whatever the
 check. The access log is off; failures are logged by exception type only,
@@ -25,22 +27,25 @@ import threading
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from sugo import i18n
+from sugo.config.settings import Settings
 from sugo.core.constants import (
+    CHUNK_MAX_TOKENS_LIMIT,
+    CHUNK_MIN_TOKENS,
     MAX_INPUT_BYTES,
     WEB_SOCKET_TIMEOUT_S,
     WEB_TOKEN_BYTES,
     WEB_UPLOAD_TIMEOUT_S,
 )
+from sugo.languages.packs import PACKS
 from sugo.ports.cache import page_cache
 from sugo.ports.errors import PortError, from_exception, web_request_refused
 from sugo.ports.web.page import render_page, static_file
-
-if TYPE_CHECKING:
-    from sugo.config.settings import Settings
 
 _log = logging.getLogger(__name__)
 
@@ -66,8 +71,29 @@ _SECURITY_HEADERS = (
     ("Cross-Origin-Resource-Policy", "same-origin"),
 )
 
+# The page's settings, one header each (ADR-055).
+LANGUAGE_HEADER = "X-Sugo-Language"
+LANGUAGES_HEADER = "X-Sugo-Languages"
+TRACKING_HEADER = "X-Sugo-Strip-Tracking"
+CHUNKS_HEADER = "X-Sugo-Chunk-Tokens"
+_BOOLEANS = {"true": True, "false": False}
+
+
+@dataclass(frozen=True)
+class Options:
+    """How to convert one upload: the user's configuration, changed by the page."""
+
+    # Interface language of the messages in the answer.
+    language: str
+    # Language packs whose text rules apply.
+    languages: tuple[str, ...]
+    strip_tracking_urls: bool
+    # Chunk size in tokens; None makes no chunks.
+    chunk_tokens: int | None
+
+
 # Turns a file's bytes into the JSON the page shows.
-Converter = Callable[[bytes], dict[str, Any]]
+Converter = Callable[[bytes, Options], dict[str, Any]]
 
 
 class _Refused(Exception):  # noqa: N818 - a signal, not an error the user sees
@@ -85,9 +111,10 @@ class WebServer(ThreadingHTTPServer):
     # On Windows, SO_REUSEADDR would let another program bind the same port.
     allow_reuse_address = False
 
-    def __init__(self, converter: Converter) -> None:
+    def __init__(self, converter: Converter, settings: Settings) -> None:
         super().__init__((LOOPBACK, 0), _Handler)
         self.converter = converter
+        self.settings = settings
         self.token = secrets.token_urlsafe(WEB_TOKEN_BYTES)
         port = self.server_address[1]
         self.port = port
@@ -143,7 +170,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._refuse(refused.status)
             return
         if self.path == "/":
-            self._send(HTTPStatus.OK, render_page(), "text/html; charset=utf-8")
+            page = render_page(self.server.settings)
+            self._send(HTTPStatus.OK, page, "text/html; charset=utf-8")
             return
         found = static_file(self.path)
         if found is None:
@@ -160,13 +188,15 @@ class _Handler(BaseHTTPRequestHandler):
                 return
             self._check_origin_and_token()
             length = self._content_length()
+            options = self._options()
             with self._one_at_a_time(length):
                 data = self._read_body(length)
                 if data is None:
                     # The client stopped sending: nothing to answer.
                     self.close_connection = True
                     return
-                self._convert(data)
+                with _speaking(options.language):
+                    self._convert(data, options)
         except _Refused as refused:
             self._refuse(refused.status)
 
@@ -204,6 +234,51 @@ class _Handler(BaseHTTPRequestHandler):
             raise _Refused(HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
         return length
 
+    def _options(self) -> Options:
+        """The page's settings; a header that is repeated or holds an unknown value is refused."""
+        settings = self.server.settings
+        language = self._single(LANGUAGE_HEADER)
+        if language is None:
+            language = i18n.active_language()
+        elif language not in i18n.LANGUAGES:
+            raise _Refused(HTTPStatus.BAD_REQUEST)
+        named = self._single(LANGUAGES_HEADER)
+        if named is None:
+            languages = settings.languages
+        else:
+            codes = named.split(",")
+            if not codes or any(code not in PACKS for code in codes):
+                raise _Refused(HTTPStatus.BAD_REQUEST)
+            languages = tuple(sorted(set(codes)))
+        tracking = self._single(TRACKING_HEADER)
+        if tracking is not None and tracking not in _BOOLEANS:
+            raise _Refused(HTTPStatus.BAD_REQUEST)
+        size = self._single(CHUNKS_HEADER)
+        chunk_tokens = None
+        if size is not None:
+            if not (
+                size.isascii() and size.isdigit() and len(size) <= len(str(CHUNK_MAX_TOKENS_LIMIT))
+            ):
+                raise _Refused(HTTPStatus.BAD_REQUEST)
+            chunk_tokens = int(size)
+            if not CHUNK_MIN_TOKENS <= chunk_tokens <= CHUNK_MAX_TOKENS_LIMIT:
+                raise _Refused(HTTPStatus.BAD_REQUEST)
+        return Options(
+            language=language,
+            languages=languages,
+            strip_tracking_urls=(
+                settings.cleaning.strip_tracking_urls if tracking is None else _BOOLEANS[tracking]
+            ),
+            chunk_tokens=chunk_tokens,
+        )
+
+    def _single(self, name: str) -> str | None:
+        """A header sent at most once, or None if absent."""
+        values = self.headers.get_all(name) or []
+        if len(values) > 1:
+            raise _Refused(HTTPStatus.BAD_REQUEST)
+        return values[0] if values else None
+
     @contextmanager
     def _one_at_a_time(self, length: int) -> Iterator[None]:
         if not self.server.busy.acquire(blocking=False):
@@ -236,9 +311,9 @@ class _Handler(BaseHTTPRequestHandler):
             remaining -= len(part)
         return b"".join(parts)
 
-    def _convert(self, data: bytes) -> None:
+    def _convert(self, data: bytes, options: Options) -> None:
         try:
-            result = self.server.converter(data)
+            result = self.server.converter(data, options)
         except Exception as error:  # noqa: BLE001 - the server outlives a failing file
             failure = error if isinstance(error, PortError) else from_exception(error)
             if failure is None:
@@ -268,12 +343,13 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
-def converter(settings: "Settings") -> Converter:
-    """Convert uploads with the user's settings, measuring tokens per provider."""
+def converter(settings: Settings) -> Converter:
+    """Convert uploads with the page's options, measuring tokens per provider."""
 
-    def convert(data: bytes) -> dict[str, Any]:
+    def convert(data: bytes, options: Options) -> dict[str, Any]:
         from sugo.core import pipeline
         from sugo.core.estimate import estimate_json, estimate_savings
+        from sugo.exporters.jsonl import jsonl_lines
         from sugo.metrics.providers import list_providers
 
         with page_cache(enabled=settings.storage.cache == "persistent") as cache:
@@ -281,16 +357,42 @@ def converter(settings: "Settings") -> Converter:
                 data,
                 cache=cache,
                 count_raw_tokens=True,
-                languages=settings.languages,
-                strip_tracking_urls=settings.cleaning.strip_tracking_urls,
+                max_chunk_tokens=options.chunk_tokens,
+                languages=options.languages,
+                strip_tracking_urls=options.strip_tracking_urls,
             )
         estimate = estimate_savings(data, conversion, list_providers())
         # Kind, pages and token counts come from the estimate.
-        return {
+        result: dict[str, Any] = {
             **estimate_json(estimate),
             "failed_pages": list(conversion.failed_pages),
             "markdown": conversion.markdown,
             "removed": dict(conversion.removed),
         }
+        if options.chunk_tokens is not None:
+            result["chunk_tokens"] = options.chunk_tokens
+            result["chunks"] = [
+                {
+                    "text": chunk.text,
+                    "tokens": chunk.tokens,
+                    "heading_path": list(chunk.heading_path),
+                    "pages": list(chunk.pages),
+                }
+                for chunk in conversion.chunks
+            ]
+            # The file sugo convert --chunks writes, byte for byte.
+            result["jsonl"] = "".join(jsonl_lines(conversion.chunks))
+        return result
 
     return convert
+
+
+@contextmanager
+def _speaking(language: str) -> Iterator[None]:
+    """Messages made inside are in ``language``; only one conversion runs at a time."""
+    previous = i18n.active_language()
+    i18n.activate(language)
+    try:
+        yield
+    finally:
+        i18n.activate(previous)

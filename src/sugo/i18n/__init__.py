@@ -50,6 +50,20 @@ def dngettext(domain: str, singular: str, plural: str, n: int) -> str:
     return _active.get(domain, _ENGLISH).ngettext(singular, plural, n)
 
 
+def translate(language: str, message: str) -> str:
+    """``message`` in ``language``, whatever the active language.
+
+    For text shown in several languages at once, such as the web page's;
+    it switches nothing process-wide.
+
+    Raises:
+        ValueError: If Sugo has no interface in that language.
+    """
+    if language not in LANGUAGES:
+        raise ValueError(f"no interface language {language!r}")
+    return message if language == "en" else _catalog(language, "sugo").gettext(message)
+
+
 def N_(message: str) -> str:  # noqa: N802 - the name translation tools look for
     """Mark ``message`` for translation without translating it now."""
     return message
