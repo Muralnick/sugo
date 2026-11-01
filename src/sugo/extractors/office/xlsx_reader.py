@@ -34,10 +34,8 @@ from typing import Protocol
 from defusedxml import ElementTree as DefusedElementTree  # type: ignore[import-untyped]
 
 from sugo.core.constants import (
-    OFFICE_EMU_PER_POINT,
     OFFICE_MAX_PART_ELEMENTS,
     OFFICE_TABLE_MAX_ROWS,
-    PPTX_MAX_COORDINATE,
     XLSX_MAX_CELLS,
     XLSX_MAX_COLUMNS,
     XLSX_MAX_GRID_CELLS,
@@ -47,7 +45,14 @@ from sugo.core.constants import (
     XML_MAX_DEPTH,
 )
 from sugo.core.models import Block, BlockFlag, BlockType, Page, PageOrigin, Table, TableCell
-from sugo.extractors.office.package import LaidOut, Package, Picture, pictures_in
+from sugo.extractors.office.package import (
+    LaidOut,
+    Package,
+    Picture,
+    chosen_content,
+    pictures_in,
+    shown_size,
+)
 from sugo.extractors.office.xml_reader import Element, Refusal, local_name
 from sugo.i18n import N_
 
@@ -64,6 +69,7 @@ _R = frozenset(
         "http://purl.oclc.org/ooxml/officeDocument/relationships",
     }
 )
+_MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
 _DAMAGED = N_("the Office file is damaged, or too large to read safely")
 _TOO_LARGE = N_("the Office file is too large to read safely")
 _TRUE = frozenset({"1", "true", "on"})
@@ -494,35 +500,39 @@ class _Book:
         for drawing in self._related(part, "/drawing"):
             relationships = self._package.relationships(drawing)
             for anchor in self._package.xml(drawing):
-                height = _anchor_height(anchor)
-                stack = [anchor]
+                # One-cell and absolute anchors give the size; two-cell ones do not.
+                extent = next((c for c in anchor if local_name(c.tag) == "ext"), None)
+                height, width = shown_size(extent) if extent is not None else (None, None)
+                # Each element with whether it, or a group around it, is hidden.
+                stack = [(anchor, False)]
                 while stack:
-                    element = stack.pop()
+                    element, hidden = stack.pop()
                     name = local_name(element.tag)
-                    if name in ("pic", "graphicFrame"):
-                        hidden = _drawn_hidden(element)
+                    hidden = hidden or _drawn_hidden(element)
+                    if element.tag == f"{{{_MC}}}AlternateContent":
+                        branch = chosen_content(element)
+                        children = [] if branch is None else list(branch)
+                        stack.extend((child, hidden) for child in children[::-1])
+                    elif name in ("pic", "graphicFrame"):
                         pictures: list[Picture | None] = []
                         if name == "pic":
                             pictures.extend(
-                                pictures_in(element, relationships, self._package, height=height)
+                                pictures_in(
+                                    element,
+                                    relationships,
+                                    self._package,
+                                    height=height,
+                                    width=width,
+                                )
                             )
                         found.extend((picture, hidden) for picture in pictures or [None])
                     else:
-                        stack.extend(list(element)[::-1])
+                        stack.extend((child, hidden) for child in list(element)[::-1])
         return found
 
 
-def _anchor_height(anchor: Element) -> float | None:
-    """The height a one-cell or absolute anchor gives its drawing, in points (``xdr:ext``)."""
-    size = next((child for child in anchor if local_name(child.tag) == "ext"), None)
-    height = None if size is None else _int(size.attrib.get("cy"))
-    if height is None or not 0 < height <= PPTX_MAX_COORDINATE:
-        return None
-    return height / OFFICE_EMU_PER_POINT
-
-
 def _drawn_hidden(drawn: Element) -> bool:
-    """Whether a picture or chart in a drawing is marked hidden (``cNvPr hidden``)."""
+    """Whether a picture, chart or group in a drawing is marked hidden (``cNvPr hidden``)."""
     for properties in drawn:
         if local_name(properties.tag).startswith("nv"):
             for item in properties:

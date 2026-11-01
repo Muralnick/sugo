@@ -31,9 +31,7 @@ from dataclasses import dataclass, field
 from sugo.core.constants import (
     DOCX_MIN_VISIBLE_HALF_POINTS,
     MAX_HEADING_LEVEL,
-    OFFICE_EMU_PER_POINT,
     OFFICE_TABLE_MAX_ROWS,
-    PPTX_MAX_COORDINATE,
 )
 from sugo.core.models import Block, BlockFlag, BlockType, Page, PageOrigin, Table, TableCell
 from sugo.extractors.office.package import (
@@ -44,6 +42,7 @@ from sugo.extractors.office.package import (
     Relationship,
     chosen_content,
     pictures_in,
+    shown_size,
 )
 from sugo.extractors.office.xml_reader import Element, local_name
 
@@ -533,7 +532,8 @@ class _Reader:
         """Text boxes are read and pictures kept for OCR; anything else is marked not converted."""
         boxes = list(_descendants(item, "txbxContent"))
         parts.boxes.extend((box, hidden) for box in boxes)
-        pictures = pictures_in(item, self._rels, self._package, height=_shown_height(item))
+        height, width = _shown_size(item)
+        pictures = pictures_in(item, self._rels, self._package, height=height, width=width)
         parts.figures.extend((picture, hidden) for picture in pictures)
         if not boxes and not pictures:
             parts.figures.append((None, hidden))
@@ -710,18 +710,15 @@ def _figure(part: Picture | None, *, hidden: bool) -> _Pending:
     return _Pending(BlockType.IMAGE, flags=flags, image=part)
 
 
-def _shown_height(drawing: Element) -> float | None:
-    """The height a DrawingML drawing is shown at, in points (``wp:extent``), if given."""
+def _shown_size(drawing: Element) -> tuple[float | None, float | None]:
+    """Height and width a DrawingML drawing is shown at, in points (``wp:extent``)."""
     stack = [drawing]
     while stack:
         element = stack.pop()
         if local_name(element.tag) == "extent":
-            height = _int(element.attrib.get("cy"))
-            if height is None or not 0 < height <= PPTX_MAX_COORDINATE:
-                return None
-            return height / OFFICE_EMU_PER_POINT
+            return shown_size(element)
         stack.extend(list(element)[::-1])
-    return None
+    return None, None
 
 
 def _shaded(properties: Element | None) -> bool:

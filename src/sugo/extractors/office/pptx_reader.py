@@ -35,16 +35,16 @@ parts turn out broken is reported as failed, never dropped.
 import math
 import re
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from sugo.core.constants import (
     MAX_LIST_LEVEL,
     OFFICE_EMU_PER_POINT,
+    OFFICE_MAX_COORDINATE,
     OFFICE_TABLE_MAX_ROWS,
     PPTX_DEFAULT_SLIDE_HEIGHT_EMU,
     PPTX_DEFAULT_SLIDE_WIDTH_EMU,
     PPTX_LINE_HEIGHT,
-    PPTX_MAX_COORDINATE,
     PPTX_MAX_GRID_CELLS,
 )
 from sugo.core.models import (
@@ -268,7 +268,7 @@ def _offset_extent(
         return None
     width = 0 if size is None else _int(size.attrib.get("cx")) or 0
     height = 0 if size is None else _int(size.attrib.get("cy")) or 0
-    limit = PPTX_MAX_COORDINATE + 1
+    limit = OFFICE_MAX_COORDINATE + 1
 
     def bounded(value: int) -> float:
         return float(min(max(value, -limit), limit))
@@ -370,9 +370,9 @@ class _Deck:
         size = _child(presentation, _P, "sldSz")
         width = _int(None if size is None else size.attrib.get("cx"))
         height = _int(None if size is None else size.attrib.get("cy"))
-        if not (width and 0 < width <= PPTX_MAX_COORDINATE):
+        if not (width and 0 < width <= OFFICE_MAX_COORDINATE):
             width = PPTX_DEFAULT_SLIDE_WIDTH_EMU
-        if not (height and 0 < height <= PPTX_MAX_COORDINATE):
+        if not (height and 0 < height <= OFFICE_MAX_COORDINATE):
             height = PPTX_DEFAULT_SLIDE_HEIGHT_EMU
         self._width, self._height = float(width), float(height)
         self.slides: list[str] = []
@@ -571,17 +571,9 @@ class _Deck:
                 info = _child(shape, _P, "nvPicPr")
                 box = _offset_extent(_path(shape, (_P, "spPr"), (_A, "xfrm")))
                 fill = _child(shape, _P, "blipFill")
-                shown = None if box is None else mapping.box(box).height / OFFICE_EMU_PER_POINT
-                if shown is not None and not (math.isfinite(shown) and shown > 0):
-                    shown = None
-                found = (
-                    []
-                    if fill is None
-                    else pictures_in(fill, slide.rels, self._package, height=shown)
-                )
-                image = _Pending(
-                    BlockType.IMAGE, flags=(BlockFlag.ILLEGIBLE,), image=found[0] if found else None
-                )
+                found = [] if fill is None else pictures_in(fill, slide.rels, self._package)
+                picture = None if not found else _as_shown(found[0], box, mapping, slide)
+                image = _Pending(BlockType.IMAGE, flags=(BlockFlag.ILLEGIBLE,), image=picture)
                 _place(slide, [image], box, mapping, hidden=hidden or _marked_hidden(info))
 
     def _shape(self, slide: _Slide, shape: Element, mapping: _Map, *, hidden: bool) -> None:
@@ -860,6 +852,35 @@ def _place(
     for block in blocks:
         block.bbox = bbox
     slide.placed.append(_Item(blocks, bbox))
+
+
+def _as_shown(picture: Picture, box: _Box | None, mapping: _Map, slide: _Slide) -> Picture:
+    """A picture with the size it is shown at, and the part past the slide's edges cropped.
+
+    What lies past the edges is not shown, so it counts with the part the
+    picture's own crop cuts off.
+    """
+    if box is None:
+        return picture
+    shown = mapping.box(box)
+    sizes = (shown.x, shown.y, shown.width, shown.height)
+    if not all(math.isfinite(value) for value in sizes):
+        return picture
+    left, top, right, bottom = picture.crop
+    if shown.width > 0:
+        kept = 1.0 - left - right
+        left += max(0.0, -shown.x) / shown.width * kept
+        right += max(0.0, shown.x + shown.width - slide.width) / shown.width * kept
+    if shown.height > 0:
+        kept = 1.0 - top - bottom
+        top += max(0.0, -shown.y) / shown.height * kept
+        bottom += max(0.0, shown.y + shown.height - slide.height) / shown.height * kept
+    return replace(
+        picture,
+        crop=(min(left, 1.0), min(top, 1.0), min(right, 1.0), min(bottom, 1.0)),
+        height=shown.height / OFFICE_EMU_PER_POINT,
+        width=shown.width / OFFICE_EMU_PER_POINT,
+    )
 
 
 def _in_reading_order(slide: _Slide) -> list[_Pending]:

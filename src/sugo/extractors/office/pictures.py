@@ -42,6 +42,9 @@ if TYPE_CHECKING:
 
 _log = logging.getLogger(__name__)
 _UNCROPPED = (0.0, 0.0, 0.0, 0.0)
+# OCR boxes are a few pixels loose: a line may reach this share past a crop
+# edge and still be whole.
+_EDGE = 0.02
 
 
 class Pictures:
@@ -108,7 +111,7 @@ class Pictures:
             self._read[key] = found
         if not any(item.text.strip() for item in found):
             return [block]
-        return [_placed(item, block, picture) for item in found]
+        return [piece for item in found for piece in _placed(item, block, picture)]
 
     def _bytes(self, part: str) -> bytes | None:
         """The part's bytes, within the package's limits; None if it cannot be read."""
@@ -124,39 +127,80 @@ class Pictures:
             return None
 
 
-def _placed(item: Block, block: Block, picture: Picture) -> Block:
-    """A block read from a picture, put where the picture is and flagged as a person sees it."""
-    hidden = BlockFlag.HIDDEN in block.flags or not _visible(item, picture)
-    bbox = None
-    if item.bbox is not None and block.bbox is not None and _shown(picture.crop):
-        bbox = _inside(_uncropped(item.bbox, picture.crop), block.bbox)
-    changes: dict[str, object] = {
-        "bbox": bbox,
-        "flags": (*item.flags, BlockFlag.HIDDEN) if hidden else item.flags,
-    }
-    if item.type is BlockType.HEADING:
-        # A picture's large text is not a heading of the document.
-        changes |= {"type": BlockType.PARAGRAPH, "heading_level": None}
-    return _with(item, **changes)
+def _placed(item: Block, block: Block, picture: Picture) -> list[Block]:
+    """A block read from a picture, put where the picture is and flagged as a person sees it.
+
+    Its lines are judged one by one: a paragraph partly cropped away becomes
+    a block of the lines shown and a hidden block of the others.
+    """
+    pieces = _pieces(item, picture)
+    placed = []
+    for text, box, seen in pieces:
+        hidden = BlockFlag.HIDDEN in block.flags or not seen
+        bbox = None
+        if box is not None and block.bbox is not None and _shown(picture.crop):
+            bbox = _inside(_uncropped(box, picture.crop), block.bbox)
+        changes: dict[str, object] = {
+            "bbox": bbox,
+            "flags": (*item.flags, BlockFlag.HIDDEN) if hidden else item.flags,
+        }
+        if len(pieces) > 1:
+            changes["text"] = text
+        if item.type is BlockType.HEADING:
+            # A picture's large text is not a heading of the document.
+            changes |= {"type": BlockType.PARAGRAPH, "heading_level": None}
+        placed.append(_with(item, **changes))
+    return placed
 
 
-def _visible(item: Block, picture: Picture) -> bool:
-    """Whether a person sees the block: inside the part shown, and not too small to read."""
+def _pieces(item: Block, picture: Picture) -> list[tuple[str, BBox | None, bool]]:
+    """The block's runs of lines a person sees or not, with their boxes in the picture."""
     box = item.bbox
+    if not _big_enough(picture):
+        return [(item.text, box, False)]
     if box is None:
         # Nothing to judge it by: seen only if nothing of the picture is hidden.
-        return picture.crop == _UNCROPPED and picture.height is None
+        return [(item.text, box, picture.crop == _UNCROPPED and picture.height is None)]
+    # Lines of one OCR paragraph are evenly spaced (the layout splits it at
+    # wider gaps), so each takes an equal band of the block's height.
+    lines = item.text.split("\n") if item.text else [""]
+    step = (box.y1 - box.y0) / len(lines)
+    runs: list[tuple[list[str], float, float, bool]] = []  # lines, top, bottom, seen
+    for number, line in enumerate(lines):
+        top, bottom = box.y0 + number * step, box.y0 + (number + 1) * step
+        seen = _seen(BBox(x0=box.x0, y0=top, x1=box.x1, y1=bottom), picture)
+        if runs and runs[-1][3] == seen:
+            runs[-1][0].append(line)
+            runs[-1] = (runs[-1][0], runs[-1][1], bottom, seen)
+        else:
+            runs.append(([line], top, bottom, seen))
+    return [
+        ("\n".join(run), BBox(x0=box.x0, y0=top, x1=box.x1, y1=bottom), seen)
+        for run, top, bottom, seen in runs
+    ]
+
+
+def _big_enough(picture: Picture) -> bool:
+    """Whether the picture is shown with any size: no height, or a sliver, hides it all."""
+    if picture.height is not None and picture.height <= 0:
+        return False
+    return picture.width is None or picture.width >= OFFICE_MIN_VISIBLE_POINTS
+
+
+def _seen(line: BBox, picture: Picture) -> bool:
+    """Whether a person sees one line: whole across, its middle not cropped, not too small."""
     left, top, right, bottom = picture.crop
     if not _shown(picture.crop):
         return False
-    centre_x, centre_y = (box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2
-    if not (left <= centre_x <= 1.0 - right and top <= centre_y <= 1.0 - bottom):
+    if line.x0 < left - _EDGE or line.x1 > 1.0 - right + _EDGE:
+        return False
+    middle = (line.y0 + line.y1) / 2
+    if not top <= middle <= 1.0 - bottom:
         return False
     if picture.height is None:
         return True
-    # The height of one line on the page: its share of the part shown.
-    line = (box.y1 - box.y0) / (item.text.count("\n") + 1) / (1.0 - top - bottom)
-    return line * picture.height >= OFFICE_MIN_VISIBLE_POINTS
+    # The line's height on the page: its share of the part shown.
+    return (line.y1 - line.y0) / (1.0 - top - bottom) * picture.height >= OFFICE_MIN_VISIBLE_POINTS
 
 
 def _shown(crop: tuple[float, float, float, float]) -> bool:

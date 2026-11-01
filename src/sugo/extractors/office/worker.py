@@ -67,7 +67,13 @@ def run(data: bytes, kind: str, first_page: int) -> Iterator[Message]:
         try:
             laid_out, images = page(index)
             refs = tuple(
-                ImageRef(block=block, part=image.part, crop=image.crop, height=image.height)
+                ImageRef(
+                    block=block,
+                    part=image.part,
+                    crop=image.crop,
+                    height=image.height,
+                    width=image.width,
+                )
                 for block, image in images.items()
             )
             yield PageRead(page=laid_out, images=refs)

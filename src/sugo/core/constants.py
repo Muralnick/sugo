@@ -378,7 +378,7 @@ PPTX_DEFAULT_SLIDE_WIDTH_EMU: Final = 12_192_000
 PPTX_DEFAULT_SLIDE_HEIGHT_EMU: Final = 6_858_000
 # Coordinates beyond the standard's range (ST_Coordinate, about 27 million
 # inches) are not positions: such a shape is placed as if it had none.
-PPTX_MAX_COORDINATE: Final = 27_273_042_329_600
+OFFICE_MAX_COORDINATE: Final = 27_273_042_329_600
 # Table cells written in one presentation, empty ones and those a span covers
 # included: the serializer draws every cell of the grid, so a cell spanning a
 # billion columns must not reach it. As XLSX_MAX_GRID_CELLS; PowerPoint's own

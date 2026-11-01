@@ -22,7 +22,9 @@ from typing import IO
 
 from sugo.core.constants import (
     MAX_OFFICE_FILE_BYTES,
+    OFFICE_EMU_PER_POINT,
     OFFICE_MAX_CONTENT_TYPES_BYTES,
+    OFFICE_MAX_COORDINATE,
     OFFICE_MAX_ENTRIES,
     OFFICE_MAX_PART_BYTES,
     OFFICE_MAX_PART_ELEMENTS,
@@ -86,6 +88,9 @@ _RELATIONSHIP_NAMESPACES = frozenset(
         "http://purl.oclc.org/ooxml/officeDocument/relationships",
     }
 )
+# Text bodies inside drawings: Word's text boxes and DrawingML's text, which
+# the readers lay out themselves, pictures included.
+_TEXT_BODIES = frozenset({"txbxContent", "txBody", "textbox"})
 _OFFICE_DOCUMENT = "/officeDocument"
 _CHUNK = 64 * 1024
 _ENCRYPTED_FLAG = 0x1
@@ -101,8 +106,10 @@ class Picture:
     # Shares of the image cut off on the left, top, right and bottom: what a
     # person never sees of it.
     crop: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
-    # Height it is shown at, in points; None when the reader cannot tell.
+    # Height and width it is shown at, in points; None when the reader cannot
+    # tell. Zero is a size: a picture drawn with none is not seen.
     height: float | None = None
+    width: float | None = None
 
 
 # A page as a reader lays it out, with each picture marked not converted, by
@@ -164,18 +171,27 @@ def pictures_in(
     package: "Package",
     *,
     height: float | None = None,
+    width: float | None = None,
 ) -> list["Picture"]:
     """Every picture a drawing shows from a part inside the package, in document order.
 
-    ``height`` is the height the drawing is shown at, in points, when the
-    reader knows it. Linked pictures (external relationships) are never
-    followed, so they are not listed.
+    ``height`` and ``width`` are the size the drawing is shown at, in points,
+    when the reader knows it. Linked pictures (external relationships) are
+    never followed, so they are not listed. Text boxes are left to the reader,
+    which lays out their text and pictures with their own hidden state, and
+    alternate content is read as Office reads it (``chosen_content``).
     """
     found: list[Picture] = []
     stack = [drawing]
     while stack:
         element = stack.pop()
         name = local_name(element.tag)
+        if name in _TEXT_BODIES:
+            continue
+        if element.tag == f"{{{_MC}}}AlternateContent":
+            branch = chosen_content(element)
+            stack.extend([] if branch is None else list(branch)[::-1])
+            continue
         if name == "blipFill":
             # DrawingML: a:blip names the part, a:srcRect the share cut off each side.
             blip = next((child for child in element if local_name(child.tag) == "blip"), None)
@@ -186,7 +202,7 @@ def pictures_in(
                     _share(None if crop is None else crop.attrib.get(side))
                     for side in ("l", "t", "r", "b")
                 )
-                found.append(Picture(part, _crop(left, top, right, bottom), height))
+                found.append(Picture(part, _crop(left, top, right, bottom), height, width))
             continue
         if name == "imagedata":
             # VML, in older documents and in fallbacks: v:imagedata and its crop attributes.
@@ -196,9 +212,30 @@ def pictures_in(
                     _vml_share(element.attrib.get(side))
                     for side in ("cropleft", "croptop", "cropright", "cropbottom")
                 )
-                found.append(Picture(part, _crop(left, top, right, bottom), height))
+                found.append(Picture(part, _crop(left, top, right, bottom), height, width))
         stack.extend(list(element)[::-1])
     return found
+
+
+def shown_size(extent: Element | None) -> tuple[float | None, float | None]:
+    """Height and width, in points, of an extent element (``cx``, ``cy`` in EMU).
+
+    A missing or unreadable value is unknown (None); zero or less is no size,
+    a drawing nobody sees; a value past the standard's range is that range.
+    """
+
+    def points(value: str | None) -> float | None:
+        try:
+            emu = None if value is None else int(value)
+        except ValueError:
+            return None
+        if emu is None:
+            return None
+        return min(max(emu, 0), OFFICE_MAX_COORDINATE) / OFFICE_EMU_PER_POINT
+
+    if extent is None:
+        return None, None
+    return points(extent.attrib.get("cy")), points(extent.attrib.get("cx"))
 
 
 def _target(

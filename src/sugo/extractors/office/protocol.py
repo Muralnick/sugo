@@ -48,9 +48,10 @@ class ImageRef(_Model):
 
     block: NonEmptyStr
     part: Annotated[str, Field(min_length=1, max_length=_MAX_PART_NAME)]
-    # Shares cut off the left, top, right and bottom, and the height shown, in points.
+    # Shares cut off the left, top, right and bottom, and the size shown, in points.
     crop: tuple[Share, Share, Share, Share] = (0.0, 0.0, 0.0, 0.0)
-    height: Annotated[float, Field(gt=0, allow_inf_nan=False)] | None = None
+    height: Annotated[float, Field(ge=0, allow_inf_nan=False)] | None = None
+    width: Annotated[float, Field(ge=0, allow_inf_nan=False)] | None = None
 
 
 class PageRead(_Model):
