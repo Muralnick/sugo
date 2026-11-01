@@ -402,6 +402,21 @@ def test_an_oversized_upload_is_refused_before_it_is_read(
     assert recorder.calls == []
 
 
+@pytest.mark.parametrize("length", ["9" * 5_000, "1" + "0" * 30, "0" * 50 + "4"])
+def test_a_huge_content_length_is_refused_as_too_large(
+    server: WebServer, recorder: Recorder, length: str
+) -> None:
+    headers = replaced(api_headers(server, b""), "Content-Length", length)
+    raw_headers = "".join(f"{name}: {value}\r\n" for name, value in headers)
+    raw = f"POST {CONVERT_PATH} HTTP/1.1\r\nHost: 127.0.0.1:{server.port}\r\n{raw_headers}\r\n"
+    response = exchange(server, raw.encode() + (b"%PDF" if length.endswith("4") else b""))
+    if length.endswith("4"):
+        assert response.status == 200  # Leading zeros are still a small number.
+    else:
+        assert_refused(response, 413)
+        assert recorder.calls == []
+
+
 def test_an_upload_at_the_limit_is_accepted(
     server: WebServer, recorder: Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -425,6 +440,38 @@ def test_a_stalled_upload_is_dropped_and_frees_the_server(
         while chunk := connection.recv(65536):
             response_bytes += chunk
     assert response_bytes == b""
+    assert recorder.calls == []
+    assert upload(server).status == 200
+
+
+def test_a_trickled_upload_is_dropped_at_the_deadline(
+    server: WebServer, recorder: Recorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(web_server, "WEB_UPLOAD_TIMEOUT_S", 0.5)
+    headers = replaced(api_headers(server, b""), "Content-Length", "100")
+    raw_headers = "".join(f"{name}: {value}\r\n" for name, value in headers)
+    raw = f"POST {CONVERT_PATH} HTTP/1.1\r\nHost: 127.0.0.1:{server.port}\r\n{raw_headers}\r\n"
+    # One byte every 0.2 s: each wait is short, the whole upload too long.
+    with socket.create_connection(("127.0.0.1", server.port), timeout=5) as connection:
+        connection.sendall(raw.encode())
+        stop = threading.Event()
+        closed = False
+        for _ in range(20):
+            try:
+                connection.sendall(b"x")
+            except OSError:
+                closed = True
+                break
+            if stop.wait(0.2):
+                break
+            connection.settimeout(0.01)
+            try:
+                if connection.recv(1) == b"":
+                    closed = True
+                    break
+            except TimeoutError:
+                pass
+    assert closed
     assert recorder.calls == []
     assert upload(server).status == 200
 
@@ -501,7 +548,7 @@ def test_a_document_is_converted_end_to_end(
     assert result["pages"] == 1
     # The payload stays text inside a JSON string; the page shows it with textContent.
     assert payload in result["markdown"]
-    assert result["tokens"] > 0
+    assert result["text"]["result_tokens"] > 0
     assert set(result) >= {"text", "images", "rejected_by", "removed", "failed_pages"}
 
 

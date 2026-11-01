@@ -13,8 +13,16 @@ from importlib import resources
 from string import Template
 
 from sugo import i18n
-from sugo.core.constants import MAX_INPUT_BYTES
+from sugo.core.constants import (
+    MAX_IMAGE_FILE_BYTES,
+    MAX_INPUT_BYTES,
+    MAX_OFFICE_FILE_BYTES,
+    MAX_PDF_FILE_BYTES,
+    MAX_XML_FILE_BYTES,
+)
 from sugo.i18n import N_
+
+_MB = 1024 * 1024
 
 # Files served as they are, by URL path: (file name, media type).
 STATIC = {
@@ -28,7 +36,9 @@ _TEXTS = {
     "tagline": N_("Documents, reduced: drop a file to get its compact Markdown."),
     "drop": N_("Drop a file here"),
     "choose": N_("Choose a file"),
-    "formats": N_("PDF, DOCX, XLSX, PPTX, PNG, JPEG, WEBP or XML, up to {size} MB."),
+    "formats": N_(
+        "PDF, DOCX, XLSX or PPTX up to {large} MB; PNG, JPEG, WEBP or XML up to {small} MB."
+    ),
     "too_large": N_("This file is larger than {size} MB."),
     "empty": N_("This file is empty."),
     "converting": N_("Converting…"),
@@ -63,9 +73,12 @@ _TEXTS = {
 
 def render_page() -> bytes:
     """The page in the interface language."""
-    size = MAX_INPUT_BYTES // (1024 * 1024)
+    size = MAX_INPUT_BYTES // _MB
     texts = {key: i18n.gettext(text) for key, text in _TEXTS.items()}
-    texts["formats"] = texts["formats"].format(size=size)
+    texts["formats"] = texts["formats"].format(
+        large=max(MAX_PDF_FILE_BYTES, MAX_OFFICE_FILE_BYTES) // _MB,
+        small=max(MAX_IMAGE_FILE_BYTES, MAX_XML_FILE_BYTES) // _MB,
+    )
     texts["too_large"] = texts["too_large"].format(size=size)
     page = Template(_resource("index.html").decode("utf-8")).substitute(
         lang=i18n.active_language(),

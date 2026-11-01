@@ -22,25 +22,33 @@ import socket
 import socketserver
 import sys
 import threading
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import TYPE_CHECKING, Any
 
-from sugo.core.constants import MAX_INPUT_BYTES, WEB_SOCKET_TIMEOUT_S, WEB_TOKEN_BYTES
+from sugo.core.constants import (
+    MAX_INPUT_BYTES,
+    WEB_SOCKET_TIMEOUT_S,
+    WEB_TOKEN_BYTES,
+    WEB_UPLOAD_TIMEOUT_S,
+)
+from sugo.ports.cache import page_cache
 from sugo.ports.errors import PortError, from_exception, web_request_refused
 from sugo.ports.web.page import render_page, static_file
 
 if TYPE_CHECKING:
     from sugo.config.settings import Settings
-    from sugo.storage.page_cache import PageCache
 
 _log = logging.getLogger(__name__)
 
 LOOPBACK = "127.0.0.1"
 TOKEN_HEADER = "X-Sugo-Token"  # noqa: S105 - a header name, not a secret
 CONVERT_PATH = "/api/convert"
+# Bytes read from the socket at a time.
+_READ_BYTES = 1024 * 1024
 
 # On every response, error pages included.
 _SECURITY_HEADERS = (
@@ -152,10 +160,10 @@ class _Handler(BaseHTTPRequestHandler):
                 return
             self._check_origin_and_token()
             length = self._content_length()
-            with self._one_at_a_time():
-                data = self.rfile.read(length)
-                if len(data) != length:
-                    # The client closed the connection early: nothing to answer.
+            with self._one_at_a_time(length):
+                data = self._read_body(length)
+                if data is None:
+                    # The client stopped sending: nothing to answer.
                     self.close_connection = True
                     return
                 self._convert(data)
@@ -178,7 +186,7 @@ class _Handler(BaseHTTPRequestHandler):
             raise _Refused(HTTPStatus.FORBIDDEN)
         expected = self.server.token.encode("ascii")
         given = tokens[0].encode("utf-8", "surrogateescape") if len(tokens) == 1 else b""
-        # Constant time on mismatched lengths too, so the token's length leaks nothing.
+        # Constant time for tokens of the right length; the length itself is public.
         if not hmac.compare_digest(given, expected):
             raise _Refused(HTTPStatus.FORBIDDEN)
 
@@ -188,19 +196,45 @@ class _Handler(BaseHTTPRequestHandler):
         lengths = self.headers.get_all("Content-Length") or []
         if len(lengths) != 1 or not lengths[0].isascii() or not lengths[0].isdigit():
             raise _Refused(HTTPStatus.LENGTH_REQUIRED)
+        # Too many digits is too large, and int() refuses more than 4 300 of them.
+        if len(lengths[0].lstrip("0")) > len(str(MAX_INPUT_BYTES)):
+            raise _Refused(HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
         length = int(lengths[0])
         if length > MAX_INPUT_BYTES:
             raise _Refused(HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
         return length
 
     @contextmanager
-    def _one_at_a_time(self) -> Iterator[None]:
+    def _one_at_a_time(self, length: int) -> Iterator[None]:
         if not self.server.busy.acquire(blocking=False):
+            # Read and drop the body first: closing with unread data can reset
+            # the connection, and the page would never see the refusal. Only a
+            # request with the token gets here, and its size is within limits.
+            self._read_body(length)
             raise _Refused(HTTPStatus.CONFLICT)
         try:
             yield
         finally:
             self.server.busy.release()
+
+    def _read_body(self, length: int) -> bytes | None:
+        """The body, or None if it is cut short or takes too long in all.
+
+        The socket timeout bounds each wait; the deadline bounds the whole
+        upload, so a client sending a byte now and then cannot hold the server.
+        """
+        deadline = time.monotonic() + WEB_UPLOAD_TIMEOUT_S
+        parts: list[bytes] = []
+        remaining = length
+        while remaining > 0:
+            if time.monotonic() > deadline:
+                return None
+            part = self.rfile.read1(min(remaining, _READ_BYTES))
+            if not part:
+                return None
+            parts.append(part)
+            remaining -= len(part)
+        return b"".join(parts)
 
     def _convert(self, data: bytes) -> None:
         try:
@@ -241,9 +275,8 @@ def converter(settings: "Settings") -> Converter:
         from sugo.core import pipeline
         from sugo.core.estimate import estimate_json, estimate_savings
         from sugo.metrics.providers import list_providers
-        from sugo.metrics.tokenizer import count_tokens
 
-        with _page_cache(enabled=settings.storage.cache == "persistent") as cache:
+        with page_cache(enabled=settings.storage.cache == "persistent") as cache:
             conversion = pipeline.convert(
                 data,
                 cache=cache,
@@ -252,33 +285,12 @@ def converter(settings: "Settings") -> Converter:
                 strip_tracking_urls=settings.cleaning.strip_tracking_urls,
             )
         estimate = estimate_savings(data, conversion, list_providers())
+        # Kind, pages and token counts come from the estimate.
         return {
-            "kind": conversion.kind.value,
-            "pages": conversion.pages,
+            **estimate_json(estimate),
             "failed_pages": list(conversion.failed_pages),
             "markdown": conversion.markdown,
-            "tokens": count_tokens(conversion.markdown),
             "removed": dict(conversion.removed),
-            **estimate_json(estimate),
         }
 
     return convert
-
-
-@contextmanager
-def _page_cache(*, enabled: bool) -> Iterator["PageCache | None"]:
-    """The persistent page cache, opened in the converting thread (SQLite needs that)."""
-    if not enabled:
-        yield None
-        return
-    from sugo.storage.page_cache import CacheUnavailableError, PageCache
-    from sugo.storage.paths import StorageDirError
-
-    try:
-        cache = PageCache.default()
-    except (CacheUnavailableError, StorageDirError, OSError):
-        _log.warning("the page cache is unavailable; using a temporary one")
-        yield None
-        return
-    with cache:
-        yield cache

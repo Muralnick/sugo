@@ -30,6 +30,7 @@ from sugo import i18n
 from sugo.core.constants import CHUNK_MAX_TOKENS, CHUNK_MAX_TOKENS_LIMIT, CHUNK_MIN_TOKENS
 from sugo.i18n import N_, ngettext
 from sugo.i18n import gettext as _
+from sugo.ports.cache import page_cache as _page_cache
 from sugo.ports.cli.doctor import Status, missing_lite_packages, run_checks
 from sugo.ports.cli.translation import TranslatedCommand, TranslatedGroup, use_language
 from sugo.ports.errors import (
@@ -44,7 +45,6 @@ if TYPE_CHECKING:
     from sugo.config.settings import Settings
     from sugo.core.estimate import SavingsEstimate
     from sugo.core.pipeline import Conversion
-    from sugo.storage.page_cache import PageCache
 
 _log = logging.getLogger(__name__)
 # Markup and highlighting off: file names and messages are shown as typed.
@@ -571,20 +571,21 @@ def ui_command(
         _require_lite()
         from sugo.ports.web.server import WebServer, converter
 
-        with WebServer(converter(settings)) as server:
-            if no_browser:
-                _write(server.url + "\n")
-            else:
-                import webbrowser
+        # Ctrl+C is the normal way to stop, even while the browser is opening.
+        try:
+            with WebServer(converter(settings)) as server:
+                if no_browser:
+                    _write(server.url + "\n")
+                else:
+                    import webbrowser
 
-                _stderr.print(Text(_("Opening {url}").format(url=server.url)))
-                if not webbrowser.open(server.url):
-                    _stderr.print(Text(_("No browser found: open the address above.")))
-            _stderr.print(_("Press Ctrl+C to stop."))
-            try:
+                    _stderr.print(Text(_("Opening {url}").format(url=server.url)))
+                    if not webbrowser.open(server.url):
+                        _stderr.print(Text(_("No browser found: open the address above.")))
+                _stderr.print(_("Press Ctrl+C to stop."))
                 server.serve_forever()
-            except KeyboardInterrupt:
-                _stderr.print(_("Stopped."))
+        except KeyboardInterrupt:
+            _stderr.print(_("Stopped."))
 
 
 # --- shared -------------------------------------------------------------------
@@ -650,25 +651,6 @@ def _failures(json_output: bool) -> Iterator[None]:
         else:
             _say_error(error)
         raise typer.Exit(error.exit_code) from None
-
-
-@contextmanager
-def _page_cache(*, enabled: bool) -> Iterator["PageCache | None"]:
-    """The user's persistent page cache; None (a temporary one per job) if off or unusable."""
-    if not enabled:
-        yield None
-        return
-    from sugo.storage.page_cache import CacheUnavailableError, PageCache
-    from sugo.storage.paths import StorageDirError
-
-    try:
-        cache = PageCache.default()
-    except (CacheUnavailableError, StorageDirError, OSError):
-        _log.warning("the page cache is unavailable; using a temporary one")
-        yield None
-        return
-    with cache:
-        yield cache
 
 
 @contextmanager

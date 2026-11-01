@@ -731,3 +731,7 @@ WEB_TOKEN_BYTES: Final = 32
 # hostile, and would otherwise hold its thread forever. Converting is not
 # counted: the socket is idle then, and no timer runs.
 WEB_SOCKET_TIMEOUT_S: Final = 60
+# Seconds a whole upload may take. 200 MB takes about a second on loopback;
+# the socket timeout bounds each wait, not a client that sends a byte now
+# and then to keep the server busy.
+WEB_UPLOAD_TIMEOUT_S: Final = 300

@@ -72,3 +72,16 @@ def test_the_help_is_translated() -> None:
     use_language("it")
     result = CliRunner().invoke(cli.app, ["ui", "--help"], terminal_width=200)
     assert "Apri la pagina di Sugo nel browser" in result.stdout
+
+
+def test_ctrl_c_while_the_browser_opens_stops_cleanly(
+    served: list[WebServer], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def interrupted(url: str) -> bool:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(webbrowser, "open", interrupted)
+    result = CliRunner().invoke(cli.app, ["ui"])
+    assert result.exit_code == 0
+    assert "Stopped." in result.stderr
+    assert served == []

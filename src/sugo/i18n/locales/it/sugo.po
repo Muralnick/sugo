@@ -599,8 +599,8 @@ msgstr "Trascina qui un file"
 msgid "Choose a file"
 msgstr "Scegli un file"
 
-msgid "PDF, DOCX, XLSX, PPTX, PNG, JPEG, WEBP or XML, up to {size} MB."
-msgstr "PDF, DOCX, XLSX, PPTX, PNG, JPEG, WEBP o XML, fino a {size} MB."
+msgid "PDF, DOCX, XLSX or PPTX up to {large} MB; PNG, JPEG, WEBP or XML up to {small} MB."
+msgstr "PDF, DOCX, XLSX o PPTX fino a {large} MB; PNG, JPEG, WEBP o XML fino a {small} MB."
 
 msgid "This file is larger than {size} MB."
 msgstr "Questo file supera {size} MB."
