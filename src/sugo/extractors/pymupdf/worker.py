@@ -9,7 +9,10 @@ null device, so nothing MuPDF prints can corrupt or forge a frame.
 
 Before parsing anything the worker limits itself: no core dumps (they would
 write document text to disk, ADR-031) and, on Linux and macOS, a cap on its
-address space, so a hostile file cannot exhaust the machine's memory.
+address space, so a hostile file cannot exhaust the machine's memory. Even
+before loading PyMuPDF it blocks the modules PyMuPDF 2.0 would otherwise
+import on its own (layout analysis and ``pymupdf4llm``, with their ONNX
+models), so ``import pymupdf`` must stay below that block.
 
 Checks before any page is interpreted:
 
@@ -28,6 +31,7 @@ is drawn around it (white on white, text under an opaque shape).
 import contextlib
 import math
 import os
+import re
 import sys
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -35,7 +39,6 @@ from typing import IO, Any
 
 import numpy as np
 import numpy.typing as npt
-import pymupdf
 
 from sugo.core.constants import (
     MAX_PDF_FILE_BYTES,
@@ -50,7 +53,7 @@ from sugo.core.constants import (
     PDF_WORKER_MEMORY_BYTES,
 )
 from sugo.core.models import BBox
-from sugo.extractors.pymupdf.guard import BROTLI_REFUSAL, names_brotli
+from sugo.extractors.pymupdf.guard import BROTLI_REFUSAL, UNCHECKED_REFUSAL, names_brotli, scan
 from sugo.extractors.pymupdf.protocol import (
     Message,
     NativeLine,
@@ -65,7 +68,27 @@ from sugo.extractors.pymupdf.protocol import (
     write_message,
 )
 
+# PyMuPDF 2.0 imports its layout module and pymupdf4llm whenever they are
+# installed; the first loads ONNX models at once and both load onnxruntime.
+# Sugo uses neither: blocking them keeps that code out of this process
+# (ADR-043). PyMuPDF treats a blocked module as not installed.
+sys.modules["pymupdf.layout"] = None  # type: ignore[assignment]
+sys.modules["pymupdf4llm"] = None  # type: ignore[assignment]
+
+import pymupdf  # noqa: E402
+
 Pixels = npt.NDArray[np.uint8]
+
+# Times the list of streams is taken before giving up on a file MuPDF keeps
+# repairing; one repair settles a file, so two equal lists come quickly.
+_STREAM_LIST_ATTEMPTS = 4
+
+# Keys under which MuPDF runs a stream as content without asking its /Subtype:
+# Type 3 glyphs, annotation appearances, and soft mask groups. Tiling patterns
+# are found by their /PatternType.
+_CONTENT_KEYS = ("CharProcs", "AP", "G", "SMask/G")
+# A reference as MuPDF prints objects: always "12 0 R".
+_PRINTED_REFERENCE = re.compile(r"(\d+) \d+ R")
 
 # MuPDF character flags (fz_stext_char flags) and font flags (span "flags").
 _FILLED = 16
@@ -156,29 +179,112 @@ def _check(document: pymupdf.Document, *, streams: bool) -> Refused | None:
 
 
 def _stream_problem(document: pymupdf.Document) -> Refused | None:
-    """Refuse a document with an inline image compressed with Brotli.
+    """Refuse a document that names Brotli anywhere MuPDF could use it (ADR-043).
 
-    Every stream is decoded and searched, images included: ``/Subtype`` is
-    written by the attacker, and a page's content stream may claim to be an
-    image. A stream that cannot be decoded cannot be checked, so the document
+    First every object as MuPDF parsed it, before any stream is decoded: a
+    filter given by reference, in whatever spelling, is a name in some object.
+    Then every decoded stream: one MuPDF may run as content is refused for any
+    Brotli name, alone or joined with the page's other content streams, as
+    MuPDF joins them; an image's pixels only for a name given to a filter key.
+    Anything that cannot be read or decoded cannot be checked, so the document
     is refused rather than parsed unchecked (temporary, ADR-043).
     """
-    for xref in range(1, document.xref_length()):
-        try:
-            if not document.xref_is_stream(xref):
+    try:
+        streams = _streams(document)
+        for xref in range(1, document.xref_length()):
+            if names_brotli(document.xref_object(xref, compressed=True).encode()):
+                return Refused(code="PDF_UNSUPPORTED", message=BROTLI_REFUSAL)
+        contents = _page_contents(document)
+        run = _run_as_content(document, streams, contents)
+        for xref in streams:
+            data = document.xref_stream(xref) or b""
+            if xref in run:
+                if names_brotli(data):
+                    return Refused(code="PDF_UNSUPPORTED", message=BROTLI_REFUSAL)
                 continue
-            decoded = document.xref_stream(xref) or b""
-        except Exception:  # noqa: BLE001  (any MuPDF failure means "unchecked")
-            return Refused(
-                code="PDF_UNSUPPORTED",
-                message="a stream of the PDF cannot be decoded, so it cannot be checked",
-            )
-        if names_brotli(decoded):
-            return Refused(
-                code="PDF_UNSUPPORTED",
-                message=BROTLI_REFUSAL,
-            )
+            found = scan(data)
+            if found.brotli:
+                return Refused(code="PDF_UNSUPPORTED", message=BROTLI_REFUSAL)
+            if not found.complete:
+                raise _UncheckedError
+        for parts in contents:
+            # MuPDF puts whitespace between the parts; both kinds are checked.
+            decoded = [document.xref_stream(xref) or b"" for xref in parts]
+            if any(names_brotli(gap.join(decoded)) for gap in (b" ", b"\n")):
+                return Refused(code="PDF_UNSUPPORTED", message=BROTLI_REFUSAL)
+        if _streams(document) != streams:
+            raise _UncheckedError  # MuPDF repaired the file while it was being checked
+    except Exception:  # noqa: BLE001  (any failure, _UncheckedError included, means "unchecked")
+        return Refused(code="PDF_UNSUPPORTED", message=UNCHECKED_REFUSAL)
     return None
+
+
+class _UncheckedError(Exception):
+    """The filters could not be checked completely."""
+
+
+def _streams(document: pymupdf.Document) -> list[int]:
+    """Every stream object, once MuPDF has stopped repairing the file.
+
+    Reading an object at a wrong offset makes MuPDF repair the file, which can
+    add objects or turn one into a stream; the list is taken again until it
+    no longer changes.
+    """
+    previous: list[int] = []
+    for _ in range(_STREAM_LIST_ATTEMPTS):
+        streams = [
+            xref for xref in range(1, document.xref_length()) if document.xref_is_stream(xref)
+        ]
+        if streams == previous:
+            return streams
+        previous = streams
+    raise _UncheckedError
+
+
+def _page_contents(document: pymupdf.Document) -> list[list[int]]:
+    """Each page's content streams. A page that fails to load is never run."""
+    contents = []
+    for index in range(document.page_count):
+        with contextlib.suppress(Exception):
+            contents.append(document[index].get_contents())
+    return contents
+
+
+def _run_as_content(
+    document: pymupdf.Document, streams: list[int], contents: list[list[int]]
+) -> set[int]:
+    """Streams MuPDF may interpret as content, whatever their ``/Subtype`` says.
+
+    Every stream but an image, and whatever pages, Type 3 glyphs, patterns,
+    annotation appearances and soft masks use, read from the objects as MuPDF
+    prints them. Over-including only makes the check stricter.
+    """
+    run = {xref for parts in contents for xref in parts}
+    for xref in streams:
+        image = document.xref_get_key(xref, "Subtype") == ("name", "/Image")
+        if not image or document.xref_get_key(xref, "PatternType")[0] != "null":
+            run.add(xref)
+    for xref in range(1, document.xref_length()):
+        for key in _CONTENT_KEYS:
+            kind, value = document.xref_get_key(xref, key)
+            if kind != "null":
+                run |= _referenced(document, value)
+    return run
+
+
+def _referenced(document: pymupdf.Document, value: str) -> set[int]:
+    """Objects referenced in ``value``, and in the dictionaries and arrays those reference."""
+    found: set[int] = set()
+    pending = [value]
+    while pending:
+        for match in _PRINTED_REFERENCE.finditer(pending.pop()):
+            xref = int(match[1])
+            if xref in found or not 0 < xref < document.xref_length():
+                continue
+            found.add(xref)
+            if not document.xref_is_stream(xref):
+                pending.append(document.xref_object(xref, compressed=True))
+    return found
 
 
 def _boxes(document: pymupdf.Document) -> tuple[PageBox, ...]:
