@@ -146,6 +146,16 @@ class EdgeStats:
     # sequences, so "1" on the first page and "2" on the second match.
     page_numbers: frozenset[tuple[Band, NumberSystem, int]]
 
+    def digest(self) -> str:
+        """A digest of these statistics, the same whatever order pages were observed in.
+
+        Cleaned pages depend on the whole document, so it is part of their
+        cache key (ADR-046): if any page reads differently, every page is
+        cleaned again.
+        """
+        canonical = repr((sorted(self.repeated.items()), sorted(self.page_numbers)))
+        return hashlib.sha256(canonical.encode()).hexdigest()
+
     def repeated_edge(self, text: EdgeText, page_index: int) -> RepeatedEdge | None:
         """Return the running header or footer this text is a copy of, if any."""
         repeated = self.repeated.get((text.band, text.pattern))

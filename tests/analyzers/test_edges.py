@@ -289,3 +289,10 @@ def test_substantive_text_with_changing_numbers_is_not_repeated() -> None:
     # Later copies would not be identical to the kept one: their figures differ.
     texts = [f"Late fee in month {i + 1} is {i + 2} percent of the price" for i in range(4)]
     assert analyze(*(page(i, block("f", text)) for i, text in enumerate(texts))).repeated == {}
+
+
+def test_digest_changes_with_the_statistics_but_not_page_order() -> None:
+    pages = [page(i, block("h", "Report", TOP), block("n", str(i + 1))) for i in range(4)]
+    digest = analyze(*pages).digest()
+    assert digest == analyze(*reversed(pages)).digest()
+    assert digest != analyze(*pages[:2]).digest()

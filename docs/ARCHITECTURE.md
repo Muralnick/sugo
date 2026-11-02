@@ -50,7 +50,7 @@ input ─► Source/Container ─► Router ─► Extractor ─► IR ─► An
                                   text layer, complexity and hardware       cleaner; image-cost baseline per provider
 ```
 
-**Routing is per page, not per document** (ADR-001): native-text pages go through PyMuPDF; complex tables, Office and scans through Docling (`normal`); the hardest pages through a VLM (`quality`).
+The v0.1 standalone pipeline, its routing by content and pass order are in ADR-046. **Routing is per page, not per document** (ADR-001): native-text pages go through PyMuPDF; complex tables, Office and scans through Docling (`normal`); the hardest pages through a VLM (`quality`).
 
 ### Multi-pass processing (ADR-006)
 

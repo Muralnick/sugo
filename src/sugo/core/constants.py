@@ -244,7 +244,6 @@ PAGE_NUMBER_MAX_CHARS: Final = 30
 # Digit runs longer than this are never page numbers (MAX_PDF_PAGES has four
 # digits) and are compared as text, not converted to integers.
 PAGE_NUMBER_MAX_DIGITS: Final = 6
-
 # --- Page cache (roadmap step 5c, ADR-045) -----------------------------------
 
 # Default size limit of the page cache; least recently used pages go first.

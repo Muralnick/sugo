@@ -218,22 +218,25 @@ class PageCache:
             _log.warning("page cache busy; usage time not updated")
         return page
 
-    def put(self, level: CacheLevel, key: bytes, page: Page) -> None:
+    def put(self, level: CacheLevel, key: bytes, page: Page) -> bool:
         """Store a page, then evict the least recently used ones past the size limit.
 
         Skipped, with a warning, when the page is too large to be read back,
         the disk is nearly full or unreachable, or another process holds the
         cache for too long: the job goes on without it.
+
+        Returns:
+            Whether the page was stored.
         """
         raw = page.model_dump_json().encode()
         if len(raw) > CACHE_MAX_RECORD_BYTES:
             _log.warning("page too large for the cache; not cached")
-            return
+            return False
         record = zlib.compress(raw)
         try:
             if shutil.disk_usage(self._path.parent).free - len(record) < CACHE_MIN_FREE_BYTES:
                 _log.warning("little free disk space; page not cached")
-                return
+                return False
             with self._db:
                 self._db.execute(
                     "INSERT OR REPLACE INTO entries VALUES (?, ?, ?, ?, ?)",
@@ -246,6 +249,8 @@ class PageCache:
                 self._estimated_bytes = self.stats().bytes
         except (sqlite3.DatabaseError, OSError):
             _log.warning("page cache busy or unwritable; page not cached")
+            return False
+        return True
 
     def stats(self) -> CacheStats:
         """Return how many pages the cache holds and how many bytes they take."""
