@@ -8,6 +8,7 @@ port (CLI ``sugo stats``, MCP ``estimate_savings``) uses this one operation.
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from sugo.core.pipeline import Conversion, InputKind
 from sugo.extractors.image.loader import image_size
@@ -65,3 +66,32 @@ def estimate_savings(
         images=tuple(images),
         rejected_by=tuple(rejected),
     )
+
+
+def estimate_json(estimate: SavingsEstimate) -> dict[str, Any]:
+    """The estimate as the JSON object the ports share (``sugo stats --json``, MCP)."""
+    return {
+        "kind": estimate.kind.value,
+        "pages": estimate.pages,
+        "text": _savings_json(estimate.text),
+        "images": [
+            {
+                "provider": image.provider,
+                "tier": image.tier,
+                "formula_verified": image.formula_verified,
+                **_savings_json(image),
+            }
+            for image in estimate.images
+        ],
+        "rejected_by": list(estimate.rejected_by),
+    }
+
+
+def _savings_json(savings: Savings) -> dict[str, Any]:
+    return {
+        "baseline_tokens": savings.baseline_tokens,
+        "result_tokens": savings.result_tokens,
+        "saved_tokens": savings.saved_tokens,
+        # One decimal: more would suggest a precision tokenizers do not share.
+        "saved_percent": round(savings.saved_percent, 1),
+    }
