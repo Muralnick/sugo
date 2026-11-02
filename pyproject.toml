@@ -25,6 +25,9 @@ lite = [
     "numpy>=2.5.4,<3",
     "onnxruntime>=1.31.0,<2",
     "pillow>=12.3.0,<13",
+    # Native PDFs (ADR-043): 2.0 bundles MuPDF 1.28.5. The worker never loads
+    # its layout module or pymupdf4llm.
+    "pymupdf>=2.0,<2.1",
     "rapidocr==3.10.0",
 ]
 
@@ -113,11 +116,17 @@ python_version = "3.12"
 plugins = ["pydantic.mypy"]
 files = ["src", "tests"]
 mypy_path = "src"
+# Test modules are named by their path (tests.extractors.image.conftest), so
+# several conftest.py files can coexist without __init__.py files.
+explicit_package_bases = true
 warn_unused_configs = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 check_untyped_defs = true
 strict_equality = true
+# PyMuPDF's API is partly unannotated; its calls stay confined to the PDF
+# worker, which validates every value it sends (ADR-043).
+untyped_calls_exclude = ["pymupdf"]
 
 [[tool.mypy.overrides]]
 # Strict typing where correctness matters most (CODE_STYLE.md, ADR-029).
@@ -211,6 +220,15 @@ forbidden_modules = [
     "sugo.setup",
     "sugo._internal.net",
 ]
+
+# MuPDF parses untrusted PDFs in C; it runs only in the worker process, which
+# sends plain data back (ADR-043). Any other import would parse PDFs inside Sugo.
+[[tool.importlinter.contracts]]
+name = "MuPDF only in the PDF worker process"
+type = "forbidden"
+source_modules = ["sugo"]
+forbidden_modules = ["pymupdf", "fitz"]
+ignore_imports = ["sugo.extractors.pymupdf.worker -> pymupdf"]
 
 # Network boundaries (ADR-036). Each contract ignores the imports made by the
 # modules it allows, which also cuts indirect chains through them; unmatched

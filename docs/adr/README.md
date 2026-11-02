@@ -44,4 +44,5 @@
 | [040](ADR-040-screenshot-detectors.md) | Screenshot detectors and chat speaker side | Accepted |
 | [041](ADR-041-cleaner-decisions.md) | Minimal cleaner decisions, applied by the core | Accepted |
 | [042](ADR-042-markdown-serializer.md) | Markdown output format | Accepted |
+| [043](ADR-043-pdf-extractor.md) | Native PDF extractor in an isolated worker | Accepted |
 | [045](ADR-045-page-cache.md) | Page cache and page store in SQLite | Accepted |
