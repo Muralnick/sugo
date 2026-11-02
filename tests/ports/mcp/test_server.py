@@ -153,6 +153,42 @@ def test_refusals_are_tool_errors_the_agent_can_read(server: Server, root: Path)
 
 
 @pytest.mark.parametrize(
+    ("text", "refused"),
+    [
+        ("-----BEGIN RSA PRIVATE KEY-----", True),
+        ("-----BEGIN PGP PRIVATE KEY BLOCK-----", True),
+        ("\\-----END ENCRYPTED PRIVATE KEY-----", True),
+        ("BEGIN Private Key ———", True),
+        ("BEGIN PRIVATE\nKEY\n\\-----", True),
+        ("-----BEGIN PUBLIC KEY-----", False),
+        ("Keep the private key -- never share it.", False),
+        ("The private key is stored in a vault.", False),
+    ],
+)
+def test_private_key_headers_are_recognised(text: str, refused: bool) -> None:
+    assert (tools._PRIVATE_KEY.search(text) is not None) is refused
+
+
+@pytest.mark.parametrize("output", ["markdown", "chunks"])
+def test_documents_holding_a_private_key_are_refused(
+    server: Server, root: Path, output: str
+) -> None:
+    document = pymupdf.open()
+    page = document.new_page()
+    for line, text in enumerate(
+        ["Server setup notes", "-----BEGIN OPENSSH PRIVATE KEY-----", "b3BlbnNzaC1rZXktdjEAAAAA"]
+    ):
+        page.insert_text((72, 72 + line * 18), text, fontsize=10)
+    (root / "setup.pdf").write_bytes(document.tobytes())
+    result = call(server, "convert_document", path="setup.pdf", output=output)["result"]
+    assert result["isError"] is True
+    assert len(result["content"]) == 1
+    error = json.loads(result["content"][0]["text"])["error"]
+    assert error["code"] == "CONTENT_EXCLUDED"
+    assert "setup" not in error["message"]
+
+
+@pytest.mark.parametrize(
     "arguments",
     [
         {},

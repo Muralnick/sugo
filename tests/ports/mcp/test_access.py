@@ -5,6 +5,12 @@ from pathlib import Path
 
 import pytest
 
+from sugo.core.constants import (
+    MCP_EXCLUDED_DIRS,
+    MCP_EXCLUDED_FILES,
+    MCP_EXCLUDED_PATTERNS,
+    MCP_EXCLUDED_SEQUENCES,
+)
 from sugo.ports.errors import PortError
 from sugo.ports.mcp.access import Roots, is_excluded
 
@@ -72,6 +78,22 @@ def test_symbolic_links_are_resolved_before_the_check(root: Path) -> None:
         "keys/id_rsa.pub",
         "vault.kdbx",
         "certs/server.pem",
+        "repo/.git/config.pdf",
+        "home/.git-credentials",
+        "home/.config/gh/hosts.pdf",
+        "AppData/Roaming/Microsoft/Credentials/blob.pdf",
+        "AppData/Local/Google/Chrome/User Data/Default/scan.png",
+        "Library/Application Support/Firefox/Profiles/x/a.pdf",
+        "AppData/Roaming/FileZilla/sitemanager.xml",
+        "project/Web.config",
+        "home/.bash_history",
+        "AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt",
+        "deploy/prod.tfstate.backup",
+        "keys/server.KEY",
+        "keys/putty.ppk",
+        "vpn/office.ovpn",
+        "docs/credentials.docx",
+        "docs/secrets.yaml",
     ],
 )
 def test_secret_locations_are_excluded_everywhere(root: Path, relative: str) -> None:
@@ -84,6 +106,32 @@ def test_secret_locations_are_excluded_everywhere(root: Path, relative: str) -> 
 def test_ordinary_names_are_not_excluded() -> None:
     assert not is_excluded(Path("docs/environment.pdf"))
     assert not is_excluded(Path("docs/ssh-guide.pdf"))
+    assert not is_excluded(Path("docs/keynote.pdf"))
+    assert not is_excluded(Path("docs/history.pdf"))
+    assert not is_excluded(Path("docs/.github/report.pdf"))
+    # Common folder names are secret only after the right parent.
+    assert not is_excluded(Path("projects/gh/report.pdf"))
+    assert not is_excluded(Path("archive/protect/plan.pdf"))
+    assert not is_excluded(Path("travel/chrome/photo.png"))
+    assert not is_excluded(Path(".config/report.pdf"))
+    assert not is_excluded(Path("gh/.config/report.pdf"))
+
+
+def test_every_listed_entry_is_excluded_in_any_case() -> None:
+    for name in MCP_EXCLUDED_DIRS | MCP_EXCLUDED_FILES:
+        assert is_excluded(Path("home") / name.upper() / "a.pdf"), name
+    for pattern in MCP_EXCLUDED_PATTERNS:
+        assert is_excluded(Path("home") / pattern.replace("*", "x").upper()), pattern
+    for sequence in MCP_EXCLUDED_SEQUENCES:
+        assert is_excluded(Path("home", *sequence, "a.pdf")), sequence
+        assert is_excluded(Path("home", *(part.title() for part in sequence))), sequence
+
+
+def test_entries_are_stored_as_they_are_compared() -> None:
+    entries = [*MCP_EXCLUDED_DIRS, *MCP_EXCLUDED_FILES, *MCP_EXCLUDED_PATTERNS]
+    entries += [part for sequence in MCP_EXCLUDED_SEQUENCES for part in sequence]
+    assert all(entry == entry.casefold() and "/" not in entry for entry in entries)
+    assert all(len(sequence) > 1 for sequence in MCP_EXCLUDED_SEQUENCES)
 
 
 def test_roots_must_exist_and_not_be_secret(tmp_path: Path) -> None:

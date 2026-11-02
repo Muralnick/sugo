@@ -7,6 +7,7 @@ read: they never write, install, download or delete (principle 10).
 
 import hashlib
 import json
+import re
 from collections.abc import Callable
 from typing import Annotated, Any, Literal
 
@@ -19,12 +20,13 @@ from sugo.core.constants import (
     MCP_MAX_PATH_CHARS,
     MCP_MAX_TOKENS,
     MCP_MIN_TOKENS,
+    MCP_PRIVATE_KEY_PATTERN,
     MCP_WRAPPER_TOKENS,
 )
 from sugo.core.pipeline import convert, read_input
 from sugo.metrics.providers import list_providers
 from sugo.metrics.tokenizer import count_tokens
-from sugo.ports.errors import unreadable
+from sugo.ports.errors import ExitCode, PortError, unreadable
 from sugo.ports.mcp.access import Allowed, Roots
 from sugo.ports.mcp.pages import Cursor, invalid_cursor, paginate_lines, paginate_text, wrap
 from sugo.storage.page_cache import PageCache
@@ -82,6 +84,8 @@ class EstimateSavings(_Arguments):
 class InvalidArgumentsError(ValueError):
     """Arguments that pass the schema but name something that does not exist."""
 
+
+_PRIVATE_KEY = re.compile(MCP_PRIVATE_KEY_PATTERN, re.IGNORECASE)
 
 _READ_ONLY = {
     "readOnlyHint": True,
@@ -159,9 +163,11 @@ class ToolRunner:
             from sugo.exporters.jsonl import jsonl_lines
 
             content = "".join(jsonl_lines(conversion.chunks))
+            _refuse_private_keys(content)
             pages = paginate_lines(content.splitlines(keepends=True), budget)
         else:
             content = conversion.markdown
+            _refuse_private_keys(content)
             pages = paginate_text(content, budget)
         digest = hashlib.sha256(content.encode("utf-8", "surrogatepass")).hexdigest()
         index = 0
@@ -210,6 +216,24 @@ class ToolRunner:
         )
         estimate = estimate_savings(data, conversion, providers)
         return [json.dumps({"source": allowed.source, **estimate_json(estimate)})]
+
+
+def _refuse_private_keys(content: str) -> None:
+    """Refuse a document whose text holds a PEM private key (ADR-053).
+
+    Checked on the whole text before any part is returned, so every part of
+    such a document gets the same refusal.
+
+    Raises:
+        PortError: CONTENT_EXCLUDED.
+    """
+    if _PRIVATE_KEY.search(content):
+        raise PortError(
+            code="CONTENT_EXCLUDED",
+            message="This file holds a private key; Sugo never sends it to agents.",
+            exit_code=ExitCode.SECURITY,
+            hint="Keys, tokens and password stores are always excluded.",
+        )
 
 
 def _read(allowed: Allowed) -> bytes:

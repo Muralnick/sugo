@@ -325,12 +325,71 @@ MCP_MAX_CURSOR_CHARS: Final = 512
 MCP_WRAPPER_ID_HEX_DIGITS: Final = 12
 
 # Never readable through MCP, whatever the allowed roots (principle 7,
-# THREAT_MODEL D): folders and files holding keys, tokens and passwords.
-# Compared case-insensitively with every component of the resolved path.
+# THREAT_MODEL D, ADR-053): folders and files holding keys, tokens, passwords,
+# browser profiles and shell histories. Compared case-insensitively with every
+# component of the resolved path.
 MCP_EXCLUDED_DIRS: Final = frozenset(
-    {".ssh", ".gnupg", ".aws", ".azure", ".kube", ".docker", ".password-store", "keyrings"}
+    {
+        ".ssh",
+        ".gnupg",
+        ".aws",
+        ".azure",
+        ".kube",
+        ".docker",
+        ".password-store",
+        "keyrings",
+        ".git",
+        ".terraform.d",
+        ".bitcoin",
+        ".ethereum",
+        ".electrum",
+        ".mozilla",
+        ".thunderbird",
+        "thunderbird",
+        "bravesoftware",
+        "chromium",
+        "filezilla",
+    }
 )
-MCP_EXCLUDED_FILES: Final = frozenset({".netrc", ".pgpass", ".env"})
+MCP_EXCLUDED_FILES: Final = frozenset(
+    {
+        ".netrc",
+        ".pgpass",
+        ".env",
+        "_netrc",
+        "pgpass.conf",
+        ".git-credentials",
+        ".npmrc",
+        ".pypirc",
+        ".yarnrc",
+        ".yarnrc.yml",
+        ".my.cnf",
+        ".boto",
+        ".s3cfg",
+        ".vault-token",
+        ".htpasswd",
+        ".histfile",
+        "consolehost_history.txt",
+        "wallet.dat",
+        "nuget.config",
+        "sitemanager.xml",
+        "recentservers.xml",
+        "filezilla.xml",
+        "unattend.xml",
+        "autounattend.xml",
+        "groups.xml",
+        "web.config",
+        "app.config",
+        "login data",
+        "web data",
+        "cookies",
+        "logins.json",
+        "key3.db",
+        "key4.db",
+        "cookies.sqlite",
+        "signons.sqlite",
+    }
+)
 MCP_EXCLUDED_PATTERNS: Final = (
     "id_rsa*",
     "id_dsa*",
@@ -338,8 +397,54 @@ MCP_EXCLUDED_PATTERNS: Final = (
     "id_ed25519*",
     ".env.*",
     "*.kdbx",
+    "*.kdb",
     "*.pem",
+    "*.key",
+    "*.p8",
+    "*.p12",
+    "*.pfx",
+    "*.jks",
+    "*.keystore",
+    "*.ppk",
+    "*.ovpn",
+    "*.tfstate",
+    "*.tfstate.*",
+    "*.publishsettings",
+    "credentials*",
+    "secrets.*",
+    # .bash_history, .zsh_history, .python_history, .psql_history and others.
+    "*_history",
 )
+# Components that are secret only one after the other: "gh" or "protect"
+# alone is an ordinary folder name, ".config/gh" holds GitHub tokens.
+MCP_EXCLUDED_SEQUENCES: Final = (
+    (".config", "gh"),
+    (".config", "gcloud"),
+    (".config", "rclone"),
+    (".config", "hub"),
+    (".m2", "settings.xml"),
+    (".m2", "settings-security.xml"),
+    (".gradle", "gradle.properties"),
+    (".subversion", "auth"),
+    # Windows credential, key and certificate stores.
+    ("microsoft", "credentials"),
+    ("microsoft", "protect"),
+    ("microsoft", "crypto"),
+    ("microsoft", "vault"),
+    ("microsoft", "systemcertificates"),
+    # Browser profiles: passwords, cookies, session tokens.
+    ("google", "chrome"),
+    ("microsoft", "edge"),
+    (".config", "google-chrome"),
+    (".config", "microsoft-edge"),
+    ("mozilla", "firefox"),
+    ("application support", "firefox"),
+)
+# The end of a PEM or OpenPGP private key header ("-----BEGIN RSA PRIVATE KEY-----",
+# "-----BEGIN PGP PRIVATE KEY BLOCK-----"): never sent to an agent (ADR-053).
+# Lenient on purpose: OCR reads dashes as en or em dashes, line wrapping and
+# the serializer's line-start escape can split the header.
+MCP_PRIVATE_KEY_PATTERN: Final = r"private\s+key(?:\s+block)?\s*\\?[-\u2010-\u2015\u2212]{3,}"
 
 # --- Text edits and text cleaners (ADR-050) ------------------------------------
 

@@ -31,7 +31,7 @@ Entries kept from ADR-049 are in plain text, new ones in **bold**.
 | Kind | Entries |
 |---|---|
 | Folders | `.ssh`, `.gnupg`, `.aws`, `.azure`, `.kube`, `.docker`, `.password-store`, `keyrings`, **`.git`**, **`.terraform.d`**, **`.bitcoin`**, **`.ethereum`**, **`.electrum`**, **`.mozilla`**, **`.thunderbird`**, **`thunderbird`**, **`bravesoftware`**, **`chromium`**, **`filezilla`** |
-| Path sequences: tools | **`.config/gh`**, **`.config/gcloud`**, **`.config/rclone`**, **`.config/hub`**, **`.cargo/credentials`**, **`.cargo/credentials.toml`**, **`.m2/settings.xml`**, **`.m2/settings-security.xml`**, **`.gradle/gradle.properties`**, **`.subversion/auth`** |
+| Path sequences: tools | **`.config/gh`**, **`.config/gcloud`**, **`.config/rclone`**, **`.config/hub`**, **`.m2/settings.xml`**, **`.m2/settings-security.xml`**, **`.gradle/gradle.properties`**, **`.subversion/auth`** |
 | Path sequences: Windows | **`microsoft/credentials`**, **`microsoft/protect`**, **`microsoft/crypto`**, **`microsoft/vault`**, **`microsoft/systemcertificates`** |
 | Path sequences: browsers | **`google/chrome`**, **`microsoft/edge`**, **`.config/google-chrome`**, **`.config/microsoft-edge`**, **`mozilla/firefox`**, **`application support/firefox`** |
 | Files | `.netrc`, `.pgpass`, `.env`, **`_netrc`**, **`pgpass.conf`**, **`.git-credentials`**, **`.npmrc`**, **`.pypirc`**, **`.yarnrc`**, **`.yarnrc.yml`**, **`.my.cnf`**, **`.boto`**, **`.s3cfg`**, **`.vault-token`**, **`.htpasswd`**, **`.histfile`**, **`consolehost_history.txt`**, **`wallet.dat`**, **`nuget.config`**, **`sitemanager.xml`**, **`recentservers.xml`**, **`filezilla.xml`**, **`unattend.xml`**, **`autounattend.xml`**, **`groups.xml`**, **`web.config`**, **`app.config`**, **`login data`**, **`web data`**, **`cookies`**, **`logins.json`**, **`key3.db`**, **`key4.db`**, **`cookies.sqlite`**, **`signons.sqlite`** |
@@ -39,14 +39,16 @@ Entries kept from ADR-049 are in plain text, new ones in **bold**.
 
 `*_history` covers `.bash_history`, `.zsh_history`, `.python_history`, `.psql_history`, `.mysql_history` and `.node_repl_history`. Browser entries cover Chrome, Edge, Brave, Chromium and Firefox on Windows, macOS and Linux, and Thunderbird's mail profiles.
 
-### Content check for XML (MCP only)
+### Content check (MCP only)
 
-After the reader has parsed an XML file, and before anything reaches the agent, the server refuses it with **`CONTENT_EXCLUDED`** (exit code `SECURITY`) when:
+Before anything reaches the agent, the server refuses a document with **`CONTENT_EXCLUDED`** (exit code `SECURITY`) when:
 
-- an element or attribute name, without its namespace prefix, casefolded and with `-`, `_` and `.` removed, is one of: `password`, `passwd`, `pwd`, `cpassword`, `passphrase`, `secret`, `clientsecret`, `sharedsecret`, `apikey`, `accesskey`, `secretkey`, `privatekey`, `accesstoken`, `refreshtoken`, `authtoken`, `apitoken`, `bearertoken`, `connectionstring`; or
-- any text or attribute value contains `PRIVATE KEY-----` (a PEM private key).
+- in a generic XML file, an element or attribute name, without its namespace prefix, casefolded and with `-`, `_` and `.` removed, is one of: `password`, `passwd`, `pwd`, `cpassword`, `passphrase`, `secret`, `clientsecret`, `sharedsecret`, `apikey`, `accesskey`, `secretkey`, `privatekey`, `accesstoken`, `refreshtoken`, `authtoken`, `apitoken`, `bearertoken`, `connectionstring`; or
+- the document's text contains the end of a private key header, `PRIVATE KEY-----` (PEM) or `PRIVATE KEY BLOCK-----` (OpenPGP), in any kind of document, and in XML attribute values too. The match ignores case and tolerates what OCR and layout do to it: white space or a line break before the dashes, dashes read as en or em dashes, and at least three of them.
 
-Only names and the PEM marker are looked at, never other values, and the message names neither the element nor the file. The check covers generic XML only: the part names inside DOCX, XLSX and PPTX are fixed by the standard and say nothing about the content. The PEM marker is also checked in the text of Office files, where a pasted private key would otherwise reach the agent.
+Only names and the PEM marker are looked at, never other values, and the message names neither the element nor the file. The name check covers generic XML only: the part names inside DOCX, XLSX and PPTX are fixed by the standard and say nothing about the content; it lands with the XML reader (ADR-054).
+
+The PEM marker is checked now, case-insensitively, on the whole text `convert_document` would return (Markdown or chunks), for **every** kind of document: a private key pasted in a PDF, photographed in a screenshot or typed in an Office file never reaches the agent. The check runs before any part is returned, so every part of such a document is refused alike. `estimate_savings` returns only counts and is not affected.
 
 ## Alternatives considered
 
