@@ -11,6 +11,7 @@ from enum import IntEnum
 from typing import Any
 
 from sugo import i18n
+from sugo.core.constants import MAX_INPUT_BYTES
 from sugo.i18n import N_
 from sugo.i18n import gettext as _
 
@@ -121,6 +122,22 @@ def from_exception(error: Exception) -> PortError | None:
             hint=_("Reinstall Sugo; a bundled file was altered or damaged."),
         )
     return None
+
+
+def web_request_refused() -> PortError:
+    """A request the web UI's protections refused (ADR-055).
+
+    One message for every check, so a probing page learns nothing about
+    which one failed.
+    """
+    return PortError(
+        code="WEB_REQUEST_REFUSED",
+        message=_("The request was refused."),
+        exit_code=ExitCode.SECURITY,
+        hint=_("Use the page sugo ui opened, one file at a time, up to {size} MB.").format(
+            size=MAX_INPUT_BYTES // (1024 * 1024)
+        ),
+    )
 
 
 def unreadable(error: OSError) -> PortError:

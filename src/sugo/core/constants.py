@@ -714,3 +714,24 @@ TRACKING_PARAMETERS: Final = frozenset(
     }
 )
 TRACKING_PARAMETER_PREFIXES: Final = ("utm_",)
+
+# --- Inputs ---------------------------------------------------------------------
+
+# The largest file any extractor accepts; each one applies its own limit.
+MAX_INPUT_BYTES: Final = max(
+    MAX_PDF_FILE_BYTES, MAX_IMAGE_FILE_BYTES, MAX_OFFICE_FILE_BYTES, MAX_XML_FILE_BYTES
+)
+
+# --- Web UI (ADR-055) -----------------------------------------------------------
+
+# Bytes of randomness in the session token: 256 bits, beyond any guessing.
+WEB_TOKEN_BYTES: Final = 32
+# Seconds a connection may stay silent while sending or receiving. Loopback
+# moves 200 MB in about a second; a client that stalls this long is stuck or
+# hostile, and would otherwise hold its thread forever. Converting is not
+# counted: the socket is idle then, and no timer runs.
+WEB_SOCKET_TIMEOUT_S: Final = 60
+# Seconds a whole upload may take. 200 MB takes about a second on loopback;
+# the socket timeout bounds each wait, not a client that sends a byte now
+# and then to keep the server busy.
+WEB_UPLOAD_TIMEOUT_S: Final = 300

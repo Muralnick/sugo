@@ -83,6 +83,15 @@ Example: a key clause repeated at the bottom of every page so it is removed as a
 
 127.0.0.1 only, random port, session token, `Host` and `Origin` checks, no CORS; engine socket owner-only in `$XDG_RUNTIME_DIR` (protects against other local users).
 
+v0.1 web UI (`sugo ui`, ADR-055):
+- The 32-byte session token is placed in the URL fragment (`#token=…`), which the browser never sends to a server, never writes into `Referer` and never exposes to another site. The page sends it in an `X-Sugo-Token` header, compared in constant time.
+- A custom header makes a cross-site request need a CORS preflight; the server never answers one with CORS headers, so a foreign page can neither send the token nor read a response.
+- `Host` must be `127.0.0.1:<port>` or `localhost:<port>` (DNS rebinding); API requests must carry an `Origin` equal to the server's.
+- Refusals use one code, `WEB_REQUEST_REFUSED`, whose message never says which check failed.
+- Document text, file names and messages are inserted as text, never HTML; a strict Content-Security-Policy forbids inline and external scripts.
+- Uploads need a `Content-Length` within the file size limits, checked before the body is read; one conversion runs at a time; there is no path parameter.
+- Residual: another program of the same user can reach the server, and a malicious browser extension can read the page and its token.
+
 ### F. Malicious extensions
 
 | Threat | Mitigation |

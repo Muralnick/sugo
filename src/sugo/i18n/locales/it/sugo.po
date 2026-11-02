@@ -559,3 +559,287 @@ msgstr "Dividi il documento in file più piccoli."
 
 msgid "Open it in Microsoft Office or LibreOffice and save it as .docx, .xlsx or .pptx, without a password."
 msgstr "Aprilo con Microsoft Office o LibreOffice e salvalo come .docx, .xlsx o .pptx, senza password."
+
+# --- Web interface (sugo ui, ADR-055) -------------------------------------------
+
+msgid ""
+"Open Sugo's page in the browser: drop a file, get its Markdown. The page is "
+"served on this computer only; Ctrl+C stops it."
+msgstr ""
+"Apri la pagina di Sugo nel browser: trascina un file, ottieni il suo Markdown. La "
+"pagina è servita solo da questo computer; Ctrl+C la ferma."
+
+msgid "Print the page's address instead of opening it."
+msgstr "Stampa l'indirizzo della pagina invece di aprirla."
+
+msgid "Opening {url}"
+msgstr "Apro {url}"
+
+msgid "No browser found: open the address above."
+msgstr "Nessun browser trovato: apri l'indirizzo qui sopra."
+
+msgid "Press Ctrl+C to stop."
+msgstr "Premi Ctrl+C per fermare."
+
+msgid "Stopped."
+msgstr "Fermato."
+
+msgid "The request was refused."
+msgstr "La richiesta è stata rifiutata."
+
+msgid "Use the page sugo ui opened, one file at a time, up to {size} MB."
+msgstr "Usa la pagina aperta da sugo ui, un file alla volta, fino a {size} MB."
+
+msgid "Documents, reduced: drop a file to get its compact Markdown."
+msgstr "Documenti, ridotti: trascina un file per avere il suo Markdown compatto."
+
+msgid "Drop a file here"
+msgstr "Trascina qui un file"
+
+msgid "Choose a file"
+msgstr "Scegli un file"
+
+msgid "PDF, DOCX, XLSX or PPTX up to {large} MB; PNG, JPEG, WEBP or XML up to {small} MB."
+msgstr "PDF, DOCX, XLSX o PPTX fino a {large} MB; PNG, JPEG, WEBP o XML fino a {small} MB."
+
+msgid "This file is larger than {size} MB."
+msgstr "Questo file supera {size} MB."
+
+msgid "This file is empty."
+msgstr "Questo file è vuoto."
+
+msgid "Converting…"
+msgstr "Conversione in corso…"
+
+msgid "Markdown"
+msgstr "Markdown"
+
+msgid "Copy"
+msgstr "Copia"
+
+msgid "Copied"
+msgstr "Copiato"
+
+msgid "The browser did not allow copying; select the text and copy it."
+msgstr "Il browser non ha permesso di copiare; seleziona il testo e copialo."
+
+msgid "Save as .md"
+msgstr "Salva come .md"
+
+msgid "Text before and after cleaning: {before} -> {after} tokens ({saved}% saved)"
+msgstr "Testo prima e dopo la pulizia: {before} -> {after} token ({saved}% risparmiato)"
+
+msgid "Pages that could not be read: {pages}"
+msgstr "Pagine che non si sono potute leggere: {pages}"
+
+msgid "Blocks removed, per cleaner"
+msgstr "Blocchi rimossi, per pulitore"
+
+msgid "No blocks removed."
+msgstr "Nessun blocco rimosso."
+
+msgid "Something went wrong; the terminal running sugo ui may say more."
+msgstr "Qualcosa è andato storto; il terminale dove gira sugo ui può dire di più."
+
+msgid "Open the address sugo ui printed in the terminal."
+msgstr "Apri l'indirizzo che sugo ui ha scritto nel terminale."
+
+msgid "Sugo runs on this computer only. To stop it, press Ctrl+C in the terminal."
+msgstr "Sugo funziona solo su questo computer. Per fermarlo, premi Ctrl+C nel terminale."
+
+msgid "Convert"
+msgstr "Converti"
+
+msgid "Settings"
+msgstr "Impostazioni"
+
+msgid "Questions"
+msgstr "Domande"
+
+msgid "Tokens before"
+msgstr "Token prima"
+
+msgid "Tokens after"
+msgstr "Token dopo"
+
+msgid "Saved"
+msgstr "Risparmiato"
+
+msgid "Pages"
+msgstr "Pagine"
+
+msgid "Chunks"
+msgstr "Chunk"
+
+msgid "{count} chunks (chosen size: {tokens} tokens)"
+msgstr "{count} chunk (dimensione scelta: {tokens} token)"
+
+msgid "Chunk {number} · {tokens} tokens"
+msgstr "Chunk {number} · {tokens} token"
+
+msgid "pages {pages}"
+msgstr "pagine {pages}"
+
+msgid "Save as .jsonl"
+msgstr "Salva come .jsonl"
+
+msgid ""
+"These choices apply to the next conversion. This browser remembers "
+"them; your configuration file is not changed."
+msgstr ""
+"Queste scelte valgono dalla prossima conversione. Questo browser le "
+"ricorda; il tuo file di configurazione non cambia."
+
+msgid "Interface language"
+msgstr "Lingua dell'interfaccia"
+
+msgid "Languages of your documents"
+msgstr "Lingue dei tuoi documenti"
+
+msgid "Sugo applies their text rules when cleaning. Choose at least one."
+msgstr ""
+"Sugo applica le loro regole del testo durante la pulizia. Scegline "
+"almeno una."
+
+msgid "Remove tracking parameters from links (utm_source and similar)"
+msgstr "Togli dai link i parametri di tracciamento (utm_source e simili)"
+
+msgid "Also split into chunks for RAG"
+msgstr "Dividi anche in chunk per RAG"
+
+msgid "Chunk size in tokens ({min} to {max})"
+msgstr "Dimensione dei chunk in token (da {min} a {max})"
+
+msgid "Back to my configuration"
+msgstr "Torna alla mia configurazione"
+
+msgid "English"
+msgstr "Inglese"
+
+msgid "Italian"
+msgstr "Italiano"
+
+msgid "Spanish"
+msgstr "Spagnolo"
+
+msgid "French"
+msgstr "Francese"
+
+msgid "German"
+msgstr "Tedesco"
+
+msgid "What does Sugo do?"
+msgstr "Che cosa fa Sugo?"
+
+msgid ""
+"It turns a document into compact Markdown for AI models and RAG "
+"systems. It removes what only costs tokens, such as repeated headers "
+"and footers, page numbers, hidden text and tracking parameters, "
+"without losing content."
+msgstr ""
+"Trasforma un documento in Markdown compatto per i modelli di IA e i "
+"sistemi RAG. Toglie ciò che costa solo token, come intestazioni e piè "
+"di pagina ripetuti, numeri di pagina, testo nascosto e parametri di "
+"tracciamento, senza perdere contenuto."
+
+msgid "Do my files leave this computer?"
+msgstr "I miei file escono da questo computer?"
+
+msgid ""
+"No. Sugo converts on this computer, and this page talks only to Sugo, "
+"here. Nothing is sent to the internet."
+msgstr ""
+"No. Sugo converte su questo computer, e questa pagina parla solo con "
+"Sugo, qui. Niente viene inviato a internet."
+
+msgid "Which files can I convert?"
+msgstr "Quali file posso convertire?"
+
+msgid ""
+"PDF, DOCX, XLSX and PPTX up to {large} MB; PNG, JPEG, WEBP and XML up "
+"to {small} MB. Old .doc, .xls and .ppt files and password-protected "
+"files are not read: save a new copy first."
+msgstr ""
+"PDF, DOCX, XLSX e PPTX fino a {large} MB; PNG, JPEG, WEBP e XML fino a "
+"{small} MB. I vecchi file .doc, .xls e .ppt e i file protetti da "
+"password non vengono letti: salvane prima una nuova copia."
+
+msgid "What are tokens?"
+msgstr "Che cosa sono i token?"
+
+msgid ""
+"The pieces of text AI models count and bill. Fewer tokens cost less "
+"and leave more room in the model's context. Sugo counts them with one "
+"tokenizer, o200k_base; other providers count a little differently."
+msgstr ""
+"I pezzetti di testo che i modelli di IA contano e fanno pagare. Meno "
+"token costano meno e lasciano più spazio nel contesto del modello. "
+"Sugo li conta con un solo tokenizer, o200k_base; altri provider "
+"contano in modo un po' diverso."
+
+msgid "Why are some blocks removed?"
+msgstr "Perché alcuni blocchi vengono tolti?"
+
+msgid ""
+"Each cleaner removes one kind of noise, and the page shows how many "
+"blocks each one removed. Text that cannot be read is marked as "
+"illegible, never guessed."
+msgstr ""
+"Ogni pulitore toglie un tipo di rumore, e la pagina mostra quanti "
+"blocchi ha tolto ciascuno. Il testo che non si riesce a leggere viene "
+"segnato come illeggibile, mai indovinato."
+
+msgid "What are chunks?"
+msgstr "Che cosa sono i chunk?"
+
+msgid ""
+"Pieces of the document of about the size you choose, each with its "
+"headings and pages, ready for a vector database. Save them as .jsonl, "
+"the same format as sugo convert --chunks."
+msgstr ""
+"Pezzi del documento grandi più o meno quanto scegli, ognuno con i suoi "
+"titoli e le sue pagine, pronti per un database vettoriale. Salvali "
+"come .jsonl, lo stesso formato di sugo convert --chunks."
+
+msgid "What are the languages of my documents for?"
+msgstr "A che cosa servono le lingue dei miei documenti?"
+
+msgid ""
+"Sugo applies their text rules when cleaning: in Italian and French, "
+"for example, it rejoins \"dell' albero\" into \"dell'albero\". Sugo never "
+"guesses the language."
+msgstr ""
+"Sugo applica le loro regole del testo durante la pulizia: in italiano "
+"e francese, per esempio, riunisce \"dell' albero\" in \"dell'albero\". "
+"Sugo non indovina mai la lingua."
+
+msgid "Where are my settings kept?"
+msgstr "Dove vengono tenute le mie impostazioni?"
+
+msgid ""
+"The choices made here stay in this browser. The base settings come "
+"from your configuration file; sugo doctor shows where it is."
+msgstr ""
+"Le scelte fatte qui restano in questo browser. Le impostazioni di base "
+"vengono dal tuo file di configurazione; sugo doctor mostra dove si "
+"trova."
+
+msgid "How do I stop Sugo?"
+msgstr "Come fermo Sugo?"
+
+msgid ""
+"Press Ctrl+C in the terminal where sugo ui runs. Closing this page is "
+"not enough."
+msgstr ""
+"Premi Ctrl+C nel terminale dove gira sugo ui. Chiudere questa pagina "
+"non basta."
+
+msgid "Can I do the same from the command line?"
+msgstr "Posso fare lo stesso dalla riga di comando?"
+
+msgid ""
+"Yes: sugo FILE converts, sugo stats FILE shows the tokens per "
+"provider, and sugo convert FILE --chunks makes chunks."
+msgstr ""
+"Sì: sugo FILE converte, sugo stats FILE mostra i token per provider, e "
+"sugo convert FILE --chunks crea i chunk."
