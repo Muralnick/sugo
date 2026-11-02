@@ -637,7 +637,7 @@ Versioning: SemVer; 0.x may change contracts with notice; 1.0 when contracts are
 |---|---|
 | PP-OCRv6 availability in RapidOCR packages (else convert to ONNX) | Verified: `rapidocr` 3.10.0 bundles PP-OCRv6 *small* (ADR-039) |
 | Deskew and perspective correction of document photos | Deferred: separate pull request after the layout module (2c) |
-| PyMuPDF 2.x adoption: 1.28.2 used while step 5a is written; move to 2.0 (or 2.0.x with MuPDF ≥ 1.28.6) after 2026-11-02, check its new dependencies and that its layout module never downloads models (ADR-043) | **Blocks merging step 5a** |
+| PyMuPDF 2.x adoption: 2.0 (MuPDF 1.28.5) adopted 2026-11-02 after checking its new dependencies and its layout module, which never downloads models and is never loaded (ADR-043); move to a 2.0.x with MuPDF ≥ 1.28.6 when 14 days old, then drop the Brotli checks | Done for 2.0 |
 | OCR speed on the reference machine: dense phone screenshot ~7.4 s warm with the bundled small models vs < 2 s target; tiny models ~2.1 s but no Japanese (`benchmarks/ocr_speed.py`, ADR-039) | Decision pending |
 | PaddleOCR-VL on macOS | To verify |
 | Exact options to redirect Docling, RapidOCR and Hugging Face caches | To verify |
