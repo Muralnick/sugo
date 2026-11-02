@@ -39,8 +39,13 @@ document is refused.
 import re
 from dataclasses import dataclass
 
-BROTLI_REFUSAL = "the PDF uses Brotli compression, refused until MuPDF fixes CVE-2026-111497"
-UNCHECKED_REFUSAL = "the PDF's compression filters cannot be checked"
+from sugo.i18n import N_
+
+# Marked, not translated: the worker sends it as data and the parent translates it.
+# Filled with MAX_PDF_PAGES by the worker; the parent recognises the result.
+PAGES_REFUSAL = N_("the PDF has more than {pages} pages")
+BROTLI_REFUSAL = N_("the PDF uses Brotli compression, refused until MuPDF fixes CVE-2026-111497")
+UNCHECKED_REFUSAL = N_("the PDF's compression filters cannot be checked")
 
 _BROTLI_NAMES = frozenset({b"Br", b"BrotliDecode"})
 _NAME_ESCAPE = re.compile(rb"#([0-9A-Fa-f]{2})")
@@ -102,7 +107,7 @@ def raw_problem(data: bytes) -> str | None:
     if found.brotli:
         return BROTLI_REFUSAL
     if found.irregular:
-        return "the PDF writes a stream filter in a form Sugo cannot check safely"
+        return N_("the PDF writes a stream filter in a form Sugo cannot check safely")
     if not found.complete:
         return UNCHECKED_REFUSAL
     return None

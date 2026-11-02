@@ -14,6 +14,7 @@ from importlib import resources
 from tiktoken.core import Encoding
 
 from sugo.core.constants import O200K_BASE_SHA256
+from sugo.i18n import gettext as _
 
 # Copied from tiktoken_ext/openai_public.py (tiktoken 0.14.0, MIT): the
 # pre-tokenisation pattern is part of the encoding, not of the vocabulary file.
@@ -51,7 +52,7 @@ def parse_vocabulary(data: bytes, expected_sha256: str) -> dict[bytes, int]:
     """
     # The hash is checked before parsing, so altered content is never interpreted.
     if hashlib.sha256(data).hexdigest() != expected_sha256:
-        raise VocabularyIntegrityError("tokenizer vocabulary failed its SHA-256 check")
+        raise VocabularyIntegrityError(_("tokenizer vocabulary failed its SHA-256 check"))
     ranks: dict[bytes, int] = {}
     for line in data.splitlines():
         if line:

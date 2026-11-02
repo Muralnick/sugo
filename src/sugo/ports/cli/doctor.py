@@ -2,7 +2,8 @@
 
 Each check reports ``ok``, ``warning`` or ``error`` with a short detail. The
 checks only read: they create no cache, download nothing and load no model
-into memory beyond hashing its file.
+into memory beyond hashing its file. Check names are English, as ``--json``
+shows them, and marked so that the table can show them translated.
 """
 
 import importlib.util
@@ -15,6 +16,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from importlib.metadata import PackageNotFoundError, version
 
+from sugo.i18n import N_
+from sugo.i18n import gettext as _
 from sugo.storage.page_cache import CACHE_FILE_NAME
 from sugo.storage.paths import cache_dir
 
@@ -58,23 +61,36 @@ def run_checks() -> list[Check]:
     """Run every check, in display order."""
     checks = [
         Check("sugo", Status.OK, version("sugo")),
-        Check("python", Status.OK, f"{platform.python_version()} on {platform.platform()}"),
-        Check("cpus", Status.OK, str(os.cpu_count() or "unknown")),
+        Check(
+            "python",
+            Status.OK,
+            _("{version} on {system}").format(
+                version=platform.python_version(), system=platform.platform()
+            ),
+        ),
+        Check(N_("cpus"), Status.OK, str(os.cpu_count() or _("unknown"))),
     ]
     missing = missing_lite_packages()
     if missing:
         checks.append(
             Check(
-                "level lite",
+                N_("level lite"),
                 Status.ERROR,
-                f'missing {", ".join(missing)}: pip install "sugo[lite]"',
+                _('missing {packages}: pip install "sugo[lite]"').format(
+                    packages=", ".join(missing)
+                ),
             )
         )
     else:
-        checks.append(Check("level lite", Status.OK, _versions(LITE_PACKAGES.values())))
-        checks.extend([_guarded("ocr models", _ocr_models), _guarded("pymupdf", _pymupdf)])
+        checks.append(Check(N_("level lite"), Status.OK, _versions(LITE_PACKAGES.values())))
+        checks.extend([_guarded(N_("ocr models"), _ocr_models), _guarded("pymupdf", _pymupdf)])
     checks.extend(
-        [_guarded("tokenizer", _tokenizer), _guarded("config", _config), _cache(), _clipboard()]
+        [
+            _guarded(N_("tokenizer"), _tokenizer),
+            _guarded(N_("config"), _config),
+            _cache(),
+            _clipboard(),
+        ]
     )
     return checks
 
@@ -87,7 +103,7 @@ def _version(dist: str) -> str:
     try:
         return version(dist)
     except PackageNotFoundError:
-        return "not installed"
+        return _("not installed")
 
 
 def _guarded(name: str, check: Callable[[], Check]) -> Check:
@@ -104,7 +120,11 @@ def _ocr_models() -> Check:
     models = bundled_models()
     for model in models:
         model.verify()
-    return Check("ocr models", Status.OK, f"{len(models)} models, SHA-256 verified")
+    return Check(
+        "ocr models",
+        Status.OK,
+        _("{count} models, SHA-256 verified").format(count=len(models)),
+    )
 
 
 def _pymupdf() -> Check:
@@ -113,7 +133,9 @@ def _pymupdf() -> Check:
         return Check(
             "pymupdf",
             Status.WARNING,
-            f"{installed} has known memory-safety bugs; convert only PDFs you trust",
+            _("{version} has known memory-safety bugs; convert only PDFs you trust").format(
+                version=installed
+            ),
         )
     return Check("pymupdf", Status.OK, installed)
 
@@ -122,7 +144,7 @@ def _tokenizer() -> Check:
     from sugo.metrics.tokenizer import get_encoding
 
     get_encoding()
-    return Check("tokenizer", Status.OK, "o200k_base, SHA-256 verified")
+    return Check("tokenizer", Status.OK, _("o200k_base, SHA-256 verified"))
 
 
 def _config() -> Check:
@@ -133,13 +155,14 @@ def _config() -> Check:
     except ConfigError as error:
         return Check("config", Status.ERROR, str(error))
     files = ", ".join(printable(str(path)) for path in loaded.sources) or (
-        f"defaults (none at {printable(str(user_config_path()))})"
+        _("defaults (none at {path})").format(path=printable(str(user_config_path())))
     )
     # The MCP server reads the user file only (ADR-051): show what it applies too.
     mcp = load(project=False, environment=False).settings
-    detail = (
-        f"{files}; languages {', '.join(loaded.settings.languages)}"
-        f"; sugo mcp: languages {', '.join(mcp.languages)}"
+    detail = _("{files}; languages {languages}; sugo mcp: languages {mcp_languages}").format(
+        files=files,
+        languages=", ".join(loaded.settings.languages),
+        mcp_languages=", ".join(mcp.languages),
     )
     if loaded.warnings:
         return Check("config", Status.WARNING, f"{detail}; " + "; ".join(loaded.warnings))
@@ -150,15 +173,15 @@ def _cache() -> Check:
     directory = cache_dir()
     database = directory / CACHE_FILE_NAME
     if not database.exists():
-        return Check("cache", Status.OK, f"{directory} (empty)")
+        return Check(N_("cache"), Status.OK, _("{folder} (empty)").format(folder=directory))
     size_mb = database.stat().st_size / 1_000_000
     return Check("cache", Status.OK, f"{directory} ({size_mb:.1f} MB)")
 
 
 def _clipboard() -> Check:
     if sys.platform in ("win32", "darwin"):
-        return Check("clipboard", Status.OK, "native")
+        return Check(N_("clipboard"), Status.OK, _("native"))
     tools = [tool for tool in ("wl-paste", "xclip") if shutil.which(tool)]
     if tools:
         return Check("clipboard", Status.OK, ", ".join(tools))
-    return Check("clipboard", Status.WARNING, "install wl-clipboard (Wayland) or xclip (X11)")
+    return Check("clipboard", Status.WARNING, _("install wl-clipboard (Wayland) or xclip (X11)"))

@@ -53,7 +53,13 @@ from sugo.core.constants import (
     PDF_WORKER_MEMORY_BYTES,
 )
 from sugo.core.models import BBox
-from sugo.extractors.pymupdf.guard import BROTLI_REFUSAL, UNCHECKED_REFUSAL, names_brotli, scan
+from sugo.extractors.pymupdf.guard import (
+    BROTLI_REFUSAL,
+    PAGES_REFUSAL,
+    UNCHECKED_REFUSAL,
+    names_brotli,
+    scan,
+)
 from sugo.extractors.pymupdf.protocol import (
     Message,
     NativeLine,
@@ -67,6 +73,7 @@ from sugo.extractors.pymupdf.protocol import (
     write_frame,
     write_message,
 )
+from sugo.i18n import N_
 
 # PyMuPDF 2.0 imports its layout module and pymupdf4llm whenever they are
 # installed; the first loads ONNX models at once and both load onnxruntime.
@@ -144,7 +151,7 @@ def run(
     try:
         document = pymupdf.open(stream=data, filetype="pdf")
     except (RuntimeError, ValueError):
-        yield Refused(code="PDF_INVALID", message="the file is not a readable PDF"), None
+        yield Refused(code="PDF_INVALID", message=N_("the file is not a readable PDF")), None
         return
     with document:
         refusal = _check(document, streams=check_streams)
@@ -175,9 +182,9 @@ def _limit_resources() -> None:
 
 def _check(document: pymupdf.Document, *, streams: bool) -> Refused | None:
     if document.needs_pass:
-        return Refused(code="PDF_ENCRYPTED", message="the PDF is protected by a password")
+        return Refused(code="PDF_ENCRYPTED", message=N_("the PDF is protected by a password"))
     if document.page_count > MAX_PDF_PAGES:
-        return Refused(code="PDF_TOO_LARGE", message=f"the PDF has more than {MAX_PDF_PAGES} pages")
+        return Refused(code="PDF_TOO_LARGE", message=PAGES_REFUSAL.format(pages=MAX_PDF_PAGES))
     if streams:
         return _stream_problem(document)
     return None

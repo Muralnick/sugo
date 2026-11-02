@@ -32,6 +32,7 @@ from sugo.core.constants import (
 )
 from sugo.core.models import BBox
 from sugo.extractors.image.preprocess import PreparedImage
+from sugo.i18n import gettext as _
 
 ENGINE_NAME = "rapidocr-ppocrv6-small"
 _HASH_CHUNK_BYTES = 1024 * 1024
@@ -61,7 +62,9 @@ class OcrModel:
                 digest.update(chunk)
         if digest.hexdigest() != self.sha256:
             # The model name is part of Sugo, not of the user's documents.
-            raise ModelIntegrityError(f"model {self.path.name} failed its SHA-256 check")
+            raise ModelIntegrityError(
+                _("model {name} failed its SHA-256 check").format(name=self.path.name)
+            )
 
 
 @dataclass(frozen=True)

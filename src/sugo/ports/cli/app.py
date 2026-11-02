@@ -6,6 +6,9 @@ terminal and honours ``NO_COLOR``. ``--json`` prints one JSON object instead.
 Exit codes follow ``ExitCode``. Typer's rich tracebacks are off: they print
 local variables, which can hold document text, and shell completion is off:
 installing it would edit the user's shell profile.
+
+Messages and help follow ``ui.language`` (ADR-052); ``--json`` output and
+``sugo mcp`` are always in English, for the programs and agents that read them.
 """
 
 import io
@@ -22,10 +25,13 @@ import typer
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
-from typer.core import TyperGroup
 
+from sugo import i18n
 from sugo.core.constants import CHUNK_MAX_TOKENS, CHUNK_MAX_TOKENS_LIMIT, CHUNK_MIN_TOKENS
+from sugo.i18n import N_, ngettext
+from sugo.i18n import gettext as _
 from sugo.ports.cli.doctor import Status, missing_lite_packages, run_checks
+from sugo.ports.cli.translation import TranslatedCommand, TranslatedGroup, use_language
 from sugo.ports.errors import (
     ExitCode,
     PortError,
@@ -45,9 +51,11 @@ _log = logging.getLogger(__name__)
 _stderr = Console(stderr=True, markup=False, highlight=False, soft_wrap=True)
 _stdout = Console(markup=False, highlight=False)
 _STATUS_STYLES = {Status.OK: "green", Status.WARNING: "yellow", Status.ERROR: "bold red"}
+_STATUS_NAMES = {Status.OK: N_("ok"), Status.WARNING: N_("warning"), Status.ERROR: N_("error")}
+_KIND_NAMES = {"pdf": N_("pdf"), "image": N_("image")}
 
 
-class _DefaultConvert(TyperGroup):
+class _DefaultConvert(TranslatedGroup):
     """Makes ``sugo FILE`` mean ``sugo convert FILE``."""
 
     def parse_args(self, ctx: Any, args: list[str]) -> list[str]:  # click.Context
@@ -59,7 +67,7 @@ class _DefaultConvert(TyperGroup):
 app = typer.Typer(
     cls=_DefaultConvert,
     name="sugo",
-    help="Documents, reduced: convert PDFs and images into compact Markdown, locally.",
+    help=N_("Documents, reduced: convert PDFs and images into compact Markdown, locally."),
     add_completion=False,
     no_args_is_help=True,
     pretty_exceptions_enable=False,
@@ -68,12 +76,30 @@ app = typer.Typer(
 
 def main() -> None:
     """Entry point of the ``sugo`` script."""
-    if not sys.stdout.isatty() and isinstance(sys.stdout, io.TextIOWrapper):
-        # Piped output is read by other programs: UTF-8 everywhere, never the
-        # Windows code page, which cannot encode most scripts.
-        sys.stdout.reconfigure(encoding="utf-8")
+    for stream in (sys.stdout, sys.stderr):
+        if not stream.isatty() and isinstance(stream, io.TextIOWrapper):
+            # Piped output is read by other programs, or shown by terminals such
+            # as Git Bash: UTF-8 everywhere, never the Windows code page, which
+            # cannot encode most scripts. Messages have accents in Italian.
+            stream.reconfigure(encoding="utf-8")
     logging.basicConfig(level=logging.WARNING, format="sugo: %(levelname)s: %(message)s")
+    use_language(_ui_language(sys.argv[1:]))
     app()
+
+
+def _ui_language(args: list[str]) -> str:
+    """The interface language, chosen before parsing so help and usage errors speak it."""
+    if args and args[0] == "mcp":
+        # The MCP server always speaks English, and reads no project file (ADR-049, ADR-051).
+        return "en"
+    from sugo.config.settings import ConfigError, load
+
+    try:
+        setting = load().settings.ui.language
+    except ConfigError:
+        # The command reports the error itself, in the system's language.
+        setting = "auto"
+    return i18n.resolve(setting)
 
 
 def _show_version(value: bool) -> None:
@@ -88,30 +114,44 @@ def _root(
     show_version: Annotated[
         bool,
         typer.Option(
-            "--version", is_eager=True, callback=_show_version, help="Show the version and exit."
+            "--version",
+            is_eager=True,
+            callback=_show_version,
+            help=N_("Show the version and exit."),
         ),
     ] = False,
 ) -> None:
-    """Documents, reduced: convert PDFs and images into compact Markdown, locally."""
+    """Options of the ``sugo`` command itself; the help is the Typer app's."""
 
 
 # --- convert ------------------------------------------------------------------
 
 
-@app.command("convert")
+@app.command(
+    "convert",
+    cls=TranslatedCommand,
+    help=N_(
+        "Convert files into compact Markdown (sugo FILE is short for sugo convert FILE).\n\n"
+        "Without -o the Markdown of one file goes to stdout; with --chunks, its "
+        "chunks as JSON Lines. With -o each file becomes NAME.md, and NAME.jsonl "
+        "with --chunks. A file that fails does not stop the others."
+    ),
+)
 def convert_command(
     files: Annotated[
         list[Path],
         # Not exists=True: a missing file is reported with the others, not as a
         # usage error that would stop the whole batch.
-        typer.Argument(dir_okay=False, metavar="FILE...", help="PDF, PNG, JPEG or WEBP files."),
+        typer.Argument(dir_okay=False, metavar="FILE...", help=N_("PDF, PNG, JPEG or WEBP files.")),
     ],
     output: Annotated[
         Path | None,
-        typer.Option("-o", "--output", file_okay=False, help="Write NAME.md files to this folder."),
+        typer.Option(
+            "-o", "--output", file_okay=False, help=N_("Write NAME.md files to this folder.")
+        ),
     ] = None,
     chunks: Annotated[
-        bool, typer.Option("--chunks", help="Also split into chunks (JSONL) for RAG.")
+        bool, typer.Option("--chunks", help=N_("Also split into chunks (JSONL) for RAG."))
     ] = False,
     max_tokens: Annotated[
         int | None,
@@ -119,31 +159,29 @@ def convert_command(
             "--max-tokens",
             min=CHUNK_MIN_TOKENS,
             max=CHUNK_MAX_TOKENS_LIMIT,
-            help=f"Chunk size in tokens [default: chunking.max_tokens, {CHUNK_MAX_TOKENS}].",
+            help=N_("Chunk size in tokens."),
+            # Typer's own default line: brackets in a help text would be Rich markup.
+            show_default=f"chunking.max_tokens, {CHUNK_MAX_TOKENS}",
         ),
     ] = None,
     front_matter: Annotated[
-        bool, typer.Option("--front-matter", help="Start the Markdown with YAML metadata.")
+        bool, typer.Option("--front-matter", help=N_("Start the Markdown with YAML metadata."))
     ] = False,
     no_cache: Annotated[
-        bool, typer.Option("--no-cache", help="Keep no page cache on disk.")
+        bool, typer.Option("--no-cache", help=N_("Keep no page cache on disk."))
     ] = False,
-    json_output: Annotated[bool, typer.Option("--json", help="Print one JSON object.")] = False,
+    json_output: Annotated[bool, typer.Option("--json", help=N_("Print one JSON object."))] = False,
 ) -> None:
-    """Convert files into compact Markdown (sugo FILE is short for sugo convert FILE).
-
-    Without -o the Markdown of one file goes to stdout; with --chunks, its
-    chunks as JSON Lines. With -o each file becomes NAME.md, and NAME.jsonl
-    with --chunks. A file that fails does not stop the others.
-    """
+    """Convert files; the help text is in the decorator, for translation."""
+    _english_for_json(json_output)
     if max_tokens is not None and not chunks:
-        raise typer.BadParameter("--max-tokens needs --chunks", param_hint="'--max-tokens'")
+        raise typer.BadParameter(_("--max-tokens needs --chunks"), param_hint="'--max-tokens'")
     if output is None and len(files) > 1:
-        raise typer.BadParameter("several files need an output folder", param_hint="'-o'")
+        raise typer.BadParameter(_("several files need an output folder"), param_hint="'-o'")
     if front_matter and output is None and (chunks or json_output):
         # Only a Markdown file or Markdown on stdout can carry front matter.
         raise typer.BadParameter(
-            "front matter goes only into Markdown output", param_hint="'--front-matter'"
+            _("front matter goes only into Markdown output"), param_hint="'--front-matter'"
         )
     targets = None if output is None else _targets(files, output, chunks=chunks)
     with _failures(json_output):
@@ -161,7 +199,7 @@ def convert_command(
             for path in files:
                 source = path.as_posix()
                 try:
-                    with _progress(f"Converting {source}", quiet=json_output):
+                    with _progress(_converting(source), quiet=json_output):
                         conversion = pipeline.convert_file(
                             path,
                             cache=cache,
@@ -208,14 +246,17 @@ def _targets(files: list[Path], output: Path, *, chunks: bool) -> dict[Path, lis
         key = path.stem.casefold()
         if key in seen and seen[key].resolve() != path.resolve():
             raise typer.BadParameter(
-                f"{seen[key].as_posix()} and {path.as_posix()} would both write {path.stem}.md",
+                _("{first} and {second} would both write {name}.md").format(
+                    first=seen[key].as_posix(), second=path.as_posix(), name=path.stem
+                ),
                 param_hint="FILES",
             )
         seen[key] = path
         names = [output / f"{path.stem}.md"] + ([output / f"{path.stem}.jsonl"] if chunks else [])
         if any(name.resolve() in inputs for name in names):
             raise typer.BadParameter(
-                f"writing {path.stem}.md would overwrite an input file", param_hint="'-o'"
+                _("writing {name}.md would overwrite an input file").format(name=path.stem),
+                param_hint="'-o'",
             )
         targets[path] = names
     return targets
@@ -239,9 +280,9 @@ def _write_outputs(
     except OSError as error:
         raise PortError(
             code="OUTPUT_UNWRITABLE",
-            message=error.strerror or "the output could not be written",
+            message=i18n.os_reason(error),
             exit_code=ExitCode.ERROR,
-            hint="Check the output folder: free space and permission to write.",
+            hint=_("Check the output folder: free space and permission to write."),
         ) from error
     return [target.as_posix() for target in targets]
 
@@ -273,19 +314,24 @@ def _metadata(conversion: "Conversion") -> dict[str, str | None]:
 # --- stats --------------------------------------------------------------------
 
 
-@app.command("stats")
+@app.command(
+    "stats",
+    cls=TranslatedCommand,
+    help=N_("Show the tokens Sugo saves on a file, per LLM provider."),
+)
 def stats_command(
     file: Annotated[
         Path,
-        typer.Argument(exists=True, dir_okay=False, readable=True, help="PDF or image file."),
+        typer.Argument(exists=True, dir_okay=False, readable=True, help=N_("PDF or image file.")),
     ],
     provider: Annotated[
         list[str] | None,
-        typer.Option("--provider", help="Compare with this provider only; repeatable."),
+        typer.Option("--provider", help=N_("Compare with this provider only; repeatable.")),
     ] = None,
-    json_output: Annotated[bool, typer.Option("--json", help="Print one JSON object.")] = False,
+    json_output: Annotated[bool, typer.Option("--json", help=N_("Print one JSON object."))] = False,
 ) -> None:
-    """Show the tokens Sugo saves on a file, per LLM provider."""
+    """Show savings per provider; the help text is in the decorator, for translation."""
+    _english_for_json(json_output)
     from sugo.metrics.providers import list_providers
 
     available = list_providers()
@@ -293,7 +339,9 @@ def stats_command(
     unknown = sorted(set(providers) - set(available))
     if unknown:
         raise typer.BadParameter(
-            f"unknown provider {', '.join(unknown)}; choose from {', '.join(available)}",
+            _("unknown provider {names}; choose from {choices}").format(
+                names=", ".join(unknown), choices=", ".join(available)
+            ),
             param_hint="'--provider'",
         )
     with _failures(json_output):
@@ -305,7 +353,7 @@ def stats_command(
         source = file.as_posix()
         with (
             _page_cache(enabled=settings.storage.cache == "persistent") as cache,
-            _progress(f"Converting {source}", quiet=json_output),
+            _progress(_converting(source), quiet=json_output),
         ):
             try:
                 data = pipeline.read_input(file)
@@ -334,22 +382,31 @@ def stats_command(
 
 
 def _print_stats(source: str, estimate: "SavingsEstimate") -> None:
-    pages = f"{estimate.pages} page" + ("" if estimate.pages == 1 else "s")
-    _stdout.print(Text(f"{source}: {estimate.kind.value}, {pages}"))
+    pages = ngettext("{count} page", "{count} pages", estimate.pages).format(count=estimate.pages)
+    kind = i18n.gettext(_KIND_NAMES.get(estimate.kind.value, estimate.kind.value))
+    _stdout.print(Text(f"{source}: {kind}, {pages}"))
     text = estimate.text
+    summary = _("Text before and after cleaning: {before} -> {after} tokens ({saved:.1f}% saved)")
     _stdout.print(
         Text(
-            f"Text before and after cleaning: {text.baseline_tokens} -> {text.result_tokens} "
-            f"tokens ({text.saved_percent:.1f}% saved)"
+            summary.format(
+                before=text.baseline_tokens, after=text.result_tokens, saved=text.saved_percent
+            )
         )
     )
     if not estimate.images and not estimate.rejected_by:
         return
-    table = Table(title="Sending the image vs sending its Markdown")
-    for column in ("provider", "tier", "image tokens", "Markdown tokens", "saved"):
-        table.add_column(column, justify="left" if column in ("provider", "tier") else "right")
+    table = Table(title=_("Sending the image vs sending its Markdown"))
+    table.add_column(_("provider"))
+    table.add_column(_("tier"))
+    for column in (_("image tokens"), _("Markdown tokens"), _("saved")):
+        table.add_column(column, justify="right")
     for image in estimate.images:
-        name = image.provider if image.formula_verified else f"{image.provider} (unverified)"
+        name = (
+            image.provider
+            if image.formula_verified
+            else _("{provider} (unverified)").format(provider=image.provider)
+        )
         table.add_row(
             name,
             image.tier,
@@ -358,22 +415,27 @@ def _print_stats(source: str, estimate: "SavingsEstimate") -> None:
             f"{image.saved_percent:.1f}%",
         )
     for name in estimate.rejected_by:
-        table.add_row(name, "-", "rejected", "-", "-")
+        table.add_row(name, "-", _("rejected"), "-", "-")
     _stdout.print(table)
 
 
 # --- clip ---------------------------------------------------------------------
 
 
-@app.command("clip")
+@app.command(
+    "clip", cls=TranslatedCommand, help=N_("Convert the image in the clipboard, e.g. a screenshot.")
+)
 def clip_command(
     output: Annotated[
         Path | None,
-        typer.Option("-o", "--output", file_okay=False, help="Write clip-HASH.md to this folder."),
+        typer.Option(
+            "-o", "--output", file_okay=False, help=N_("Write clip-HASH.md to this folder.")
+        ),
     ] = None,
-    json_output: Annotated[bool, typer.Option("--json", help="Print one JSON object.")] = False,
+    json_output: Annotated[bool, typer.Option("--json", help=N_("Print one JSON object."))] = False,
 ) -> None:
-    """Convert the image in the clipboard, e.g. a screenshot."""
+    """Convert the clipboard image; the help text is in the decorator, for translation."""
+    _english_for_json(json_output)
     with _failures(json_output):
         settings = _settings(quiet=json_output)
         _require_lite()
@@ -383,7 +445,7 @@ def clip_command(
         data = read_clipboard_image()
         with (
             _page_cache(enabled=settings.storage.cache == "persistent") as cache,
-            _progress("Converting", quiet=json_output),
+            _progress(_("Converting"), quiet=json_output),
         ):
             conversion = pipeline.convert(
                 data,
@@ -399,7 +461,7 @@ def clip_command(
         if json_output:
             _write_json({"documents": [_document_json(conversion, written, with_chunks=False)]})
         else:
-            _say_converted("clipboard", conversion, written)
+            _say_converted(_("clipboard"), conversion, written)
             if written is None:
                 _print_result(conversion, chunks=False, front_matter=False)
 
@@ -407,11 +469,16 @@ def clip_command(
 # --- doctor -------------------------------------------------------------------
 
 
-@app.command("doctor")
+@app.command(
+    "doctor",
+    cls=TranslatedCommand,
+    help=N_("Check the installation: levels, verified models, cache and clipboard."),
+)
 def doctor_command(
-    json_output: Annotated[bool, typer.Option("--json", help="Print one JSON object.")] = False,
+    json_output: Annotated[bool, typer.Option("--json", help=N_("Print one JSON object."))] = False,
 ) -> None:
-    """Check the installation: levels, verified models, cache and clipboard."""
+    """Run the checks; the help text is in the decorator, for translation."""
+    _english_for_json(json_output)
     checks = run_checks()
     if json_output:
         _write_json(
@@ -426,8 +493,8 @@ def doctor_command(
         table = Table(show_header=False, box=None)
         for check in checks:
             table.add_row(
-                check.name,
-                Text(check.status.value, style=_STATUS_STYLES[check.status]),
+                i18n.gettext(check.name),
+                Text(i18n.gettext(_STATUS_NAMES[check.status]), style=_STATUS_STYLES[check.status]),
                 check.detail,
             )
         _stdout.print(table)
@@ -438,7 +505,11 @@ def doctor_command(
 # --- mcp ----------------------------------------------------------------------
 
 
-@app.command("mcp")
+@app.command(
+    "mcp",
+    cls=TranslatedCommand,
+    help=N_("Serve Sugo to AI agents over MCP (stdio), reading only inside the given folders."),
+)
 def mcp_command(
     root: Annotated[
         list[Path],
@@ -446,11 +517,11 @@ def mcp_command(
             "--root",
             exists=True,
             file_okay=False,
-            help="A folder agents may read; repeatable. Required.",
+            help=N_("A folder agents may read; repeatable. Required."),
         ),
     ],
 ) -> None:
-    """Serve Sugo to AI agents over MCP (stdio), reading only inside the given folders."""
+    """Serve over MCP, in English: ``main`` chooses no other language for it."""
     from sugo.ports.mcp.access import Roots
 
     try:
@@ -490,9 +561,19 @@ def _settings(*, quiet: bool) -> "Settings":
     return loaded.settings
 
 
+def _english_for_json(json_output: bool) -> None:
+    """``--json`` output is read by programs: its messages are always in English."""
+    if json_output:
+        use_language("en")
+
+
+def _converting(source: str) -> str:
+    return _("Converting {source}").format(source=source)
+
+
 def _warn(warnings: tuple[str, ...]) -> None:
     for warning in warnings:
-        _stderr.print(Text(f"warning: {warning}"))
+        _stderr.print(Text(_("warning: {message}").format(message=warning)))
 
 
 def _require_lite() -> None:
@@ -512,7 +593,7 @@ def _failures(json_output: bool) -> Iterator[None]:
     try:
         yield
     except KeyboardInterrupt:
-        _stderr.print("Interrupted.")
+        _stderr.print(_("Interrupted."))
         raise typer.Exit(ExitCode.INTERRUPTED) from None
     except Exception as caught:
         error = _as_cli_error(caught)
@@ -559,7 +640,7 @@ def _make_folder(output: Path) -> None:
     except OSError as error:
         raise PortError(
             code="OUTPUT_UNWRITABLE",
-            message=error.strerror or "the output folder could not be created",
+            message=i18n.os_reason(error),
             exit_code=ExitCode.ERROR,
             details={"output": output.as_posix()},
         ) from error
@@ -610,18 +691,23 @@ def _say_converted(source: str, conversion: "Conversion", written: list[str] | N
         _stderr.print(Text(f"{source} -> {', '.join(written)}"))
     if conversion.failed_pages:
         pages = ", ".join(str(page) for page in conversion.failed_pages)
-        _stderr.print(Text(f"{source}: pages {pages} could not be read", style="yellow"))
+        message = ngettext(
+            "{source}: page {pages} could not be read",
+            "{source}: pages {pages} could not be read",
+            len(conversion.failed_pages),
+        )
+        _stderr.print(Text(message.format(source=source, pages=pages), style="yellow"))
 
 
 def _say_error(error: PortError, source: str | None = None) -> None:
     line = Text()
     if source is not None:
         line.append(f"{source}: ")
-    line.append("error", style="bold red")
+    line.append(_("error"), style="bold red")
     line.append(f" {error.code}: {error.message}")
     _stderr.print(line)
     if error.hint:
-        _stderr.print(Text(f"  hint: {error.hint}", style="dim"))
+        _stderr.print(Text("  " + _("hint: {hint}").format(hint=error.hint), style="dim"))
 
 
 def _write(text: str) -> None:

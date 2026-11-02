@@ -10,6 +10,10 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Any
 
+from sugo import i18n
+from sugo.i18n import N_
+from sugo.i18n import gettext as _
+
 
 class ExitCode(IntEnum):
     """Process exit codes; a public contract (ARCHITECTURE §12)."""
@@ -46,17 +50,22 @@ class PortError(Exception):
 
 # Codes raised by the extractors and the pipeline, with what the user can do.
 # Size limits are part of the security floor (principle 7): exit code 4.
+# Hints are translated when the error is made, in the language active then.
+_DAMAGED = N_("The file may be damaged; open it and save it again.")
 _KNOWN: dict[str, tuple[ExitCode, str | None]] = {
-    "INPUT_UNSUPPORTED": (ExitCode.ERROR, "Sugo reads PDF, PNG, JPEG and WEBP files."),
-    "IMAGE_UNSUPPORTED": (ExitCode.ERROR, "Save the image as a still PNG, JPEG or WEBP."),
-    "IMAGE_INVALID": (ExitCode.ERROR, "The file may be damaged; open it and save it again."),
-    "IMAGE_TOO_LARGE": (ExitCode.SECURITY, "Reduce the image size, or split it."),
-    "PDF_INVALID": (ExitCode.ERROR, "The file may be damaged; open it and save it again."),
-    "PDF_ENCRYPTED": (ExitCode.ERROR, "Save an unprotected copy of the PDF and convert that."),
-    "PDF_TOO_LARGE": (ExitCode.SECURITY, "Split the PDF into smaller files."),
+    "INPUT_UNSUPPORTED": (ExitCode.ERROR, N_("Sugo reads PDF, PNG, JPEG and WEBP files.")),
+    "IMAGE_UNSUPPORTED": (ExitCode.ERROR, N_("Save the image as a still PNG, JPEG or WEBP.")),
+    "IMAGE_INVALID": (ExitCode.ERROR, _DAMAGED),
+    "IMAGE_TOO_LARGE": (ExitCode.SECURITY, N_("Reduce the image size, or split it.")),
+    "PDF_INVALID": (ExitCode.ERROR, _DAMAGED),
+    "PDF_ENCRYPTED": (ExitCode.ERROR, N_("Save an unprotected copy of the PDF and convert that.")),
+    "PDF_TOO_LARGE": (ExitCode.SECURITY, N_("Split the PDF into smaller files.")),
     "PDF_UNSUPPORTED": (ExitCode.ERROR, None),
-    "PDF_EXTRACTION_FAILED": (ExitCode.ERROR, "Try again; if it fails again, run: sugo doctor"),
-    "CONFIG_INVALID": (ExitCode.USAGE, "Fix the file or variable named above; run: sugo doctor"),
+    "PDF_EXTRACTION_FAILED": (ExitCode.ERROR, N_("Try again; if it fails again, run: sugo doctor")),
+    "CONFIG_INVALID": (
+        ExitCode.USAGE,
+        N_("Fix the file or variable named above; run: sugo doctor"),
+    ),
 }
 
 
@@ -64,7 +73,7 @@ def level_missing(packages: list[str]) -> PortError:
     """The error for a missing engine level, naming the absent packages."""
     return PortError(
         code="LEVEL_MISSING",
-        message="The lite level is not installed.",
+        message=_("The lite level is not installed."),
         exit_code=ExitCode.MISSING,
         hint='pip install "sugo[lite]"',
         details={"missing": packages},
@@ -76,7 +85,12 @@ def from_exception(error: Exception) -> PortError | None:
     code = getattr(type(error), "code", None)
     if isinstance(code, str) and code in _KNOWN:
         exit_code, hint = _KNOWN[code]
-        return PortError(code=code, message=str(error), exit_code=exit_code, hint=hint)
+        return PortError(
+            code=code,
+            message=str(error),
+            exit_code=exit_code,
+            hint=None if hint is None else i18n.gettext(hint),
+        )
     # Imported here: the integrity errors live in the lite level's modules.
     from sugo.extractors.image.ocr_engine import ModelIntegrityError
     from sugo.metrics.tokenizer import VocabularyIntegrityError
@@ -86,16 +100,16 @@ def from_exception(error: Exception) -> PortError | None:
             code="INTEGRITY_CHECK_FAILED",
             message=str(error),
             exit_code=ExitCode.SECURITY,
-            hint="Reinstall Sugo; a bundled file was altered or damaged.",
+            hint=_("Reinstall Sugo; a bundled file was altered or damaged."),
         )
     return None
 
 
 def unreadable(error: OSError) -> PortError:
     """The error for an input that cannot be read; only for reading, never for writing."""
-    # strerror only: the full message repeats the path, which the CLI shows separately.
+    # The reason only: the full message repeats the path, which the CLI shows separately.
     return PortError(
         code="FILE_UNREADABLE",
-        message=error.strerror or "the file could not be read",
+        message=i18n.os_reason(error),
         exit_code=ExitCode.ERROR,
     )
