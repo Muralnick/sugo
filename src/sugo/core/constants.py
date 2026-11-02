@@ -1,5 +1,6 @@
 """Thresholds and limits used by the core, each with the reason for its value."""
 
+from types import MappingProxyType
 from typing import Final
 
 # Markdown has six heading levels (`#` to `######`); deeper levels cannot be rendered.
@@ -336,3 +337,75 @@ MCP_EXCLUDED_PATTERNS: Final = (
     "*.kdbx",
     "*.pem",
 )
+
+# --- Text edits and text cleaners (ADR-050) ------------------------------------
+
+# Typographic ligatures and the letters they stand for. Only these are expanded:
+# full NFKC would also turn "m²" into "m2" and "½" into "1" + U+2044 + "2", changing meaning.
+LIGATURES: Final = MappingProxyType(
+    {
+        "ﬀ": "ff",
+        "ﬁ": "fi",
+        "ﬂ": "fl",
+        "ﬃ": "ffi",
+        "ﬄ": "ffl",
+        "ﬅ": "st",
+        "ﬆ": "st",
+    }
+)
+
+# Spaces that print like a plain space: no-break, fixed-width and narrow
+# spaces. The ideographic space stays until the CJK language packs exist.
+SPECIAL_SPACES: Final = "\u00a0" + "".join(map(chr, range(0x2000, 0x200B))) + "\u202f\u205f"
+
+# Characters that never print and only cost tokens: zero-width space, word
+# joiner, byte order mark and soft hyphen. Zero-width joiners stay: emoji and
+# some scripts need them.
+INVISIBLE_CHARS: Final = "\u200b\u2060\ufeff\u00ad"
+
+# Hyphens that can end a line in the middle of a word.
+LINE_BREAK_HYPHENS: Final = "-\u2010\u2011\u00ad"
+
+# Distinct words remembered by the lexicon analyzer. Hyphen joins need a word
+# seen elsewhere in the document; past this many words the rest are not
+# recorded, so a hostile document cannot grow memory without bound and a word
+# not recorded is simply left hyphenated.
+LEXICON_MAX_WORDS: Final = 200_000
+
+# Text edits the core accepts for one block and for one page. Real prose needs
+# a few per line; past these a cleaner is skipped for that block, or its
+# proposals for the page are refused, so a hostile document cannot make
+# cleaning take minutes per page and fill memory with edit records.
+MAX_EDITS_PER_BLOCK: Final = 2_000
+MAX_EDITS_PER_PAGE: Final = 10_000
+
+# URL query parameters that only track the reader, removed by the tracking
+# URL cleaner. Compared case-insensitively; any parameter starting with a
+# prefix also counts.
+TRACKING_PARAMETERS: Final = frozenset(
+    {
+        "fbclid",
+        "gclid",
+        "gclsrc",
+        "dclid",
+        "gbraid",
+        "wbraid",
+        "msclkid",
+        "yclid",
+        "twclid",
+        "ttclid",
+        "li_fat_id",
+        "igshid",
+        "mc_cid",
+        "mc_eid",
+        "_hsenc",
+        "_hsmi",
+        "mkt_tok",
+        "oly_anon_id",
+        "oly_enc_id",
+        "vero_id",
+        "rb_clickid",
+        "wickedid",
+    }
+)
+TRACKING_PARAMETER_PREFIXES: Final = ("utm_",)

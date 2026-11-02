@@ -82,6 +82,46 @@ class BlockFlag(StrEnum):
     HIDDEN = "hidden"
 
 
+class EditKind(StrEnum):
+    """The only kinds of text change the core applies (ADR-050).
+
+    Each kind is checked mechanically by the core, so no cleaner can slip in
+    new words: a deletion only removes, a normalisation keeps every visible
+    character, and a hyphen join only removes a line-break hyphen.
+    """
+
+    # Remove a span, e.g. a tracking parameter from a URL.
+    DELETE = "delete"
+    # Same visible characters, other form: "ﬁ" -> "fi", a no-break space -> " ".
+    NORMALIZE = "normalize"
+    # "infor-\nmation" -> "information": the hyphen and the line break go.
+    HYPHEN_JOIN = "hyphen_join"
+
+
+class TextEdit(_Model):
+    """A change the core made to a block's text, kept so it can be inspected and undone.
+
+    ``start`` and ``end`` index the text as it was before the edits of the
+    same cleaner, so applying the record in reverse restores the original.
+    """
+
+    start: Annotated[int, Field(ge=0)]
+    end: Annotated[int, Field(ge=0)]
+    original: NonEmptyStr
+    replacement: str
+    kind: EditKind
+    edited_by: NonEmptyStr
+    reason: NonEmptyStr
+
+    @model_validator(mode="after")
+    def _check_span(self) -> Self:
+        if self.end - self.start != len(self.original):
+            raise ValueError("an edit's span must match its original text")
+        if self.original == self.replacement:
+            raise ValueError("an edit must change the text")
+        return self
+
+
 class BBox(_Model):
     """Bounding box normalised to the page: (0, 0) is top-left, (1, 1) bottom-right."""
 
@@ -179,6 +219,8 @@ class Block(_Model):
     origin_engine: NonEmptyStr
     flags: tuple[BlockFlag, ...] = ()
     time_range: TimeRange | None = None
+    # Every change made to ``text``, oldest first (principle 3, ADR-050).
+    edits: tuple[TextEdit, ...] = ()
     removed: bool = False
     removed_by: NonEmptyStr | None = None
     reason: NonEmptyStr | None = None
@@ -195,7 +237,7 @@ class Block(_Model):
             raise ValueError("a removed block must record removed_by and reason")
         if not self.removed and (self.removed_by is not None or self.reason is not None):
             raise ValueError("removed_by and reason are only allowed on removed blocks")
-        if BlockFlag.ILLEGIBLE in self.flags and self.text:
+        if BlockFlag.ILLEGIBLE in self.flags and (self.text or self.edits):
             raise ValueError("an illegible block must not carry text")
         if self.heading_level is not None and self.type is not BlockType.HEADING:
             raise ValueError("heading_level is only allowed on heading blocks")
@@ -204,6 +246,23 @@ class Block(_Model):
         if self.speaker is not None and self.type is not BlockType.CHAT_MESSAGE:
             raise ValueError("speaker is only allowed on chat_message blocks")
         return self
+
+    def original_text(self) -> str:
+        """The text as extracted, before any edit: every edit undone, newest first."""
+        text = self.text
+        groups: list[list[TextEdit]] = []
+        for edit in self.edits:
+            if groups and groups[-1][0].edited_by == edit.edited_by:
+                groups[-1].append(edit)
+            else:
+                groups.append([edit])
+        for group in reversed(groups):
+            # Offsets index the text before this cleaner's edits. Undone in
+            # order, everything before an edit is already that text again.
+            for edit in group:
+                end = edit.start + len(edit.replacement)
+                text = text[: edit.start] + edit.original + text[end:]
+        return text
 
     def mark_removed(self, removed_by: str, reason: str) -> Self:
         """Return a copy marked as removed; the block itself is never deleted.
