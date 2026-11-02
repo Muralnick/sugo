@@ -1,5 +1,7 @@
 """Tests for the PDF worker, run in-process: checks, hidden text, scans."""
 
+import subprocess
+import sys
 import zlib
 from collections.abc import Callable
 
@@ -8,6 +10,7 @@ import pytest
 
 from sugo.core.constants import PDF_OCR_MAX_PIXELS
 from sugo.extractors.pymupdf import worker
+from sugo.extractors.pymupdf.guard import BROTLI_REFUSAL
 from sugo.extractors.pymupdf.protocol import Message, NativePage, Opened, Refused, ScanPage
 from sugo.extractors.pymupdf.worker import run
 
@@ -207,3 +210,68 @@ def test_scan_render_always_fits_the_pixel_limit(size: tuple[float, float]) -> N
     page = document.new_page(width=size[0], height=size[1])
     pixmap = page.get_pixmap(dpi=worker._ocr_dpi(*size), alpha=False)
     assert pixmap.width * pixmap.height <= PDF_OCR_MAX_PIXELS
+
+
+def test_worker_never_loads_the_pymupdf_models() -> None:
+    """PyMuPDF 2.0 loads ONNX models on import unless the worker blocks them."""
+    code = (
+        "import sys; import sugo.extractors.pymupdf.worker\n"
+        "blocked = [m for m in ('pymupdf.layout', 'pymupdf4llm')"
+        " if sys.modules.get(m, 0) is not None]\n"
+        "loaded = {m.split('.')[0] for m in sys.modules}"
+        " & {'onnxruntime', 'networkx', 'tabulate', 'psutil', 'yaml'}\n"
+        "sys.exit(f'not blocked: {blocked}, loaded: {sorted(loaded)}' if blocked or loaded else 0)"
+    )
+    result = subprocess.run(  # noqa: S603
+        [sys.executable, "-I", "-c", code], capture_output=True, text=True, check=False, timeout=60
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    "stream_dict",
+    [b"/F 5 0 R", b"/Filter +5 0 R", b"/Filter [ %]\n /Br]", b"/F [ (]) 5 0 R]"],
+    ids=["short-key", "signed-reference", "commented-array", "string-in-array"],
+)
+def test_stream_filter_naming_brotli_is_refused_before_decoding(
+    raw_pdf: RawPdf, stream_dict: bytes
+) -> None:
+    # The worker reads each stream's filter through MuPDF's objects, so no
+    # spelling the raw guard might miss reaches the decoder.
+    (refusal,) = messages(raw_pdf(stream_dict, content=b"x", extra=b"/Br"))
+    assert isinstance(refusal, Refused)
+    assert refusal.message == BROTLI_REFUSAL
+
+
+def two_contents(first: bytes, second: bytes) -> bytes:
+    """A one-page PDF whose content is split into two compressed streams."""
+    document = pymupdf.open()
+    page = document.new_page()
+    parts = []
+    for content in (first, second):
+        xref = document.get_new_xref()
+        document.update_object(xref, "<<>>")
+        document.update_stream(xref, content)
+        parts.append(f"{xref} 0 R")
+    document.xref_set_key(page.xref, "Contents", f"[{' '.join(parts)}]")
+    return document.tobytes()
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        (b"q BI /W 1 /H 1 /CS /G /BPC 8 /F", b"/Br ID x EI Q"),
+        (b"q BI /W 1 /H 1 /CS /G /BPC 8 /F [", b"/Br] ID x EI Q"),
+    ],
+    ids=["name", "array"],
+)
+def test_inline_image_split_across_content_streams_is_refused(first: bytes, second: bytes) -> None:
+    # MuPDF joins a page's content streams, so neither half alone shows the filter.
+    (refusal,) = messages(two_contents(first, second))
+    assert isinstance(refusal, Refused)
+    assert refusal.message == BROTLI_REFUSAL
+
+
+def test_page_with_several_content_streams_is_read() -> None:
+    data = two_contents(b"BT /Helv 11 Tf 72 72 Td (first) Tj ET", b"BT 72 90 Td (second) Tj ET")
+    assert isinstance(messages(data)[0], Opened)

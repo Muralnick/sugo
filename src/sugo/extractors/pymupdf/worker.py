@@ -9,7 +9,10 @@ null device, so nothing MuPDF prints can corrupt or forge a frame.
 
 Before parsing anything the worker limits itself: no core dumps (they would
 write document text to disk, ADR-031) and, on Linux and macOS, a cap on its
-address space, so a hostile file cannot exhaust the machine's memory.
+address space, so a hostile file cannot exhaust the machine's memory. Even
+before loading PyMuPDF it blocks the modules PyMuPDF 2.0 would otherwise
+import on its own (layout analysis and ``pymupdf4llm``, with their ONNX
+models), so ``import pymupdf`` must stay below that block.
 
 Checks before any page is interpreted:
 
@@ -35,10 +38,10 @@ from typing import IO, Any
 
 import numpy as np
 import numpy.typing as npt
-import pymupdf
 
 from sugo.core.constants import (
     MAX_PDF_FILE_BYTES,
+    MAX_PDF_FILTER_REFERENCES,
     MAX_PDF_PAGES,
     PDF_MIN_TEXT_CONTRAST,
     PDF_MIN_VISIBLE_FONT_SIZE,
@@ -50,7 +53,7 @@ from sugo.core.constants import (
     PDF_WORKER_MEMORY_BYTES,
 )
 from sugo.core.models import BBox
-from sugo.extractors.pymupdf.guard import BROTLI_REFUSAL, names_brotli
+from sugo.extractors.pymupdf.guard import BROTLI_REFUSAL, UNCHECKED_REFUSAL, scan
 from sugo.extractors.pymupdf.protocol import (
     Message,
     NativeLine,
@@ -64,6 +67,15 @@ from sugo.extractors.pymupdf.protocol import (
     write_frame,
     write_message,
 )
+
+# PyMuPDF 2.0 imports its layout module and pymupdf4llm whenever they are
+# installed; the first loads ONNX models at once and both load onnxruntime.
+# Sugo uses neither: blocking them keeps that code out of this process
+# (ADR-043). PyMuPDF treats a blocked module as not installed.
+sys.modules["pymupdf.layout"] = None  # type: ignore[assignment]
+sys.modules["pymupdf4llm"] = None  # type: ignore[assignment]
+
+import pymupdf  # noqa: E402
 
 Pixels = npt.NDArray[np.uint8]
 
@@ -156,29 +168,78 @@ def _check(document: pymupdf.Document, *, streams: bool) -> Refused | None:
 
 
 def _stream_problem(document: pymupdf.Document) -> Refused | None:
-    """Refuse a document with an inline image compressed with Brotli.
+    """Refuse a document that names Brotli as a filter anywhere MuPDF would use it.
 
-    Every stream is decoded and searched, images included: ``/Subtype`` is
-    written by the attacker, and a page's content stream may claim to be an
-    image. A stream that cannot be decoded cannot be checked, so the document
+    First every stream's own ``/Filter`` and ``/F``, read through MuPDF's
+    objects without decoding anything, so no stream is decoded before its
+    filters are known. Then every decoded stream, images included (``/Subtype``
+    is written by the attacker, and a page's content stream may claim to be an
+    image), and each page's content streams joined as MuPDF joins them, so an
+    inline image cannot start in one and name its filter in the next.
+    Anything that cannot be read or decoded cannot be checked, so the document
     is refused rather than parsed unchecked (temporary, ADR-043).
     """
-    for xref in range(1, document.xref_length()):
-        try:
-            if not document.xref_is_stream(xref):
-                continue
-            decoded = document.xref_stream(xref) or b""
-        except Exception:  # noqa: BLE001  (any MuPDF failure means "unchecked")
-            return Refused(
-                code="PDF_UNSUPPORTED",
-                message="a stream of the PDF cannot be decoded, so it cannot be checked",
-            )
-        if names_brotli(decoded):
-            return Refused(
-                code="PDF_UNSUPPORTED",
-                message=BROTLI_REFUSAL,
-            )
+    try:
+        streams = [
+            xref for xref in range(1, document.xref_length()) if document.xref_is_stream(xref)
+        ]
+        for xref in streams:
+            for key in ("Filter", "F"):
+                kind, value = document.xref_get_key(xref, key)
+                if kind != "null" and _names_brotli(document, _as_filter(value.encode())):
+                    return Refused(code="PDF_UNSUPPORTED", message=BROTLI_REFUSAL)
+        for xref in streams:
+            if _names_brotli(document, document.xref_stream(xref) or b""):
+                return Refused(code="PDF_UNSUPPORTED", message=BROTLI_REFUSAL)
+        for index in range(document.page_count):
+            if _page_contents_name_brotli(document, index):
+                return Refused(code="PDF_UNSUPPORTED", message=BROTLI_REFUSAL)
+    except Exception:  # noqa: BLE001  (any failure, _UncheckedError included, means "unchecked")
+        return Refused(code="PDF_UNSUPPORTED", message=UNCHECKED_REFUSAL)
     return None
+
+
+class _UncheckedError(Exception):
+    """The filters could not be checked completely."""
+
+
+def _as_filter(value: bytes) -> bytes:
+    """PDF bytes in which ``value`` is the filter of a stream."""
+    return b"/Filter " + value
+
+
+def _names_brotli(document: pymupdf.Document, data: bytes) -> bool:
+    """Whether ``data`` names Brotli as a filter, following references to other objects."""
+    pending = [data]
+    seen: set[int] = set()
+    while pending:
+        found = scan(pending.pop())
+        if not found.complete:
+            raise _UncheckedError
+        if found.brotli:
+            return True
+        for xref in found.references - seen:
+            if not 0 < xref < document.xref_length():
+                continue  # MuPDF reads a missing object as null
+            seen.add(xref)
+            if len(seen) > MAX_PDF_FILTER_REFERENCES:
+                raise _UncheckedError
+            pending.append(_as_filter(document.xref_object(xref, compressed=True).encode()))
+    return False
+
+
+def _page_contents_name_brotli(document: pymupdf.Document, index: int) -> bool:
+    """Whether a page's content streams, joined, name Brotli for an inline image."""
+    try:
+        contents = document[index].get_contents()
+    except Exception:  # noqa: BLE001  (a page that fails to load is never interpreted)
+        return False
+    if len(contents) <= 1:
+        return False  # a single stream was checked on its own
+    parts = [document.xref_stream(xref) or b"" for xref in contents]
+    # MuPDF puts whitespace between the parts; either kind may end a comment
+    # or not, so both are checked.
+    return any(_names_brotli(document, gap.join(parts)) for gap in (b" ", b"\n"))
 
 
 def _boxes(document: pymupdf.Document) -> tuple[PageBox, ...]:

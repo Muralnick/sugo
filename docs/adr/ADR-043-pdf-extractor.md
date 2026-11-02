@@ -1,7 +1,7 @@
 # ADR-043: Native PDF extractor in an isolated worker
 
-**Status:** Accepted. **Merge blocked** until PyMuPDF 2.x is adopted (see "Version").  
-**Date:** 2026-10-29  
+**Status:** Accepted.  
+**Date:** 2026-10-29; amended 2026-11-02 (PyMuPDF 2.0 adopted)  
 **Deciders:** project author  
 **Implements:** ADR-001 (per-page routing), ADR-007 (`lite` level), ADR-018 (process isolation, first slice), ADR-031 (hardening)  
 **Amends:** IR flags (ADR-005): new `hidden` flag
@@ -18,10 +18,14 @@ PDFs are also a vehicle for prompt injection: text a person cannot see (white on
 
 | Release | Date | MuPDF | Dependencies | Status |
 |---|---|---|---|---|
-| PyMuPDF 1.28.2 | 2026-08-06 | 1.28.2 (known bugs above) | none | **Temporary**, for development only |
-| PyMuPDF 2.0 | 2026-10-19 | 1.28.5 | networkx, numpy, onnxruntime, pyyaml, psutil, tabulate, two empty compatibility packages | Adopt once 14 days old (2026-11-02) |
+| PyMuPDF 1.28.2 | 2026-08-06 | 1.28.2 (known bugs above) | none | Used only while step 5a was written |
+| PyMuPDF 2.0 | 2026-10-19 | 1.28.5 | networkx, numpy, onnxruntime, pyyaml, psutil, tabulate, two empty compatibility packages | **Adopted** 2026-11-02, when 14 days old |
 
-`pymupdf>=1.28.2,<1.29` is in the `sugo[lite]` extra while step 5a is written. **This PR is not merged before** moving to PyMuPDF 2.0, or a 2.0.x with MuPDF ≥ 1.28.6 once 14 days old, after checking its new dependencies' licences and versions and **verifying that its built-in layout module (formerly `pymupdf-layout`) never downloads a model**. That check and the final pin amend this ADR.
+`pymupdf>=2.0,<2.1` is in the `sugo[lite]` extra; a 2.0.x with MuPDF ≥ 1.28.6 is adopted once 14 days old. Checks made on 2026-11-02 before adopting 2.0:
+
+- **New dependencies:** numpy, onnxruntime and pyyaml were already in Sugo. networkx 3.7 (BSD-3-Clause), psutil 7.2.2 (BSD-3-Clause) and tabulate 0.10.0 (MIT) are new: permissive, on the licence allow-list (`CODE_STYLE.md`), each more than 14 days old. `pymupdf-layout` and `pymupdf4llm` 2.0 are empty compatibility packages (about 1 KB, no code).
+- **No model download:** the layout module's ONNX models are inside the wheel (pinned by its hash in `uv.lock`), and the Python code of `pymupdf.layout` and `pymupdf4llm` contains no network access.
+- **Layout module and `pymupdf4llm` never loaded:** the wheel also contains `pymupdf4llm` (Markdown conversion with its own OCR model). `import pymupdf` imports both whenever they are installed; `pymupdf.layout` loads its ONNX models at once, and both load onnxruntime. Sugo uses neither, so the worker blocks both imports before loading PyMuPDF, which treats them as not installed: the models, onnxruntime and their memory stay out of the worker. A test checks this in a fresh process. Sugo never calls `find_tables()`, `get_layout()` or PyMuPDF's Tesseract OCR either.
 
 Licence: AGPL-3.0 (dual-licensed by Artifex), on the allow-list (ADR-010). The wheel (about 64 MB) bundles MuPDF's third-party C libraries, distributed by Artifex under the same terms. It also ships a `pymupdf` command-line tool affected by CVE-2026-82035 (path traversal when extracting fonts); Sugo never runs it.
 
@@ -41,14 +45,16 @@ Licence: AGPL-3.0 (dual-licensed by Artifex), on the allow-list (ADR-010). The w
 |---|---|---|
 | Size ≤ 200 MB | Sugo | `PDF_TOO_LARGE` |
 | `%PDF-` in the first 1 024 bytes | Sugo | `PDF_INVALID` |
-| No Brotli filter in the raw bytes, after undoing `#xx` escapes: `/BrotliDecode` anywhere, or the abbreviation `/Br` right after a filter key (`/Filter`, `/F`), alone or in an array | Sugo | `PDF_UNSUPPORTED` |
-| No stream filter given by indirect reference (its name could hide in compressed data) | Sugo | `PDF_UNSUPPORTED` |
+| No Brotli filter in the raw bytes, after undoing `#xx` escapes: `/BrotliDecode` anywhere, or the abbreviation `/Br` after a filter key (`/Filter`, `/F`), alone or anywhere in an array | Sugo | `PDF_UNSUPPORTED` |
+| No `/Filter` given by indirect reference, numbers signed or not, nor `/F` in a stream's dictionary (its name could hide in compressed data) | Sugo | `PDF_UNSUPPORTED` |
+| A scan cut short by its work cap | Sugo, worker | `PDF_UNSUPPORTED` |
 | Opens, ≤ 5 000 pages | Worker | `PDF_INVALID`, `PDF_TOO_LARGE` |
 | No password needed (a PDF restricted only by an owner password opens normally) | Worker | `PDF_ENCRYPTED` |
-| No Brotli inline image in any decoded stream, images included (first worker start only; restarts read the same checked bytes); a stream MuPDF refuses to decode is refused too | Worker | `PDF_UNSUPPORTED` |
+| No stream's `/Filter` or `/F` names Brotli, read through MuPDF's objects with references followed (at most 256), **before any stream is decoded** | Worker | `PDF_UNSUPPORTED` |
+| No Brotli inline image in any decoded stream, images included, nor in each page's content streams joined as MuPDF joins them; references after a filter key are resolved (first worker start only; restarts read the same checked bytes); a stream MuPDF refuses to decode is refused too | Worker | `PDF_UNSUPPORTED` |
 | Worker failed to open, or kept failing | Sugo | `PDF_EXTRACTION_FAILED` |
 
-The Brotli checks rely on a PDF rule: a stream dictionary is never compressed, so every stream's filter is visible in the raw bytes. Inline images live in content streams, which the worker decodes and searches. It searches every stream, because `/Subtype /Image` is written by the attacker and a page's content can claim it. The abbreviation `/Br` counts only after a filter key: alone, three bytes plus a delimiter occur by chance in compressed data, and an early version refused about 1 in 20 large ordinary files. The regular expressions cannot backtrack exponentially, and tests run them on hostile and random inputs. The Brotli checks are removed once a PyMuPDF with MuPDF ≥ 1.28.6 is adopted.
+The raw check relies on a PDF rule: a stream dictionary is never compressed, so every stream's filter is visible in the raw bytes. It is a first barrier; the worker's check of every stream's filter through MuPDF's objects is the authoritative one, because MuPDF accepts spellings a scan of bytes can miss (2026-11-02 security review: `/F` as the filter key, given by reference, and signed object numbers). The raw check must still be complete for object streams and cross-reference streams, which MuPDF decodes while opening the file, before the worker can check anything: a reference after `/F` is refused when a stream follows its dictionary, and allowed elsewhere, where it is how file specifications are written. Names are read as MuPDF reads them, up to the next delimiter, before their `#xx` escapes are undone: `/A#28` is the name `A(`, not a name followed by a string that would hide what comes next. Inline images live in content streams, which the worker decodes and searches; a page's content streams are also searched joined, as MuPDF joins them, because an inline image can start in one and name its filter in the next. It searches every stream, because `/Subtype /Image` is written by the attacker and a page's content can claim it. The abbreviation `/Br` counts only after a filter key: alone, three bytes plus a delimiter occur by chance in compressed data, and an early version refused about 1 in 20 large ordinary files. Filter arrays are read token by token as MuPDF reads them (comments, nested strings, hex strings, any amount of whitespace), with no length bound; the total work is capped at four times the input plus 64 KB, and a scan that reaches the cap refuses the document, so an array that never closes costs linear time and cannot slip through. The regular expressions are possessive and cannot backtrack, and tests run them on hostile and random inputs. The Brotli checks are removed once a PyMuPDF with MuPDF ≥ 1.28.6 is adopted.
 
 ### Pages
 
