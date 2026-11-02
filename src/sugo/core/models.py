@@ -80,6 +80,10 @@ class BlockFlag(StrEnum):
     # off the page or drawn invisible. Kept apart so a cleaner can remove it with
     # a reason; a classic way to slip instructions to an LLM (ADR-043).
     HIDDEN = "hidden"
+    # Holds credentials by its structure, such as an XML ``password`` element.
+    # The text stays, for the person who converts their own file; the MCP
+    # server never sends a document with such a block to an agent (ADR-053).
+    SECRET = "secret"  # noqa: S105  (a flag name, not a password)
 
 
 class EditKind(StrEnum):

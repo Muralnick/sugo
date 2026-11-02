@@ -13,24 +13,22 @@ Pickle is never used: unpickling data from a compromised process would run
 its code inside Sugo.
 """
 
-import struct
 from typing import IO, Annotated, Literal
 
 from pydantic import Field, TypeAdapter
 
 from sugo.core.constants import MAX_PDF_PAGES, PDF_MAX_MESSAGE_BYTES, PDF_OCR_MAX_PIXELS
 from sugo.core.models import BBox, NonEmptyStr, _Model
+from sugo.extractors import worker as frames
+from sugo.extractors.worker import ProtocolError, write_frame
 
-_LENGTH = struct.Struct(">I")
+__all__ = ["ProtocolError", "write_frame"]
+
 _RGB_CHANNELS = 3
 
 PageIndex = Annotated[int, Field(ge=0, lt=MAX_PDF_PAGES)]
 Points = Annotated[float, Field(gt=0)]
 Rotation = Literal[0, 90, 180, 270]
-
-
-class ProtocolError(RuntimeError):
-    """The worker sent something that is not a valid message."""
 
 
 class NativeLine(_Model):
@@ -114,13 +112,6 @@ Message = Opened | Refused | NativePage | ScanPage | PageFailed
 _MESSAGE: TypeAdapter[Message] = TypeAdapter(Annotated[Message, Field(discriminator="kind")])
 
 
-def write_frame(stream: IO[bytes], payload: bytes) -> None:
-    """Write one frame and flush it."""
-    stream.write(_LENGTH.pack(len(payload)))
-    stream.write(payload)
-    stream.flush()
-
-
 def write_message(stream: IO[bytes], message: Message) -> None:
     """Write a message as a JSON frame."""
     write_frame(stream, message.model_dump_json().encode())
@@ -132,18 +123,7 @@ def read_frame(stream: IO[bytes]) -> bytes | None:
     Raises:
         ProtocolError: If the frame is too large or cut short.
     """
-    header = stream.read(_LENGTH.size)
-    if not header:
-        return None
-    if len(header) != _LENGTH.size:
-        raise ProtocolError("truncated frame header")
-    (length,) = _LENGTH.unpack(header)
-    if length > PDF_MAX_MESSAGE_BYTES:
-        raise ProtocolError(f"frame of {length} bytes exceeds the limit")
-    payload = stream.read(length)
-    if len(payload) != length:
-        raise ProtocolError("truncated frame")
-    return payload
+    return frames.read_frame(stream, PDF_MAX_MESSAGE_BYTES)
 
 
 def parse_message(payload: bytes) -> Message:

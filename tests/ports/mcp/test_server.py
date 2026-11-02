@@ -169,6 +169,20 @@ def test_private_key_headers_are_recognised(text: str, refused: bool) -> None:
     assert (tools._PRIVATE_KEY.search(text) is not None) is refused
 
 
+def test_xml_is_converted_unless_it_holds_credentials(server: Server, root: Path) -> None:
+    (root / "data.xml").write_bytes(b"<order><id>5</id></order>")
+    result = call(server, "convert_document", path="data.xml")["result"]
+    assert json.loads(result["content"][0]["text"])["kind"] == "xml"
+    assert "id: 5" in result["content"][1]["text"]
+    # The name says nothing; the content check finds the credential.
+    (root / "settings.data").write_bytes(b"<server><host>h</host><apiKey>k</apiKey></server>")
+    refused = call(server, "convert_document", path="settings.data")["result"]
+    assert refused["isError"] is True
+    error = json.loads(refused["content"][0]["text"])["error"]
+    assert error["code"] == "CONTENT_EXCLUDED"
+    assert "credentials" in error["message"]
+
+
 @pytest.mark.parametrize("output", ["markdown", "chunks"])
 def test_documents_holding_a_private_key_are_refused(
     server: Server, root: Path, output: str

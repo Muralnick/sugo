@@ -4,7 +4,8 @@
 **Date:** 2026-10-31  
 **Deciders:** project author  
 **Implements:** ROADMAP v0.1 "Office (DOCX, XLSX, PPTX) and XML through a light reader", ADR-007 (`lite` level), ADR-018 (process isolation), THREAT_MODEL (XXE, hidden text)  
-**Updates:** ADR-007 ("Office via lightweight dedicated libraries" becomes Sugo's own reader), ADR-046 (routing by content)  
+**Updates:** ADR-007 ("Office via lightweight dedicated libraries" becomes Sugo's own reader), ADR-046 (routing by content), ADR-043 (its worker plumbing becomes shared)  
+**Amends:** IR flags (ADR-005): new `secret` flag  
 **Requires:** ADR-053 merged first  
 **Adds error codes:** `OFFICE_INVALID`, `OFFICE_UNSUPPORTED`, `OFFICE_TOO_LARGE`, `XML_INVALID`, `XML_TOO_LARGE`, `OFFICE_EXTRACTION_FAILED`
 
@@ -20,14 +21,14 @@ The libraries ADR-007 had in mind, `python-docx` and `python-pptx`, parse with `
 
 ### Own reader on `zipfile` and `defusedxml` (maintainer decision)
 
-- Sugo reads Office Open XML itself with the standard library's `zipfile` and **`defusedxml` 0.7.1** (PSF-2.0, on the allow-list, pure Python, no dependencies). It is a base dependency, so `pip install sugo` reads Office and XML without the `lite` extra.
+- Sugo reads Office Open XML itself with the standard library's `zipfile` and **`defusedxml` 0.7.1** (PSF-2.0, on the allow-list, pure Python, no dependencies). It is a base dependency: the reader itself needs nothing from the `lite` extra. In v0.1 the pipeline module still loads the `lite` packages for every input, so in practice `sugo[lite]` is installed anyway; loading them only for PDF and images is a later clean-up.
 - Parsing uses `defusedxml.ElementTree.iterparse` with **`forbid_dtd=True`**, entities and external references forbidden. Office parts never carry a DTD. A generic XML file with one (old DocBook, `<!DOCTYPE html>`) is refused with `XML_INVALID`.
-- Parts are streamed and elements released as soon as they are read, so memory follows the size of a paragraph or a row, not of the file.
+- Office parts are streamed and elements released as soon as they are read, so memory follows the size of a paragraph or a row, not of the file. A generic XML file is held as a tree, since its layout compares sibling records; its limits are lower (below).
 - `defusedxml` has had no release since 2021. It only wraps the standard library's parser, so it moves with Python's own fixes; if it stops working with a future Python, the same checks can be done with `xml.parsers.expat` handlers in one module, with an ADR.
 
 ### Isolation
 
-The reader runs in a **worker process**, like the PDF extractor (ADR-043): `python -I -m sugo.extractors.office.worker`, no shell, the file on stdin, results as length-prefixed JSON frames validated by strict pydantic models, never pickle. The frame protocol of ADR-043 moves to a shared module. The worker gets the same core-dump switch and, on Linux and macOS, 1.5 GB address-space cap. Pure Python code cannot be interrupted from inside the same process, so the worker is what makes the time limits real: opening 60 s, each page 30 s, the whole file 300 s. A page that fails, stalls or crashes the worker is marked illegible and a fresh worker continues; after 3 restarts the file is refused with `OFFICE_EXTRACTION_FAILED`.
+The reader runs in a **worker process**, like the PDF extractor (ADR-043): `python -I -m sugo.extractors.office.worker`, no shell, the file on stdin, results as length-prefixed JSON frames validated by strict pydantic models, never pickle. The frames, the process handling, the resource limits and the private stdout of ADR-043 move to a shared module, `sugo.extractors.worker`; the PDF extractor uses it unchanged. The worker gets the same core-dump switch and, on Linux and macOS, 1.5 GB address-space cap. Pure Python code cannot be interrupted from inside the same process, so the worker is what makes the time limits real: opening 60 s, each page 30 s, the whole file 300 s. A page that fails, stalls or crashes the worker is marked illegible and a fresh worker continues; after 3 restarts the file is refused with `OFFICE_EXTRACTION_FAILED`.
 
 ### Recognising the file by its content
 
@@ -46,13 +47,13 @@ Macro-enabled files are read like the others: macros are never run nor output. T
 
 | Limit | Value | Refusal |
 |---|---|---|
-| File size | 200 MB, as for PDF | `OFFICE_TOO_LARGE` / `XML_TOO_LARGE` |
+| File size | Office: 200 MB, as for PDF. Generic XML: 50 MB, as its tree takes about ten times its size | `OFFICE_TOO_LARGE` / `XML_TOO_LARGE` |
 | ZIP entries | 10 000 | `OFFICE_TOO_LARGE` |
 | Uncompressed size of one part | 100 MB, counted while decompressing (header sizes are not trusted) | `OFFICE_TOO_LARGE` |
 | Uncompressed size of all parts read | 300 MB | `OFFICE_TOO_LARGE` |
 | Compression ratio of a part over 1 MB | 200 : 1 | `OFFICE_TOO_LARGE` |
 | XML nesting depth | 256 | `OFFICE_INVALID` / `XML_INVALID` |
-| XML elements in one file or part | 5 000 000 | `OFFICE_TOO_LARGE` / `XML_TOO_LARGE` |
+| XML elements | 5 000 000 in one Office part; 1 000 000 in a generic XML file | `OFFICE_TOO_LARGE` / `XML_TOO_LARGE` |
 | Spreadsheet cells read | 2 000 000 | `OFFICE_TOO_LARGE` |
 | Encrypted ZIP entries, broken archive, missing main part | — | `OFFICE_INVALID` |
 
@@ -87,7 +88,10 @@ Each page is cached like a PDF page (ADR-045); the reader's version is part of t
 - Text shown only by layouts and masters (placeholder prompts such as "Click to add title") is not read.
 
 **XML**
-- An indented outline, two spaces per level: `name: text`, attributes as `@name: value`, namespace prefixes dropped. Three or more sibling elements with the same simple children (such as invoice lines) become a table, the cheapest of the forms in ADR-042. Comments and processing instructions are not output. The exact format is measured against alternatives in the implementation PR and fixed in the serializer's tests.
+- An indented outline, two spaces per level: `name: text`, attributes as `@name: value`, namespace prefixes dropped, white space collapsed. Elements with neither text, attributes nor children carry no content and are left out; so are comments, processing instructions and the `xsi:schemaLocation` attributes, which only point at schemas. Text between child elements (mixed content) keeps its place as a line of its own.
+- Three or more consecutive sibling records with the same name and distinct leaf fields (such as invoice lines) become a table under a line with their name; columns are the record's attributes (`@id`) and fields, in first-seen order, and a missing field is an empty cell. Tables over 200 rows are split, the header repeated.
+- A Markdown paragraph loses the indentation of its first line (ADR-042), so the paragraph that resumes after a table starts with its parent's line again.
+- Measured on o200k_base: an electronic invoice (FatturaPA layout, 20 lines) goes from 2 293 to 873 tokens (**−62%**); a small configuration file from 57 to 47 (−18%).
 
 ### Hidden content is marked removed (maintainer decision)
 
@@ -118,10 +122,11 @@ What a reader of the document does not see stays in the IR, flagged `hidden`, an
 
 ## Consequences
 
-- New base dependency `defusedxml`; new stable error codes listed above; new `kind` values.
+- New base dependency `defusedxml`; new stable error codes listed above; new `kind` values; new IR flag `secret` (ADR-053), not part of the chunk schema.
 - Agents can now ask for XML files, so ADR-053 must be merged before this reader.
 - Each Office file pays a worker start (about 0.3 s). Speed and token savings are measured on DOCX, XLSX, PPTX and XML samples in the implementation PR and in step 8.
 - Residual risks:
   - text hidden by means not listed above (text the same colour as a background image or shape, tiny text set through a theme) reaches the LLM;
   - complex layouts (multi-column DOCX, SmartArt, floating shapes) may come out in a different order; Docling handles them in v0.2;
+  - the XML outline is cleaned like prose, so the hyphen-join rule (ADR-050) could fuse a value ending in "-" with the next field name; it needs the fused word to appear elsewhere in the document, which field names make very unlikely. A block type for structured data, which text cleaners skip, would close it;
   - Windows has no memory cap or core-dump switch in the worker (as ADR-043).

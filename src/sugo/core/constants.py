@@ -201,6 +201,67 @@ PDF_HEADING_MIN_SIZE_RATIO: Final = 1.2
 # ...and it has at most this many lines: a large-print paragraph is not a heading.
 PDF_HEADING_MAX_LINES: Final = 3
 
+# --- Office and XML reader (ADR-054) -----------------------------------------
+
+# Largest XML file read. The whole tree is held in the worker's memory, about
+# ten times the file's size; a larger file is refused before parsing.
+MAX_XML_FILE_BYTES: Final = 50 * 1024 * 1024
+
+# Deepest nesting and most elements in one XML file. Real data files nest a
+# dozen levels; deeper or larger files are attacks on time and memory.
+XML_MAX_DEPTH: Final = 256
+XML_MAX_ELEMENTS: Final = 1_000_000
+
+# Bytes looked at to recognise XML by its content, after a byte order mark.
+XML_SNIFF_BYTES: Final = 1024
+
+# Sibling records with the same simple fields (invoice lines, rows of an
+# export) become a table from this many on; fewer read better as an outline.
+XML_MIN_TABLE_RECORDS: Final = 3
+
+# Rows in one table block; longer tables are split, the header repeated, so a
+# chunk never has to hold an unbounded table (ADR-047).
+OFFICE_TABLE_MAX_ROWS: Final = 200
+
+# Attributes of the XML Schema instance namespace that only point at schemas.
+XML_SCHEMA_INSTANCE_NS: Final = "http://www.w3.org/2001/XMLSchema-instance"
+XML_SCHEMA_LOCATION_ATTRIBUTES: Final = frozenset({"schemalocation", "nonamespaceschemalocation"})
+
+# Element and attribute names that hold credentials, compared without namespace,
+# casefolded, without "-", "_" and ".". Their blocks are flagged ``secret`` and
+# never sent to an agent (ADR-053). Bare "token" and "key" are too common.
+XML_CREDENTIAL_NAMES: Final = frozenset(
+    {
+        "password",
+        "passwd",
+        "pwd",
+        "cpassword",
+        "passphrase",
+        "secret",
+        "clientsecret",
+        "sharedsecret",
+        "apikey",
+        "accesskey",
+        "secretkey",
+        "privatekey",
+        "accesstoken",
+        "refreshtoken",
+        "authtoken",
+        "apitoken",
+        "bearertoken",
+        "connectionstring",
+    }
+)
+
+# The worker process, as for PDF (ADR-043): address space on Linux and macOS,
+# seconds to open and check a file and to return one page, restarts after a
+# page kills or stalls it, and the largest message it may send.
+OFFICE_WORKER_MEMORY_BYTES: Final = 1536 * 1024 * 1024
+OFFICE_OPEN_TIMEOUT_S: Final = 60.0
+OFFICE_PAGE_TIMEOUT_S: Final = 30.0
+OFFICE_MAX_WORKER_RESTARTS: Final = 3
+OFFICE_MAX_MESSAGE_BYTES: Final = 64 * 1024 * 1024
+
 # --- Headers, footers and page numbers (roadmap step 5b, ADR-044) ------------
 # Conservative on purpose: a running header left in costs a few tokens, a
 # clause removed by mistake breaks principle 3 (THREAT_MODEL C). Initial

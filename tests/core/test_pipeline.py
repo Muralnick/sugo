@@ -121,9 +121,22 @@ def test_input_is_routed_by_content_not_name(tmp_path: Path) -> None:
 
 
 def test_unsupported_input_is_refused() -> None:
-    with pytest.raises(InputUnsupportedError, match="PDF, PNG, JPEG or WEBP") as caught:
+    with pytest.raises(InputUnsupportedError, match="PDF, PNG, JPEG, WEBP or XML") as caught:
         detect_kind(b"PK\x03\x04 a zip or docx file")
     assert caught.value.code == "INPUT_UNSUPPORTED"
+
+
+def test_xml_is_converted_and_cached(cache: PageCache) -> None:
+    data = b"<invoice><number>7</number><note>Thanks</note></invoice>"
+    assert detect_kind(data) is InputKind.XML
+    first = convert(data, cache=cache)
+    assert (first.kind, first.pages, first.secret_blocks) == (InputKind.XML, 1, 0)
+    assert first.markdown == "invoice:\n  number: 7\n  note: Thanks"
+    # The cached page answers the second run, flags included.
+    secret = b"<config><user>u</user><password>p</password></config>"
+    assert convert(secret, cache=cache).secret_blocks == 1
+    assert convert(secret, cache=cache).secret_blocks == 1
+    assert convert(data, cache=cache).markdown == first.markdown
 
 
 def test_screenshot_loses_its_status_bar(engine: OcrEngine) -> None:

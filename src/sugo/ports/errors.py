@@ -53,7 +53,7 @@ class PortError(Exception):
 # Hints are translated when the error is made, in the language active then.
 _DAMAGED = N_("The file may be damaged; open it and save it again.")
 _KNOWN: dict[str, tuple[ExitCode, str | None]] = {
-    "INPUT_UNSUPPORTED": (ExitCode.ERROR, N_("Sugo reads PDF, PNG, JPEG and WEBP files.")),
+    "INPUT_UNSUPPORTED": (ExitCode.ERROR, N_("Sugo reads PDF, PNG, JPEG, WEBP and XML files.")),
     "IMAGE_UNSUPPORTED": (ExitCode.ERROR, N_("Save the image as a still PNG, JPEG or WEBP.")),
     "IMAGE_INVALID": (ExitCode.ERROR, _DAMAGED),
     "IMAGE_TOO_LARGE": (ExitCode.SECURITY, N_("Reduce the image size, or split it.")),
@@ -62,6 +62,12 @@ _KNOWN: dict[str, tuple[ExitCode, str | None]] = {
     "PDF_TOO_LARGE": (ExitCode.SECURITY, N_("Split the PDF into smaller files.")),
     "PDF_UNSUPPORTED": (ExitCode.ERROR, None),
     "PDF_EXTRACTION_FAILED": (ExitCode.ERROR, N_("Try again; if it fails again, run: sugo doctor")),
+    "XML_INVALID": (ExitCode.ERROR, N_("Check that the file is well-formed XML without a DTD.")),
+    "XML_TOO_LARGE": (ExitCode.SECURITY, N_("Split the XML file into smaller files.")),
+    "OFFICE_EXTRACTION_FAILED": (
+        ExitCode.ERROR,
+        N_("Try again; if it fails again, run: sugo doctor"),
+    ),
     "CONFIG_INVALID": (
         ExitCode.USAGE,
         N_("Fix the file or variable named above; run: sugo doctor"),
