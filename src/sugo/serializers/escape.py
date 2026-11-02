@@ -28,6 +28,27 @@ _HEADING_CLOSER = re.compile(r"(^|\s)(#+)(\s*)$")
 # Backslashes already in the text before the marker are doubled, so they stay
 # literal and the marker's own backslash still escapes it.
 _MARKER = re.compile(rf"(\\*){re.escape(ILLEGIBLE_MARKER)}")
+# C0 controls but tab and line feed, DEL and C1. The line-breaking ones (CR,
+# VT, FF, FS, GS, RS, NEL) become line feeds; the rest are dropped.
+_LINE_BREAKS = frozenset({0x0D, 0x0B, 0x0C, 0x1C, 0x1D, 0x1E, 0x85})
+_CONTROLS: dict[int, str | None] = {
+    code: "\n" if code in _LINE_BREAKS else None
+    for code in (*range(0x00, 0x20), *range(0x7F, 0xA0))
+    if code not in (0x09, 0x0A)
+}
+
+
+def drop_controls(text: str) -> str:
+    """Remove the control characters a document could use to drive a terminal.
+
+    Escape sequences in the output could clear the screen, fake a prompt or
+    write the clipboard of whoever reads it in a terminal (security review of
+    ADR-048). Controls that ``str.splitlines`` treats as line breaks become
+    ``\\n``, so lines split as before; the others never print and are dropped.
+    Called before any escaping, so a dropped character cannot hide structure
+    from the escaper.
+    """
+    return text.replace("\r\n", "\n").translate(_CONTROLS)
 
 
 def escape_marker(text: str) -> str:

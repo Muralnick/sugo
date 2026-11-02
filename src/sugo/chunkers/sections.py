@@ -33,6 +33,7 @@ from sugo.core.chunks import Chunk
 from sugo.core.constants import CHUNK_MAX_TOKENS, CHUNK_MIN_TOKENS, OUTPUT_ID_HEX_DIGITS
 from sugo.core.models import Block, BlockType, Page
 from sugo.metrics.tokenizer import count_tokens
+from sugo.serializers.escape import drop_controls
 from sugo.serializers.markdown import render
 
 # Where a paragraph may be cut: after a sentence end and the spaces after
@@ -131,7 +132,8 @@ class SectionChunker:
         levels = self._open_levels if self._open_levels is not None else []
         while self._headings and self._headings[-1][0] >= level:
             self._headings.pop()
-        title = " ".join(block.text.split())
+        # Controls dropped as in the Markdown: the path is shown to people too.
+        title = " ".join(drop_controls(block.text).split())
         if title:
             self._headings.append((level, title))
         self._append(block, page_number, tokens)

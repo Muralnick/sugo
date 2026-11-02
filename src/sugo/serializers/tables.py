@@ -25,7 +25,7 @@ from collections.abc import Callable
 
 from sugo.core.models import Table
 from sugo.metrics.tokenizer import count_tokens
-from sugo.serializers.escape import escape_line_start, escape_marker
+from sugo.serializers.escape import drop_controls, escape_line_start, escape_marker
 
 Grid = list[list[str]]
 
@@ -53,7 +53,7 @@ def _grid(table: Table) -> Grid:
     for cell in table.cells:
         # Every line boundary, a lone "\r" or U+2028 too: any of them would break
         # the row in two for some readers.
-        text = escape_marker("<br>".join(cell.text.strip().splitlines()))
+        text = escape_marker("<br>".join(drop_controls(cell.text).strip().splitlines()))
         for row in range(cell.row, cell.row + cell.row_span):
             for col in range(cell.col, cell.col + cell.col_span):
                 grid[row][col] = text

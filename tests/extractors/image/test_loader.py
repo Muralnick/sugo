@@ -20,6 +20,7 @@ from sugo.extractors.image.loader import (
     UnsupportedImageError,
     decode_image,
     detect_format,
+    image_size,
     read_image_file,
 )
 
@@ -152,6 +153,18 @@ def test_exif_orientation_is_applied(encode: Encode) -> None:
     exif[0x0112] = 6
     image = decode_image(encode(Image.new("RGB", (40, 10)), "JPEG", exif=exif))
     assert (image.width, image.height) == (10, 40)
+
+
+def test_size_from_the_header_matches_the_decoded_image(encode: Encode) -> None:
+    exif = Image.Exif()
+    exif[0x0112] = 6
+    assert image_size(encode(Image.new("RGB", (40, 10)), "JPEG", exif=exif)) == (10, 40)
+    assert image_size(encode(Image.new("RGB", (40, 10)), "PNG")) == (40, 10)
+
+
+def test_size_of_a_corrupt_header_is_an_image_error() -> None:
+    with pytest.raises(ImageLoadError):
+        image_size(MAGIC_PREFIXES[0] + bytes(20))
 
 
 @pytest.mark.invariant

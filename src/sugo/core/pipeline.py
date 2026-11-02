@@ -46,6 +46,7 @@ from sugo.extractors.pymupdf.extract import (
     extract_pdf,
     is_failed_page,
 )
+from sugo.metrics.tokenizer import count_tokens
 from sugo.serializers.markdown import render
 from sugo.storage.page_cache import (
     CacheLevel,
@@ -107,6 +108,9 @@ class Conversion:
     source: str | None
     source_sha256: str
     pages: int
+    # Page numbers, counted from 1, that could not be read: their content is
+    # missing from the Markdown, so the conversion is only partly successful.
+    failed_pages: tuple[int, ...]
     # Blocks removed, per cleaner name, so the user can see what went and why.
     removed: Mapping[str, int]
     # Empty unless chunks were asked for (``max_chunk_tokens``).
@@ -114,6 +118,9 @@ class Conversion:
     sugo_version: str
     # Digest of the settings that change the output (cleaners, chunk size).
     config_hash: str
+    # Tokens of the text before cleaning, the baseline of ADR-003; None
+    # unless asked for (``count_raw_tokens``), as it renders every page twice.
+    raw_tokens: int | None = None
 
 
 def convert_file(
@@ -123,6 +130,7 @@ def convert_file(
     ocr: Callable[[], OcrEngine] = default_ocr_engine,
     source: str | None = None,
     max_chunk_tokens: int | None = None,
+    count_raw_tokens: bool = False,
 ) -> Conversion:
     """Read a file and convert it; ``source`` defaults to the path as given.
 
@@ -132,16 +140,25 @@ def convert_file(
         sugo.extractors.pymupdf.extract.PdfError: If a PDF is refused.
         sugo.extractors.image.loader.ImageLoadError: If an image is refused.
     """
-    with path.open("rb") as file:
-        # One byte more than the limit lets the extractor report "too large".
-        data = file.read(_MAX_INPUT_BYTES + 1)
     return convert(
-        data,
+        read_input(path),
         cache=cache,
         ocr=ocr,
         source=path.as_posix() if source is None else source,
         max_chunk_tokens=max_chunk_tokens,
+        count_raw_tokens=count_raw_tokens,
     )
+
+
+def read_input(path: Path) -> bytes:
+    """Read a file to convert, stopping just past the largest size any extractor accepts.
+
+    Raises:
+        OSError: If the file cannot be read.
+    """
+    with path.open("rb") as file:
+        # One byte more than the limit lets the extractor report "too large".
+        return file.read(_MAX_INPUT_BYTES + 1)
 
 
 def convert(
@@ -151,6 +168,7 @@ def convert(
     ocr: Callable[[], OcrEngine] = default_ocr_engine,
     source: str | None = None,
     max_chunk_tokens: int | None = None,
+    count_raw_tokens: bool = False,
 ) -> Conversion:
     """Convert a document's bytes into Markdown, and into chunks if asked.
 
@@ -161,6 +179,7 @@ def convert(
         source: Name of the document, e.g. its path as the user gave it. It
             gives the document its id, kept across new editions (ADR-047).
         max_chunk_tokens: Chunk size in tokens; None makes no chunks.
+        count_raw_tokens: Also count the tokens of the uncleaned text.
 
     Raises:
         InputUnsupportedError: If the data is neither a PDF nor a supported image.
@@ -170,7 +189,9 @@ def convert(
     kind = detect_kind(data)
     if max_chunk_tokens is not None and max_chunk_tokens < CHUNK_MIN_TOKENS:
         raise ValueError(f"max_chunk_tokens must be at least {CHUNK_MIN_TOKENS}")
-    options = _Options(source=source, max_chunk_tokens=max_chunk_tokens)
+    options = _Options(
+        source=source, max_chunk_tokens=max_chunk_tokens, count_raw_tokens=count_raw_tokens
+    )
     if cache is not None:
         return _Job(data, kind, cache, ocr, options).run()
     try:
@@ -205,6 +226,8 @@ def detect_kind(data: bytes) -> InputKind:
 class _Options:
     source: str | None
     max_chunk_tokens: int | None
+    # Not part of the config hash: it measures the output, never changes it.
+    count_raw_tokens: bool
 
     def config_hash(self) -> str:
         settings = {"cleaners": _CLEANING, "max_chunk_tokens": self.max_chunk_tokens}
@@ -258,8 +281,13 @@ class _Job:
         )
         removed: Counter[str] = Counter()
         parts: list[str] = []
+        raw_parts: list[str] | None = [] if self._options.count_raw_tokens else None
         chunks: list[Chunk] = []
         for index in range(count):
+            if raw_parts is not None:
+                raw_text = render(self._extracted(index).blocks)
+                if raw_text:
+                    raw_parts.append(raw_text)
             page = self._cleaned(index, stats, cleaning)
             removed.update(block.removed_by for block in page.blocks if block.removed_by)
             text = render(page.blocks)
@@ -277,10 +305,13 @@ class _Job:
             source=self._options.source,
             source_sha256=self._sha256,
             pages=count,
+            failed_pages=tuple(index + 1 for index in sorted(self._failed)),
             removed=MappingProxyType(dict(sorted(removed.items()))),
             chunks=tuple(chunks),
             sugo_version=sugo_version,
             config_hash=config_hash,
+            # Joined like the Markdown, so both counts measure the same layout.
+            raw_tokens=None if raw_parts is None else count_tokens("\n\n".join(raw_parts)),
         )
 
     def _extract(self) -> int:
