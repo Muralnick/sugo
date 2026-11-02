@@ -79,6 +79,10 @@ import pymupdf  # noqa: E402
 
 Pixels = npt.NDArray[np.uint8]
 
+# Times the list of streams is taken before giving up on a file MuPDF keeps
+# repairing; one repair settles a file, so two equal lists come quickly.
+_STREAM_LIST_ATTEMPTS = 4
+
 # MuPDF character flags (fz_stext_char flags) and font flags (span "flags").
 _FILLED = 16
 _STROKED = 32
@@ -180,9 +184,7 @@ def _stream_problem(document: pymupdf.Document) -> Refused | None:
     is refused rather than parsed unchecked (temporary, ADR-043).
     """
     try:
-        streams = [
-            xref for xref in range(1, document.xref_length()) if document.xref_is_stream(xref)
-        ]
+        streams = _streams(document)
         for xref in streams:
             for key in ("Filter", "F"):
                 kind, value = document.xref_get_key(xref, key)
@@ -194,6 +196,8 @@ def _stream_problem(document: pymupdf.Document) -> Refused | None:
         for index in range(document.page_count):
             if _page_contents_name_brotli(document, index):
                 return Refused(code="PDF_UNSUPPORTED", message=BROTLI_REFUSAL)
+        if _streams(document) != streams:
+            raise _UncheckedError  # MuPDF repaired the file while it was being checked
     except Exception:  # noqa: BLE001  (any failure, _UncheckedError included, means "unchecked")
         return Refused(code="PDF_UNSUPPORTED", message=UNCHECKED_REFUSAL)
     return None
@@ -201,6 +205,24 @@ def _stream_problem(document: pymupdf.Document) -> Refused | None:
 
 class _UncheckedError(Exception):
     """The filters could not be checked completely."""
+
+
+def _streams(document: pymupdf.Document) -> list[int]:
+    """Every stream object, once MuPDF has stopped repairing the file.
+
+    Reading an object at a wrong offset makes MuPDF repair the file, which can
+    add objects or turn one into a stream; the list is taken again until it
+    no longer changes.
+    """
+    previous: list[int] = []
+    for _ in range(_STREAM_LIST_ATTEMPTS):
+        streams = [
+            xref for xref in range(1, document.xref_length()) if document.xref_is_stream(xref)
+        ]
+        if streams == previous:
+            return streams
+        previous = streams
+    raise _UncheckedError
 
 
 def _as_filter(value: bytes) -> bytes:

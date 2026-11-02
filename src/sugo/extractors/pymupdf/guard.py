@@ -74,15 +74,16 @@ _KEY = re.compile(
 # Possessive and atomic quantifiers throughout: no pattern can backtrack.
 _SPACE = re.compile(rb"(?:[\s\x00]|%[^\r\n]*+)*+")
 _NAME = re.compile(rb"/([^" + _DELIMITER + rb"]*+)")
-# "5 0 R": MuPDF's lexer accepts a sign before each number.
+# "5 0 R" as MuPDF's lexer reads it: signs (any number of them) before each
+# number, and no whitespace needed where a sign or "R" ends a number ("5+0R").
 _GAP = rb"(?:[\s\x00]|%[^\r\n]*+[\r\n])"
-_REF = re.compile(rb"[+\-]?(\d++)" + _GAP + rb"++[+\-]?\d++" + _GAP + rb"*+R" + _NAME_END)
-_INTEGER = re.compile(rb"[+\-]?\d+")
+_REF = re.compile(rb"[+\-]*+(\d++)" + _GAP + rb"*+[+\-]*+\d++" + _GAP + rb"*+R" + _NAME_END)
 _TOKEN = re.compile(
     rb"[\s\x00]++|%[^\r\n]*+|<<|>>|<[^>]*+>?|[^" + _DELIMITER + rb"]++|[\[\](){}>/]"
 )
 _STRING_PART = re.compile(rb"[^()\\]++|\\.?|[()]", re.DOTALL)
-_STREAM = re.compile(rb"stream(?:\r\n|[\r\n])")
+# MuPDF accepts the keyword before any whitespace or delimiter.
+_STREAM = re.compile(rb"stream" + _NAME_END)
 # Bytes the scans of one input may read beyond each key, in total, beyond the
 # input's own length.
 _SCAN_BUDGET_SLACK = 64 * 1024
@@ -163,7 +164,6 @@ def _array(data: bytes, position: int, budget: list[int]) -> tuple[set[bytes], s
     included, and where the array ends."""
     names: set[bytes] = set()
     references: set[int] = set()
-    words: list[bytes] = []  # bare words since the last name or bracket, to spot "5 0 R"
     depth = 1
     start = position
     while depth and (token := _next_token(data, position, start, budget)) is not None:
@@ -180,18 +180,9 @@ def _array(data: bytes, position: int, budget: list[int]) -> tuple[set[bytes], s
             assert name is not None  # noqa: S101  (a "/" always starts a name)
             names.add(_unescape(name[1]))
             position = name.end()
-            words.clear()
-        elif text[0] in b" \t\r\n\f\x00%":
-            continue
-        elif text == b"R":
-            match words[-2:]:
-                case [number, generation] if _INTEGER.fullmatch(number) and _INTEGER.fullmatch(
-                    generation
-                ):
-                    references.add(int(number))
-            words.clear()
-        else:
-            words.append(text)
+        elif (reference := _REF.match(data, token.start())) is not None:
+            references.add(int(reference[1]))
+            position = reference.end()
     budget[0] -= position - start
     return names, references, position
 

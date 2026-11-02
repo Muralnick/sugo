@@ -151,3 +151,21 @@ def test_scans_that_never_end_are_cut_and_refused(hostile: bytes) -> None:
     problem = raw_problem(b"%PDF-1.7\n" + hostile)
     assert time.perf_counter() - start < 2.0
     assert problem == UNCHECKED_REFUSAL
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [b"/Filter 5+0R", b"/Filter 5-0 R", b"/Filter [5 0R]", b"/Filter [5+0R]", b"/Filter --5 0 R"],
+)
+def test_reference_written_without_spaces_is_refused(raw_pdf: RawPdf, entry: bytes) -> None:
+    # MuPDF's lexer ends a number at a sign or a letter: "5+0R" is "5 0 R".
+    problem = raw_problem(raw_pdf(entry, extra=b"/FlateDecode"))
+    assert problem is not None
+    assert "indirectly" in problem
+
+
+@pytest.mark.parametrize("keyword", [b"stream \n", b"stream\t", b"stream%\n", b"stream<"])
+def test_stream_keyword_is_recognised_as_mupdf_reads_it(keyword: bytes) -> None:
+    data = b"%PDF-1.7\n4 0 obj\n<< /Type /ObjStm /F 5 0 R /Length 1 >>\n" + keyword + b"x"
+    assert raw_problem(data) is not None
+    assert scan(b"BI /W 1 /F 6+0R ID x EI").references == {6}
