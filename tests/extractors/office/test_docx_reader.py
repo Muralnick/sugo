@@ -184,6 +184,27 @@ def test_alternate_content_is_read_once() -> None:
     assert text(body) == "boxed"
 
 
+@pytest.mark.parametrize(
+    ("declared", "shown"),
+    [
+        ('xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"', "chosen"),
+        # Office skips a choice requiring a namespace it does not know.
+        ('xmlns:wps="urn:attacker"', "fallback"),
+    ],
+)
+def test_alternate_content_is_chosen_as_office_chooses_it(declared: str, shown: str) -> None:
+    mc = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+    body = (
+        f'<w:p><w:r><mc:AlternateContent xmlns:mc="{mc}" {declared}>'
+        '<mc:Choice Requires="wps"><w:drawing><w:txbxContent>'
+        + p("chosen")
+        + "</w:txbxContent></w:drawing></mc:Choice><mc:Fallback><w:pict><w:txbxContent>"
+        + p("fallback")
+        + "</w:txbxContent></w:pict></mc:Fallback></mc:AlternateContent></w:r></w:p>"
+    )
+    assert text(body) == shown
+
+
 def test_word_documents_are_recognised_without_parsing_xml() -> None:
     assert word_document(docx(p("x")))
     macro = "application/vnd.ms-word.document.macroEnabled.main+xml"

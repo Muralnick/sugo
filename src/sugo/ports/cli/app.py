@@ -145,7 +145,7 @@ def convert_command(
         typer.Argument(
             dir_okay=False,
             metavar="FILE...",
-            help=N_("PDF, DOCX, XLSX, PNG, JPEG, WEBP or XML files."),
+            help=N_("PDF, DOCX, XLSX, PPTX, PNG, JPEG, WEBP or XML files."),
         ),
     ],
     output: Annotated[

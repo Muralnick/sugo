@@ -5,7 +5,7 @@
 **Deciders:** project author  
 **Implements:** ROADMAP v0.1 "Office (DOCX, XLSX, PPTX) and XML through a light reader", ADR-007 (`lite` level), ADR-018 (process isolation), THREAT_MODEL (XXE, hidden text)  
 **Updates:** ADR-007 ("Office via lightweight dedicated libraries" becomes Sugo's own reader), ADR-046 (routing by content), ADR-043 (its worker plumbing becomes shared)  
-**Amends:** IR flags (ADR-005): new `secret` flag  
+**Amends:** IR (ADR-005): new `secret` flag; new `list_level` field on list items (maintainer decision, 2026-11-01)  
 **Requires:** ADR-053 merged first  
 **Adds error codes:** `OFFICE_INVALID`, `OFFICE_UNSUPPORTED`, `OFFICE_TOO_LARGE`, `XML_INVALID`, `XML_TOO_LARGE`, `OFFICE_EXTRACTION_FAILED`
 
@@ -36,7 +36,7 @@ The reader runs in a **worker process**, like the PDF extractor (ADR-043): `pyth
 |---|---|
 | ZIP (`PK\x03\x04`) with `[Content_Types].xml` whose main part is a Word document, template or macro-enabled document | `docx` |
 | The same for a workbook (`.xlsx`, `.xltx`, `.xlsm`; not the binary `.xlsb`) | `xlsx` |
-| The same for a presentation (`.pptx`, `.potx`, `.pptm`) | `pptx` |
+| The same for a presentation, template or slide show (`.pptx`, `.potx`, `.ppsx` and their macro-enabled forms `.pptm`, `.potm`, `.ppsm`) | `pptx` |
 | Text that starts, after an optional BOM and white space, with `<?xml` or `<` and a name character | `xml` |
 | OLE compound file (`D0 CF 11 E0`): legacy `.doc/.xls/.ppt` or a password-protected Office file | refused, `OFFICE_UNSUPPORTED` |
 | Any other ZIP | refused as before (`INPUT_UNSUPPORTED`) |
@@ -56,6 +56,7 @@ Macro-enabled files are read like the others: macros are never run nor output. T
 | XML elements | 2 000 000 in one Office part; 1 000 000 in a generic XML file | `OFFICE_TOO_LARGE` / `XML_TOO_LARGE` |
 | Spreadsheet cells read | 2 000 000 in a workbook, 500 000 in one sheet (maintainer decision; one sheet is one page: measured, 500 000 numeric cells take 11 s and a 29 MB message, a million 22 s and 59 MB, too close to the 30 s page time and 64 MB message limits) | `OFFICE_TOO_LARGE` |
 | Spreadsheet table cells written, empty ones included | 4 000 000, so that a few cells far apart cannot make a huge grid | `OFFICE_TOO_LARGE` |
+| Presentation table cells written, empty ones and those a span covers included: the serializer draws every cell of the grid, so one cell spanning a billion columns must not reach it (security review; PowerPoint's own tables stop at 75 columns) | 4 000 000 in a presentation, every slide's tables counted before the first page | `OFFICE_TOO_LARGE` |
 | Characters of cell text in one sheet, hidden cells included | 16 000 000, so that one long shared string used by many cells cannot fill the worker or the page message (security review) | `OFFICE_TOO_LARGE` |
 | Workbook whose sheets share a part, or a sheet with more column ranges than Excel has columns | — (Excel never writes them; a part read twice counts once towards the total) | `OFFICE_INVALID` |
 | Encrypted ZIP entries, broken archive, missing main part | — | `OFFICE_INVALID` |
@@ -80,8 +81,8 @@ Each page is cached like a PDF page (ADR-045); the reader's version is part of t
 - Footnotes and endnotes after the page that cites them, with their number.
 - Each section's header and footer once, flagged as running header or footer, so the existing cleaner proposes their removal with a reason (ADR-044).
 - Equations and embedded objects are not guessed: each becomes a block marked not converted. Until the image PR, images are marked the same way.
-- Numbered items keep Word's label ("2.1."); the IR has no list levels, and the label carries the structure. The serializer escapes a label such as "1." that would open a Markdown list inside the item.
-- `mc:AlternateContent` is read from its first choice only; the fallback repeats the same text box for older readers.
+- Numbered items keep Word's label ("2.1."), which carries the structure; the list level added to the IR for PPTX (below) is not yet set by the DOCX reader. The serializer escapes a label such as "1." that would open a Markdown list inside the item.
+- `mc:AlternateContent` is read as Office reads it (security review, 2026-11-01): the first `mc:Choice` whose `Requires` names only namespaces Office understands, else the `mc:Fallback`; the other branches are not read. The fallback usually repeats the choice for older readers, but a crafted file can put other text in a choice Office never shows. The parsed tree keeps no prefixes, so while an Office part is parsed each choice is given the namespaces its prefixes are bound to; a prefix bound to nothing, or to a namespace not on the list, is not understood. The same rule applies to PPTX.
 - The whole document is laid out before its first page, since numbering and notes depend on what comes before; a layout error therefore refuses the file (`OFFICE_EXTRACTION_FAILED`) instead of marking one page. A DOCX is laid out again on every run, in well under a second; its cleaned pages are still cached.
 - Recognised in Sugo's own process from the ZIP directory and a byte search in `[Content_Types].xml`, without parsing XML; the worker parses everything else.
 - Measured on o200k_base: a five-article contract with a ten-row table is 1 805 tokens as `document.xml`, 325 as plain extracted text and **314** as Sugo's Markdown, with one hidden instruction removed.
@@ -96,8 +97,15 @@ Each page is cached like a PDF page (ADR-045); the reader's version is part of t
 - Measured on o200k_base: a 50-row sales sheet (date, region, product, quantity, price, a formula total) is 5 382 tokens as `sheet1.xml` and **1 416** as Sugo's Markdown (**−74%**).
 
 **PPTX**
-- Shapes in reading order by position, through the XY-cut shared with the image and PDF extractors; group shapes are entered. The title placeholder becomes a heading, body text keeps its bullet levels, tables become tables.
-- Text shown only by layouts and masters (placeholder prompts such as "Click to add title") is not read.
+- Shapes in reading order by position, through the XY-cut shared with the image and PDF extractors; group shapes are entered and their children placed on the slide through the group's frame. A placeholder without a position of its own takes its layout's, else its master's; a shape with no position at all follows the placed ones, in document order. An offset without a size is a shape of no size at that offset, so the off-slide rule still applies to it; coordinates beyond the standard's range, or scaled to infinity by nested groups, count as off the slide (security review).
+- The title placeholder becomes a heading; footer and date placeholders become footer blocks and the slide number placeholder a page number block, with their position, so the edge cleaners remove them when they repeat (ADR-044).
+- Body text keeps its bullet levels (maintainer decision, 2026-11-01): blocks gain an optional `list_level` (0 to 8, PowerPoint's nine levels), allowed only on list items, and the serializer indents a nested item two spaces per level, never more than one level below the item above, where Markdown would read it as code. Whether a paragraph has a bullet is decided as PowerPoint does: the paragraph, then the shape's list style, its layout and master placeholders, then the master's title, body or other text style. Numbered paragraphs keep their label (`1.`, `a)`, `(iv)`), counted per level.
+- Tables become tables (ADR-042), the header row from the table's "first row" setting, a merged cell's text in its first cell, split into tables of 200 rows with the header repeated. SmartArt becomes its nodes' text as list items, nested by the diagram's parent links (a loop in a damaged file is read once); like shapes and speaker notes, only the text of runs and fields is read, never text placed in extensions, which PowerPoint does not show (security review). Hyperlinks to web and mail addresses become Markdown links, as in DOCX.
+- Pictures, charts, media, ink, equations and embedded objects become one block each marked not converted (pictures until the image PR, below); an equation follows the text of its paragraph.
+- Text shown only by layouts and masters (placeholder prompts such as "Click to add title", a logo's text) is not read: they are opened only for positions and list styles.
+- The slide list is checked when the file is opened: a slide missing from the package, listed twice or linked outside it refuses the file (`OFFICE_INVALID`). Each slide is then laid out when its page is sent; a slide whose parts turn out broken is marked illegible, never dropped. Every slide's tables are counted before the first page, against the table cell limit; a slide that cannot be read then is left to its own page. A presentation without slides is one empty page. Pages are measured in points, from the presentation's slide size (PowerPoint's 16:9 default when it has none).
+- Recognised like DOCX, from the ZIP directory and a byte search in `[Content_Types].xml` for a presentation, template or slide show main part.
+- Measured on o200k_base: an eight-slide business deck (title slide, bullets on two levels, a 6 × 4 budget table, two columns, numbered steps, a footer and slide number on every slide, speaker notes on two slides), written in PowerPoint's markup, is 15 424 tokens as its slide XML, 459 as plain extracted text and **394** as Sugo's Markdown (**−97%**), with seven of the eight footers (the first copy is kept, ADR-044), every slide number and one hidden instruction in the notes removed.
 
 **XML**
 - An indented outline, two spaces per level: `name: text`, attributes as `@name: value`, namespace prefixes dropped, white space collapsed. Elements with neither text, attributes nor children carry no content and are left out; so are comments, processing instructions and the `xsi:schemaLocation` attributes, which only point at schemas. Text between child elements (mixed content) keeps its place as a line of its own.
@@ -138,6 +146,7 @@ What a reader of the document does not see stays in the IR, flagged `hidden`, an
 - Agents can now ask for XML files, so ADR-053 must be merged before this reader.
 - Each Office file pays a worker start (about 0.3 s). Speed and token savings are measured on DOCX, XLSX, PPTX and XML samples in the implementation PR and in step 8.
 - Residual risks:
+  - alternate content requiring an Office namespace missing from Sugo's list is read from its fallback, while Office shows the choice; the list holds the namespaces Office documents put in `Requires` and grows with new Office versions;
   - text hidden by means not listed above (text the same colour as a background image or shape, tiny text set through a theme; in a workbook, white text, conditional formats, cells covered by shapes) reaches the LLM;
   - complex layouts (multi-column DOCX, SmartArt, floating shapes) may come out in a different order; Docling handles them in v0.2;
   - the XML outline is cleaned like prose, so the hyphen-join rule (ADR-050) could fuse a value ending in "-" with the next field name; it needs the fused word to appear elsewhere in the document, which field names make very unlikely. A block type for structured data, which text cleaners skip, would close it;

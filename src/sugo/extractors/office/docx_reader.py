@@ -34,7 +34,7 @@ from sugo.core.constants import (
     OFFICE_TABLE_MAX_ROWS,
 )
 from sugo.core.models import Block, BlockFlag, BlockType, Page, PageOrigin, Table, TableCell
-from sugo.extractors.office.package import Package, Relationship
+from sugo.extractors.office.package import SAFE_LINK, Package, Relationship, chosen_content
 from sugo.extractors.office.xml_reader import Element, local_name
 
 ENGINE_NAME = "docx"
@@ -63,9 +63,6 @@ _TRANSPARENT = frozenset(
 )
 _HIDDEN_CONTAINERS = frozenset({"del", "moveFrom"})
 _HEADING_STYLE = re.compile(r"heading\s*([1-9])")
-# Only these outside addresses become Markdown links; anything else (javascript:,
-# file:, white space or brackets that would break the link) stays plain text.
-_LINK = re.compile(r"(?:https?://|mailto:)[^\s()<>\[\]]+", re.IGNORECASE)
 _FALSE = frozenset({"0", "false", "off"})
 _WHITE = "FFFFFF"
 # Roman numerals stop at 3 999; larger counters are written as decimals.
@@ -375,7 +372,7 @@ class _Reader:
                 if content is not None:
                     self._body(content, top=top, hidden=hidden)
             elif _ns(element.tag) == _MC and local_name(element.tag) == "AlternateContent":
-                choice = next((c for c in element if local_name(c.tag) == "Choice"), None)
+                choice = chosen_content(element)
                 if choice is not None:
                     self._body(choice, top=top, hidden=hidden)
 
@@ -447,7 +444,7 @@ class _Reader:
         label = definition.text
         for index in range(level + 1):
             number_format = levels.get(index, definition).format
-            label = label.replace(f"%{index + 1}", _number(counters[index], number_format))
+            label = label.replace(f"%{index + 1}", counter_text(counters[index], number_format))
         return label.strip()
 
     def _inline(self, element: Element, parts: _Paragraph, look: _RunLook, *, hidden: bool) -> None:
@@ -458,7 +455,7 @@ class _Reader:
                     parts.not_converted += 1
                 continue
             if namespace == _MC and name == "AlternateContent":
-                choice = next((c for c in child if local_name(c.tag) == "Choice"), None)
+                choice = chosen_content(child)
                 if choice is not None:
                     self._inline(choice, parts, look, hidden=hidden)
                 continue
@@ -480,7 +477,7 @@ class _Reader:
         concealed = hidden or look.hidden(shaded=parts.shaded)
         for item in run:
             if _ns(item.tag) == _MC and local_name(item.tag) == "AlternateContent":
-                choice = next((c for c in item if local_name(c.tag) == "Choice"), None)
+                choice = chosen_content(item)
                 if choice is not None:
                     self._drawing(choice, parts, hidden=concealed)
                 continue
@@ -527,7 +524,7 @@ class _Reader:
             text.strip()
             and target is not None
             and target.external
-            and _LINK.fullmatch(target.target)
+            and SAFE_LINK.fullmatch(target.target)
         ):
             parts.text(False, f"[{text}]({target.target})")
         else:
@@ -614,7 +611,9 @@ class _Reader:
         size = max(1, OFFICE_TABLE_MAX_ROWS - len(header))
         parts_of_body = [body[start : start + size] for start in range(0, len(body), size)] or [[]]
         for part in parts_of_body:
-            self._add(_Pending(BlockType.TABLE, table=_grid(header + part, width, len(header))))
+            self._add(
+                _Pending(BlockType.TABLE, table=table_grid(header + part, width, len(header)))
+            )
 
     # --- Pages and sections -------------------------------------------------
 
@@ -688,7 +687,11 @@ def _paragraph_style(paragraph: Element) -> str | None:
     return _val(_child(_child(paragraph, "pPr"), "pStyle"))
 
 
-def _grid(rows: list[list[tuple[str, int]]], width: int, header_rows: int) -> Table:
+def table_grid(rows: list[list[tuple[str, int]]], width: int, header_rows: int) -> Table:
+    """A table from rows of (text, columns spanned); a span past the width is cut.
+
+    Also used for PowerPoint tables, whose cells are read the same way.
+    """
     cells: list[TableCell] = []
     for row_index, row in enumerate(rows):
         column = 0
@@ -701,8 +704,12 @@ def _grid(rows: list[list[tuple[str, int]]], width: int, header_rows: int) -> Ta
     return Table(n_rows=len(rows), n_cols=width, header_rows=header_rows, cells=tuple(cells))
 
 
-def _number(value: int, number_format: str) -> str:
-    """A list counter in Word's number formats; unknown formats as decimals."""
+def counter_text(value: int, number_format: str) -> str:
+    """A list counter in Word's number formats; unknown formats as decimals.
+
+    Also used for PowerPoint's numbered paragraphs, whose schemes map onto
+    ``lowerLetter``, ``upperLetter``, ``lowerRoman`` and ``upperRoman``.
+    """
     if number_format in ("lowerLetter", "upperLetter") and value > 0:
         letters = ""
         while value > 0:

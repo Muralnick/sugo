@@ -14,7 +14,7 @@ from sugo.core.decisions import apply_decisions
 from sugo.core.models import Block, BlockFlag, BlockType, ChatSide, Table, TableCell
 from sugo.extractors.image.extract import extract_page
 from sugo.extractors.image.ocr_engine import OcrEngine, bundled_models
-from sugo.serializers.markdown import render
+from sugo.serializers.markdown import render, render_widest
 
 
 def block(kind: BlockType, text: str = "", block_id: str = "b", **extra: object) -> Block:
@@ -43,6 +43,30 @@ class TestBlockTypes:
     def test_list_items_are_tight(self) -> None:
         out = render(blocks(block(BlockType.LIST_ITEM, "a"), block(BlockType.LIST_ITEM, "b\nc")))
         assert out == "- a\n- b\n  c"
+
+    def test_nested_list_items_are_indented_under_the_item_above(self) -> None:
+        out = render(
+            blocks(
+                block(BlockType.LIST_ITEM, "a", list_level=0),
+                block(BlockType.LIST_ITEM, "b\nmore", list_level=1),
+                block(BlockType.LIST_ITEM, "c", list_level=2),
+                block(BlockType.LIST_ITEM, "d", list_level=0),
+            )
+        )
+        assert out == "- a\n  - b\n    more\n    - c\n- d"
+
+    def test_list_levels_never_jump_into_code(self) -> None:
+        # Four spaces before a first item, or six under an item at level 0,
+        # would make Markdown code: an item is at most one level below the one above.
+        out = render(
+            blocks(
+                block(BlockType.LIST_ITEM, "deep", list_level=3),
+                block(BlockType.LIST_ITEM, "deeper", list_level=5),
+                block(BlockType.PARAGRAPH, "text"),
+                block(BlockType.LIST_ITEM, "again", list_level=2),
+            )
+        )
+        assert out == "- deep\n  - deeper\n\ntext\n\n- again"
 
     def test_chat_messages_carry_their_side(self) -> None:
         out = render(
@@ -252,3 +276,10 @@ def test_chat_screenshot_to_markdown() -> None:
     page = apply_decisions(page, cleaner.propose(page), cleaner=cleaner.name)
     expected = "\n".join(f"{side}: {text}" for side, text in bubbles * 2)
     assert render(page.blocks) == expected
+
+
+def test_render_widest_shows_a_nested_item_at_its_own_level() -> None:
+    item = block(BlockType.LIST_ITEM, "deep\nmore", list_level=2)
+    assert render([item]) == "- deep\n  more"
+    assert render_widest(item) == "    - deep\n      more"
+    assert render_widest(item.mark_removed("test", "gone")) == ""

@@ -6,6 +6,10 @@ from typing import Final
 # Markdown has six heading levels (`#` to `######`); deeper levels cannot be rendered.
 MAX_HEADING_LEVEL: Final = 6
 
+# List levels count from 0, the outermost; PowerPoint has nine (0-8), and so
+# does Word's numbering.
+MAX_LIST_LEVEL: Final = 8
+
 # Pages are rotated in quarter turns by PDF viewers and image EXIF orientation alike.
 PAGE_ROTATIONS: Final = frozenset({0, 90, 180, 270})
 
@@ -272,6 +276,74 @@ OFFICE_MAX_PART_ELEMENTS: Final = 2_000_000
 # lists a few dozen parts; a larger one is not a document Sugo reads.
 OFFICE_MAX_CONTENT_TYPES_BYTES: Final = 1024 * 1024
 
+# Namespaces Office understands when it chooses among alternate content
+# (mc:AlternateContent, ISO/IEC 29500-3): it shows the first mc:Choice whose
+# Requires names only namespaces it knows, else the mc:Fallback. The readers
+# choose the same way, so a Choice requiring a made-up namespace, which Office
+# never shows, is never read either. Office's own extension namespaces that
+# documents put in Requires; one missing here makes the readers take the
+# Fallback where Office shows the Choice (ADR-054, residual risks).
+OFFICE_UNDERSTOOD_NAMESPACES: Final = frozenset(
+    {
+        # The standard's own, transitional and strict, and VML.
+        "http://schemas.openxmlformats.org/markup-compatibility/2006",
+        "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "http://purl.oclc.org/ooxml/presentationml/main",
+        "http://schemas.openxmlformats.org/drawingml/2006/main",
+        "http://purl.oclc.org/ooxml/drawingml/main",
+        "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+        "http://purl.oclc.org/ooxml/wordprocessingml/main",
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        "http://purl.oclc.org/ooxml/officeDocument/relationships",
+        "http://schemas.openxmlformats.org/officeDocument/2006/math",
+        "http://purl.oclc.org/ooxml/officeDocument/math",
+        "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+        "http://schemas.openxmlformats.org/drawingml/2006/picture",
+        "http://schemas.openxmlformats.org/drawingml/2006/chart",
+        "http://schemas.openxmlformats.org/drawingml/2006/diagram",
+        "urn:schemas-microsoft-com:vml",
+        "urn:schemas-microsoft-com:office:office",
+        "urn:schemas-microsoft-com:office:word",
+        # PowerPoint.
+        "http://schemas.microsoft.com/office/powerpoint/2010/main",
+        "http://schemas.microsoft.com/office/powerpoint/2012/main",
+        "http://schemas.microsoft.com/office/powerpoint/2015/09/main",
+        "http://schemas.microsoft.com/office/powerpoint/2015/10/main",
+        "http://schemas.microsoft.com/office/powerpoint/2017/3/main",
+        "http://schemas.microsoft.com/office/powerpoint/2017/10/main",
+        "http://schemas.microsoft.com/office/powerpoint/2018/8/main",
+        # DrawingML.
+        "http://schemas.microsoft.com/office/drawing/2007/8/2/chart",
+        "http://schemas.microsoft.com/office/drawing/2010/main",
+        "http://schemas.microsoft.com/office/drawing/2012/main",
+        "http://schemas.microsoft.com/office/drawing/2014/main",
+        "http://schemas.microsoft.com/office/drawing/2014/chartex",
+        "http://schemas.microsoft.com/office/drawing/2015/9/8/chartex",
+        "http://schemas.microsoft.com/office/drawing/2015/10/21/chartex",
+        "http://schemas.microsoft.com/office/drawing/2016/5/9/chartex",
+        "http://schemas.microsoft.com/office/drawing/2016/5/10/chartex",
+        "http://schemas.microsoft.com/office/drawing/2016/5/11/chartex",
+        "http://schemas.microsoft.com/office/drawing/2016/5/12/chartex",
+        "http://schemas.microsoft.com/office/drawing/2016/5/13/chartex",
+        "http://schemas.microsoft.com/office/drawing/2016/5/14/chartex",
+        "http://schemas.microsoft.com/office/drawing/2016/ink",
+        "http://schemas.microsoft.com/office/drawing/2017/model3d",
+        # Word.
+        "http://schemas.microsoft.com/office/word/2010/wordml",
+        "http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing",
+        "http://schemas.microsoft.com/office/word/2010/wordprocessingShape",
+        "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup",
+        "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas",
+        "http://schemas.microsoft.com/office/word/2010/wordprocessingInk",
+        "http://schemas.microsoft.com/office/word/2012/wordml",
+        "http://schemas.microsoft.com/office/word/2015/wordml/symex",
+        "http://schemas.microsoft.com/office/word/2016/wordml/cid",
+        "http://schemas.microsoft.com/office/word/2018/wordml",
+        "http://schemas.microsoft.com/office/word/2018/wordml/cex",
+        "http://schemas.microsoft.com/office/word/2020/wordml/sdtdatahash",
+    }
+)
+
 # Text under this size, in half-points (2 pt), cannot be read on the page.
 DOCX_MIN_VISIBLE_HALF_POINTS: Final = 4
 
@@ -289,6 +361,24 @@ XLSX_MAX_SHEET_TEXT: Final = 16_000_000
 # Excel's own grid: 1 048 576 rows and 16 384 columns (A to XFD).
 XLSX_MAX_ROWS: Final = 1_048_576
 XLSX_MAX_COLUMNS: Final = 16_384
+
+# Slide positions are in EMU: 12 700 to a point. A presentation that gives no
+# slide size gets PowerPoint's 16:9 default, 13.333 by 7.5 inches.
+PPTX_EMU_PER_POINT: Final = 12_700
+PPTX_DEFAULT_SLIDE_WIDTH_EMU: Final = 12_192_000
+PPTX_DEFAULT_SLIDE_HEIGHT_EMU: Final = 6_858_000
+# Coordinates beyond the standard's range (ST_Coordinate, about 27 million
+# inches) are not positions: such a shape is placed as if it had none.
+PPTX_MAX_COORDINATE: Final = 27_273_042_329_600
+# Table cells written in one presentation, empty ones and those a span covers
+# included: the serializer draws every cell of the grid, so a cell spanning a
+# billion columns must not reach it. As XLSX_MAX_GRID_CELLS; PowerPoint's own
+# tables stop at 75 columns.
+PPTX_MAX_GRID_CELLS: Final = 4_000_000
+# Line height, as a share of the slide's height, from which the XY-cut sets
+# the gaps that separate shapes (LAYOUT_PARAGRAPH_GAP, LAYOUT_COLUMN_GAP):
+# about 11 pt on a 7.5-inch slide, so shapes set slightly apart are split.
+PPTX_LINE_HEIGHT: Final = 0.02
 
 # The worker process, as for PDF (ADR-043): address space on Linux and macOS,
 # seconds to open and check a file and to return one page, restarts after a

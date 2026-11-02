@@ -34,7 +34,7 @@ from sugo.core.constants import CHUNK_MAX_TOKENS, CHUNK_MIN_TOKENS, OUTPUT_ID_HE
 from sugo.core.models import Block, BlockType, Page
 from sugo.metrics.tokenizer import count_tokens
 from sugo.serializers.escape import drop_controls
-from sugo.serializers.markdown import render
+from sugo.serializers.markdown import render, render_widest
 
 # Where a paragraph may be cut: after a sentence end and the spaces after
 # it ("3.14" is not one), after CJK sentence punctuation (ideographic full
@@ -98,7 +98,7 @@ class SectionChunker:
         yield from self._close()
 
     def _add_block(self, block: Block, page_number: int) -> Iterator[Chunk]:
-        tokens = count_tokens(render([block]))
+        tokens = count_tokens(render_widest(block))
         if block.type is BlockType.HEADING:
             yield from self._add_heading(block, page_number, tokens)
             return
@@ -281,7 +281,7 @@ def _cut(text: str, max_tokens: int, block: Block, index: int) -> tuple[str, str
 
 def _cost(text: str, block: Block, index: int) -> int:
     continued = index > 0 and block.type is BlockType.LIST_ITEM
-    return count_tokens(render([_with_text(block, text, index, as_paragraph=continued)]))
+    return count_tokens(render_widest(_with_text(block, text, index, as_paragraph=continued)))
 
 
 def _with_text(block: Block, text: str, index: int, *, as_paragraph: bool = False) -> Block:
@@ -289,6 +289,7 @@ def _with_text(block: Block, text: str, index: int, *, as_paragraph: bool = Fals
     fields = {**block.model_dump(), "id": f"{block.id}#{index}", "text": text}
     if as_paragraph:
         fields["type"] = BlockType.PARAGRAPH
+        fields["list_level"] = None
     return Block.model_validate(fields)
 
 

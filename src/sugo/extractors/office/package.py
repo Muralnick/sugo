@@ -6,14 +6,15 @@ external relationships are recorded but never followed. Each part is
 decompressed in bounded steps and counted as it comes: the sizes written in
 the archive are the attacker's, so they are never trusted.
 
-``word_document`` and ``excel_workbook`` recognise a Word document or an
-Excel workbook from the raw bytes, without parsing XML, so Sugo's own process
-can route a file before the worker reads it. ``stream`` lets a large part be
+``office_kind`` recognises a Word document, an Excel workbook or a
+PowerPoint presentation from the raw bytes, without parsing XML, so Sugo's own process can route a
+file before the worker reads it. ``stream`` lets a large part be
 parsed piece by piece; a part read twice counts once towards the total.
 """
 
 import io
 import posixpath
+import re
 import zipfile
 from dataclasses import dataclass
 from typing import IO
@@ -27,8 +28,15 @@ from sugo.core.constants import (
     OFFICE_MAX_RATIO,
     OFFICE_MAX_TOTAL_BYTES,
     OFFICE_RATIO_MIN_BYTES,
+    OFFICE_UNDERSTOOD_NAMESPACES,
 )
-from sugo.extractors.office.xml_reader import Element, Refusal, local_name, parse
+from sugo.extractors.office.xml_reader import (
+    REQUIRED_NAMESPACES,
+    Element,
+    Refusal,
+    local_name,
+    parse,
+)
 from sugo.i18n import N_
 
 ZIP_SIGNATURE = b"PK\x03\x04"
@@ -50,6 +58,26 @@ EXCEL_MAIN_TYPES = (
     b"application/vnd.ms-excel.sheet.macroEnabled.main+xml",
     b"application/vnd.ms-excel.template.macroEnabled.main+xml",
 )
+# Main parts of PowerPoint presentations, templates, slide shows and their
+# macro-enabled forms; the binary .ppt is an OLE file, refused before this.
+POWERPOINT_MAIN_TYPES = (
+    b"application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+    b"application/vnd.openxmlformats-officedocument.presentationml.template.main+xml",
+    b"application/vnd.openxmlformats-officedocument.presentationml.slideshow.main+xml",
+    b"application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml",
+    b"application/vnd.ms-powerpoint.template.macroEnabled.main+xml",
+    b"application/vnd.ms-powerpoint.slideshow.macroEnabled.main+xml",
+)
+# In the order a file naming several main parts is taken for one of them.
+_MAIN_TYPES = (
+    ("docx", WORD_MAIN_TYPES),
+    ("xlsx", EXCEL_MAIN_TYPES),
+    ("pptx", POWERPOINT_MAIN_TYPES),
+)
+# Only these outside addresses become Markdown links; anything else (javascript:,
+# file:, white space or brackets that would break the link) stays plain text.
+SAFE_LINK = re.compile(r"(?:https?://|mailto:)[^\s()<>\[\]]+", re.IGNORECASE)
+_MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
 _OFFICE_DOCUMENT = "/officeDocument"
 _CHUNK = 64 * 1024
 _ENCRYPTED_FLAG = 0x1
@@ -66,34 +94,64 @@ class Relationship:
     external: bool
 
 
-def word_document(data: bytes) -> bool:
-    """Whether the data is a ZIP whose content types name a Word main part.
+def office_kind(data: bytes) -> str | None:
+    """ "docx", "xlsx" or "pptx" if the data is a ZIP whose content types name that main part.
 
-    Reads the ZIP directory and one small entry; parses no XML.
+    Reads the ZIP directory and one small entry, once; parses no XML.
     """
-    return _names_main_type(data, WORD_MAIN_TYPES)
-
-
-def excel_workbook(data: bytes) -> bool:
-    """Whether the data is a ZIP whose content types name an Excel main part."""
-    return _names_main_type(data, EXCEL_MAIN_TYPES)
-
-
-def _names_main_type(data: bytes, main_types: tuple[bytes, ...]) -> bool:
     if not data.startswith(ZIP_SIGNATURE):
-        return False
+        return None
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             info = archive.getinfo(CONTENT_TYPES)
             if info.flag_bits & _ENCRYPTED_FLAG or info.file_size > OFFICE_MAX_CONTENT_TYPES_BYTES:
-                return False
+                return None
             with archive.open(info) as entry:
                 types = entry.read(OFFICE_MAX_CONTENT_TYPES_BYTES + 1)
     except (zipfile.BadZipFile, KeyError, OSError, ValueError, EOFError, NotImplementedError):
-        return False
-    return len(types) <= OFFICE_MAX_CONTENT_TYPES_BYTES and any(
-        main in types for main in main_types
-    )
+        return None
+    if len(types) > OFFICE_MAX_CONTENT_TYPES_BYTES:
+        return None
+    for kind, main_types in _MAIN_TYPES:
+        if any(main in types for main in main_types):
+            return kind
+    return None
+
+
+def word_document(data: bytes) -> bool:
+    """Whether the data is a ZIP whose content types name a Word main part."""
+    return office_kind(data) == "docx"
+
+
+def excel_workbook(data: bytes) -> bool:
+    """Whether the data is a ZIP whose content types name an Excel main part."""
+    return office_kind(data) == "xlsx"
+
+
+def powerpoint_presentation(data: bytes) -> bool:
+    """Whether the data is a ZIP whose content types name a PowerPoint main part."""
+    return office_kind(data) == "pptx"
+
+
+def chosen_content(alternate: Element) -> Element | None:
+    """The branch of an ``mc:AlternateContent`` that Office shows, or None.
+
+    The first ``mc:Choice`` whose required namespaces Office all understands,
+    else the ``mc:Fallback``. A Choice requiring a namespace Office does not
+    know is never shown by Office, so it is never read: otherwise a crafted
+    file could show a person the fallback and give the LLM other text.
+    """
+    for branch in alternate:
+        if not branch.tag.startswith(f"{{{_MC}}}"):
+            continue
+        name = local_name(branch.tag)
+        if name == "Choice":
+            required = branch.attrib.get(REQUIRED_NAMESPACES, "").split()
+            if all(uri in OFFICE_UNDERSTOOD_NAMESPACES for uri in required):
+                return branch
+        elif name == "Fallback":
+            return branch
+    return None
 
 
 class Package:
@@ -174,6 +232,7 @@ class Package:
                 self.read(name),
                 max_bytes=OFFICE_MAX_PART_BYTES,
                 max_elements=OFFICE_MAX_PART_ELEMENTS,
+                office=True,
             )
         except Refusal as refusal:
             if refusal.code.startswith("OFFICE_"):

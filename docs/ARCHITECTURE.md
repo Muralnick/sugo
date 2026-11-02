@@ -84,7 +84,7 @@ Block
 ├── text, script (latin | han-kana | hangul | …), language, confidence
 ├── bbox normalised to 0–1
 ├── style: font size, bold, monospace (when available)
-├── heading_level, reading_order
+├── heading_level, list_level (type = list_item), reading_order
 ├── table: cell grid with spans and header rows (type = table)
 ├── speaker: left | right (type = chat_message; neutral side, ADR-040)
 ├── origin_engine, flags (illegible, suspicious_instruction, low_agreement, hidden, …)

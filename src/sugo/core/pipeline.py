@@ -19,7 +19,7 @@ import hashlib
 import json
 import logging
 from collections import Counter
-from collections.abc import Callable, Generator, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from importlib.metadata import version
@@ -110,14 +110,21 @@ class InputKind(StrEnum):
     IMAGE = "image"
     DOCX = "docx"
     XLSX = "xlsx"
+    PPTX = "pptx"
     XML = "xml"
 
 
-_OFFICE_KINDS = frozenset({InputKind.XML, InputKind.DOCX, InputKind.XLSX})
+_OFFICE_KINDS = frozenset({InputKind.XML, InputKind.DOCX, InputKind.XLSX, InputKind.PPTX})
+# Office documents with any number of pages, and the extractor of each.
+_PAGED_OFFICE: dict[InputKind, Callable[[bytes], Iterator[Page]]] = {
+    InputKind.DOCX: office.extract_docx,
+    InputKind.XLSX: office.extract_xlsx,
+    InputKind.PPTX: office.extract_pptx,
+}
 
 
 class InputUnsupportedError(ValueError):
-    """The input is none of PDF, DOCX, XLSX, a supported image or XML."""
+    """The input is none of PDF, DOCX, XLSX, PPTX, a supported image or XML."""
 
     code: ClassVar[str] = "INPUT_UNSUPPORTED"
 
@@ -166,7 +173,8 @@ def convert_file(
     """Read a file and convert it; ``source`` defaults to the path as given.
 
     Raises:
-        InputUnsupportedError: If the file is none of PDF, DOCX, XLSX, a supported image or XML.
+        InputUnsupportedError: If the file is none of PDF, DOCX, XLSX, PPTX, a supported image
+            or XML.
         OSError: If the file cannot be read.
         sugo.extractors.pymupdf.extract.PdfError: If a PDF is refused.
         sugo.extractors.image.loader.ImageLoadError: If an image is refused.
@@ -222,7 +230,8 @@ def convert(
 
     Raises:
         ValueError: If a language has no pack, or ``max_chunk_tokens`` is too small.
-        InputUnsupportedError: If the data is none of PDF, DOCX, XLSX, a supported image or XML.
+        InputUnsupportedError: If the data is none of PDF, DOCX, XLSX, PPTX, a supported image
+            or XML.
         sugo.extractors.pymupdf.extract.PdfError: If a PDF is refused.
         sugo.extractors.image.loader.ImageLoadError: If an image is refused.
         sugo.extractors.office.extract.OfficeError: If a DOCX, XLSX or XML file is refused.
@@ -256,22 +265,22 @@ def detect_kind(data: bytes) -> InputKind:
     Raises:
         sugo.extractors.office.extract.OfficeUnsupportedError: For a legacy
             or password-protected Office file.
-        InputUnsupportedError: If the data is none of PDF, DOCX, XLSX, a supported image or XML.
+        InputUnsupportedError: If the data is none of PDF, DOCX, XLSX, PPTX, a supported image
+            or XML.
     """
     if PDF_SIGNATURE in data[:PDF_SIGNATURE_WINDOW]:
         return InputKind.PDF
     office.check_legacy(data)
-    if office.is_docx(data):
-        return InputKind.DOCX
-    if office.is_xlsx(data):
-        return InputKind.XLSX
+    office_kind = office.kind_of(data)
+    if office_kind is not None:
+        return InputKind(office_kind)
     try:
         detect_format(data)
     except UnsupportedImageError:
         if office.looks_like_xml(data):
             return InputKind.XML
         raise InputUnsupportedError(
-            _("not a supported input: PDF, DOCX, XLSX, PNG, JPEG, WEBP or XML expected")
+            _("not a supported input: PDF, DOCX, XLSX, PPTX, PNG, JPEG, WEBP or XML expected")
         ) from None
     return InputKind.IMAGE
 
@@ -409,13 +418,13 @@ class _Job:
                 for page in office.extract_xml(self._data):
                     self._keep(page)
             return 1
-        if self._kind in (InputKind.DOCX, InputKind.XLSX):
+        if self._kind in _PAGED_OFFICE:
             # Read again rather than guessing the page count from the cache:
-            # a document is laid out whole in well under a second, and a
-            # workbook's limits are checked on all its sheets anyway.
+            # a document is laid out whole in well under a second, a
+            # workbook's limits are checked on all its sheets anyway, and a
+            # slide is laid out in milliseconds.
             count = 0
-            extract = office.extract_docx if self._kind is InputKind.DOCX else office.extract_xlsx
-            for page in extract(self._data):
+            for page in _PAGED_OFFICE[self._kind](self._data):
                 self._keep(page)
                 count = page.index + 1
             return count
@@ -498,10 +507,9 @@ class _Job:
     def _reextract(self, index: int) -> Page:
         if self._kind is InputKind.IMAGE:
             return extract_page(self._data, self._ocr())
-        if self._kind is InputKind.DOCX:
-            return next(page for page in office.extract_docx(self._data) if page.index == index)
-        if self._kind is InputKind.XLSX:
-            return next(page for page in office.extract_xlsx(self._data) if page.index == index)
+        if self._kind in _PAGED_OFFICE:
+            extract = _PAGED_OFFICE[self._kind]
+            return next(page for page in extract(self._data) if page.index == index)
         pages = (
             office.extract_xml(self._data)
             if self._kind is InputKind.XML

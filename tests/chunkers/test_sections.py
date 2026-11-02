@@ -246,6 +246,34 @@ def test_split_list_item_stays_one_item() -> None:
     assert [c.text.startswith("- ") for c in chunks] == [True] + [False] * (len(chunks) - 1)
 
 
+def test_split_nested_list_item_continues_as_text() -> None:
+    def item(block_id: str, text: str, level: int) -> Block:
+        return Block(
+            id=block_id, type=BlockType.LIST_ITEM, text=text, list_level=level, origin_engine="t"
+        )
+
+    long = " ".join(f"Point {n} of a very long bullet." for n in range(30))
+    chunks = chunk([page(0, item("a", "Top", 0), item("b", long, 1))], max_tokens=40)
+    assert len(chunks) > 2
+    assert all(c.tokens <= 40 for c in chunks)
+    assert words(" ".join(c.text for c in chunks)) == ["-", "Top", "-", *words(long)]
+
+
+def test_nested_items_are_counted_with_their_indentation() -> None:
+    items = [
+        Block(
+            id=f"i{n}",
+            type=BlockType.LIST_ITEM,
+            text=f"item {n}",
+            list_level=min(n, 8),
+            origin_engine="t",
+        )
+        for n in range(40)
+    ]
+    for max_tokens in (40, 60, 100):
+        assert all(c.tokens <= max_tokens for c in chunk([page(0, *items)], max_tokens=max_tokens))
+
+
 def test_heading_path_names_every_heading_in_the_chunk() -> None:
     chunks = chunk([page(0, heading("a", "A", 2), heading("b", "B", 1), para("p", "Text."))])
     assert [(c.text, c.heading_path) for c in chunks] == [
