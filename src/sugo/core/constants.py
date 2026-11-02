@@ -149,11 +149,6 @@ MAX_PDF_FILE_BYTES: Final = 200 * 1024 * 1024
 # declaring far more is a mistake or an attack on time and memory.
 MAX_PDF_PAGES: Final = 5_000
 
-# Most objects followed while checking one stream's filters (ADR-043). Real
-# filters are a name or a short array, and file specifications a few objects;
-# far more is an attempt to hide a filter, refused as unchecked.
-MAX_PDF_FILTER_REFERENCES: Final = 256
-
 # Address space of the PDF worker process (Linux and macOS). MuPDF needs a few
 # hundred MB on large pages; a hostile file that asks for more is stopped by
 # the operating system instead of slowing the whole machine (ADR-018).

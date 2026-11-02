@@ -10,7 +10,7 @@ import pytest
 
 from sugo.core.constants import PDF_OCR_MAX_PIXELS
 from sugo.extractors.pymupdf import worker
-from sugo.extractors.pymupdf.guard import BROTLI_REFUSAL
+from sugo.extractors.pymupdf.guard import BROTLI_REFUSAL, raw_problem
 from sugo.extractors.pymupdf.protocol import Message, NativePage, Opened, Refused, ScanPage
 from sugo.extractors.pymupdf.worker import run
 
@@ -274,4 +274,64 @@ def test_inline_image_split_across_content_streams_is_refused(first: bytes, seco
 
 def test_page_with_several_content_streams_is_read() -> None:
     data = two_contents(b"BT /Helv 11 Tf 72 72 Td (first) Tj ET", b"BT 72 90 Td (second) Tj ET")
+    assert isinstance(messages(data)[0], Opened)
+
+
+def with_stream(
+    dictionary: str, data: bytes, link: Callable[[pymupdf.Document, int], None]
+) -> bytes:
+    """A one-page PDF with one more stream, attached to the document by ``link``."""
+    document = pymupdf.open()
+    document.new_page()
+    xref = document.get_new_xref()
+    document.update_object(xref, dictionary)
+    document.update_stream(xref, data)
+    link(document, xref)
+    return document.tobytes()
+
+
+def test_brotli_name_hidden_in_an_object_stream_is_refused() -> None:
+    # Compressed in an object stream, the name is out of the raw guard's sight;
+    # the worker reads every object as MuPDF parsed it.
+    document = pymupdf.open()
+    page = document.new_page()
+    xref = document.get_new_xref()
+    document.update_object(xref, "<< /X /Br >>")
+    document.xref_set_key(page.xref, "Hidden", f"{xref} 0 R")
+    data = document.tobytes(use_objstms=True, deflate=True)
+    assert raw_problem(data) is None
+    (refusal,) = messages(data)
+    assert isinstance(refusal, Refused)
+    assert refusal.message == BROTLI_REFUSAL
+
+
+def page_contents(document: pymupdf.Document, xref: int) -> None:
+    document.xref_set_key(document[0].xref, "Contents", f"{xref} 0 R")
+
+
+def appearance(document: pymupdf.Document, xref: int) -> None:
+    annot = document.get_new_xref()
+    document.update_object(
+        annot, f"<< /Type /Annot /Subtype /Square /Rect [0 0 9 9] /AP << /N {xref} 0 R >> >>"
+    )
+    document.xref_set_key(document[0].xref, "Annots", f"[{annot} 0 R]")
+
+
+@pytest.mark.parametrize("link", [page_contents, appearance], ids=["contents", "appearance"])
+def test_stream_run_as_content_is_refused_for_any_brotli_name(
+    link: Callable[[pymupdf.Document, int], None],
+) -> None:
+    # It claims to be an image, but MuPDF runs it as content all the same.
+    image = "<< /Type /XObject /Subtype /Image /Width 1 /Height 1 /BitsPerComponent 8 >>"
+    (refusal,) = messages(with_stream(image, b"q BI /W 1 /H 1 /DP << /X /Br >> ID x EI Q", link))
+    assert isinstance(refusal, Refused)
+    assert refusal.message == BROTLI_REFUSAL
+
+
+def test_brotli_name_by_chance_in_image_pixels_is_not_refused() -> None:
+    image = (
+        "<< /Type /XObject /Subtype /Image /Width 4 /Height 1"
+        " /ColorSpace /DeviceGray /BitsPerComponent 8 >>"
+    )
+    data = with_stream(image, b"/Br ", lambda document, xref: None)
     assert isinstance(messages(data)[0], Opened)
