@@ -84,6 +84,6 @@ On the reference machine: 100 dense native pages in 3.1 s (**32 pages/s**, targe
 - Each document pays for a worker start (about 0.3 s) and one decoding of all its streams, and each page for a 72 DPI render.
 - Residual risks:
   - text hidden by other means stays visible to the LLM: clipping paths MuPDF does not report, colour tricks over images, or a text layer that disagrees with an image on a page that is not a scan;
-  - headings are judged page by page, so levels may differ between pages until the analyzer (step 5b) adds document-wide statistics;
+  - headings are judged page by page, so levels may differ between pages; harmonising them needs a cleaner decision that changes a block, deferred to the extension API (ADR-044);
   - Windows has no memory cap or core-dump switch in the worker.
   - until MuPDF 1.28.6, false refusals: a document whose text or objects contain the name `/Br` or `/BrotliDecode` (a manual about PDF filters), and any document with one stream MuPDF cannot decode (6 of the 74 measured PDFs). The latter is to be revisited in step 8.

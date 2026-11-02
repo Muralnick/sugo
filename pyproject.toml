@@ -189,6 +189,22 @@ forbidden_modules = [
     "sugo._internal.net",
 ]
 
+# Analyzers read IR pages and return statistics; cleaners use them (ADR-044).
+[[tool.importlinter.contracts]]
+name = "Analyzers work on the IR only"
+type = "forbidden"
+source_modules = ["sugo.analyzers"]
+forbidden_modules = [
+    "sugo.extractors",
+    "sugo.cleaners",
+    "sugo.serializers",
+    "sugo.ports",
+    "sugo.sources",
+    "sugo.models",
+    "sugo.setup",
+    "sugo._internal.net",
+]
+
 # The page cache stores IR pages; it never runs extractors, cleaners or
 # networks (ADR-045).
 [[tool.importlinter.contracts]]
@@ -213,6 +229,7 @@ type = "forbidden"
 source_modules = ["sugo.serializers"]
 forbidden_modules = [
     "sugo.extractors",
+    "sugo.analyzers",
     "sugo.cleaners",
     "sugo.ports",
     "sugo.sources",

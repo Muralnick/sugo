@@ -68,7 +68,7 @@ Residual: no tool can guarantee immunity; the receiving LLM and agent are the la
 
 ### C. Output poisoning
 
-Example: a key clause repeated at the bottom of every page so it is removed as a footer. Mitigations: conservative legal recipes; header/footer removals of long or substantive text are flagged; removal report and preview; adversarial cases in the content-loss benchmark.
+Example: a key clause repeated at the bottom of every page so it is removed as a footer. Mitigations: conservative legal recipes; long or substantive header/footer text keeps its first copy, only later identical copies are removed, and hidden copies never count as repeats (ADR-044); removal report and preview; adversarial cases in the content-loss benchmark.
 
 ### D. AI agents via MCP
 

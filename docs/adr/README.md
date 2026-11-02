@@ -45,4 +45,5 @@
 | [041](ADR-041-cleaner-decisions.md) | Minimal cleaner decisions, applied by the core | Accepted |
 | [042](ADR-042-markdown-serializer.md) | Markdown output format | Accepted |
 | [043](ADR-043-pdf-extractor.md) | Native PDF extractor in an isolated worker | Accepted |
+| [044](ADR-044-headers-footers.md) | Running headers, footers and page numbers | Accepted |
 | [045](ADR-045-page-cache.md) | Page cache and page store in SQLite | Accepted |
