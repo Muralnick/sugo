@@ -54,3 +54,5 @@
 | [050](ADR-050-text-edits.md) | Text edits, text normalisation and tracking URLs | Accepted |
 | [051](ADR-051-configuration-v0.1.md) | Basic TOML configuration for v0.1 | Accepted |
 | [052](ADR-052-italian-interface.md) | Italian interface for v0.1 | Accepted |
+| [053](ADR-053-mcp-secret-exclusions.md) | Wider secret exclusions for the MCP server | Proposed |
+| [054](ADR-054-office-xml-reader.md) | Light Office and XML reader | Proposed |
