@@ -1,6 +1,7 @@
 """Tests for interface languages: catalog reading, language choice and translation."""
 
 import errno
+import sys
 
 import pytest
 
@@ -177,3 +178,54 @@ def test_translate_picks_a_language_without_switching() -> None:
     assert i18n.active_language() == "en"
     with pytest.raises(ValueError, match="no interface language"):
         i18n.translate("fr", "Choose a file")
+
+
+@pytest.mark.parametrize(
+    ("variables", "expected"),
+    [
+        ({"LANG": "it_IT.UTF-8"}, ("it", "LANG")),
+        ({"LANG": "en_US.UTF-8", "LC_ALL": "it_CH.UTF-8"}, ("it", "LC_ALL")),
+        ({"LANG": "de_DE.UTF-8"}, ("en", "LANG")),
+        ({"LANG": "C.UTF-8"}, ("en", "LANG")),
+        ({"LANG": "it_IT.UTF-8", "LC_ALL": "C"}, ("en", "LC_ALL")),
+        ({"LANG": "it_IT.UTF-8", "LC_MESSAGES": "POSIX"}, ("en", "LC_MESSAGES")),
+    ],
+)
+def test_a_locale_variable_is_a_clear_signal(
+    monkeypatch: pytest.MonkeyPatch, variables: dict[str, str], expected: tuple[str, str]
+) -> None:
+    monkeypatch.setattr(i18n, "_windows_display_language", lambda: "it")
+    for name, value in variables.items():
+        monkeypatch.setenv(name, value)
+    assert i18n.detect_language() == expected
+
+
+@pytest.mark.parametrize(("windows", "expected"), [("it", "it"), ("en", "en")])
+def test_without_variables_the_windows_menus_decide(
+    monkeypatch: pytest.MonkeyPatch, windows: str, expected: str
+) -> None:
+    monkeypatch.delenv("LANG", raising=False)
+    monkeypatch.setattr(i18n, "_windows_display_language", lambda: windows)
+    # An Italian regional format on an English Windows does not make Sugo Italian.
+    monkeypatch.setattr(i18n.locale, "getlocale", lambda: ("Italian_Italy", "1252"))
+    assert i18n.detect_language() == (expected, "windows")
+
+
+def test_without_a_clear_signal_the_interface_is_english(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("LANG", raising=False)
+    monkeypatch.setattr(i18n, "_windows_display_language", lambda: None)
+    monkeypatch.setattr(i18n.locale, "getlocale", lambda: ("Italian_Italy", "1252"))
+    assert i18n.detect_language() == ("en", "none")
+    assert i18n.resolve("auto") == "en"
+
+
+def test_the_windows_display_language_is_read_only_on_windows() -> None:
+    found = i18n._windows_display_language()
+    if sys.platform == "win32":
+        assert found in i18n.LANGUAGES
+    else:
+        assert found is None
+
+
+def test_every_interface_language_has_a_name() -> None:
+    assert set(i18n.LANGUAGE_NAMES) == set(i18n.LANGUAGES)

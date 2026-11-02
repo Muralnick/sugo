@@ -88,6 +88,7 @@ def run_checks() -> list[Check]:
         [
             _guarded(N_("tokenizer"), _tokenizer),
             _guarded(N_("config"), _config),
+            _guarded(N_("language"), _language),
             _cache(),
             _clipboard(),
         ]
@@ -145,6 +146,29 @@ def _tokenizer() -> Check:
 
     get_encoding()
     return Check("tokenizer", Status.OK, _("o200k_base, SHA-256 verified"))
+
+
+def _language() -> Check:
+    """The interface language and why: the setting, or what the system says (ADR-052)."""
+    from sugo import i18n
+    from sugo.config.settings import ConfigError, load
+
+    setting: str
+    try:
+        setting = load().settings.ui.language
+    except ConfigError:
+        setting = "auto"  # The config check reports the error.
+    language: str
+    if setting != "auto":
+        language, source = setting, _("set in ui.language")
+    else:
+        language, found = i18n.detect_language()
+        sources = {
+            "windows": _("from the Windows display language"),
+            "none": _("the system gives no clear language; English"),
+        }
+        source = sources.get(found) or _("from the variable {name}").format(name=found)
+    return Check("language", Status.OK, f"{i18n.gettext(i18n.LANGUAGE_NAMES[language])}, {source}")
 
 
 def _config() -> Check:

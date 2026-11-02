@@ -133,3 +133,27 @@ def test_doctor_details_are_shown_as_written(monkeypatch: pytest.MonkeyPatch) ->
         cli, "run_checks", lambda: [doctor.Check("x", doctor.Status.OK, 'pip install "sugo[lite]"')]
     )
     assert 'pip install "sugo[lite]"' in CliRunner().invoke(cli.app, ["doctor"]).stdout
+
+
+@pytest.mark.parametrize(
+    ("setting", "lang", "expected"),
+    [
+        (None, "it_IT.UTF-8", "Italian, from the variable LANG"),
+        ("en", "it_IT.UTF-8", "English, set in ui.language"),
+        (None, None, "English, the system gives no clear language; English"),
+    ],
+)
+def test_doctor_says_where_the_language_comes_from(
+    monkeypatch: pytest.MonkeyPatch, setting: str | None, lang: str | None, expected: str
+) -> None:
+    from sugo import i18n
+
+    monkeypatch.setattr(i18n, "_windows_display_language", lambda: None)
+    if setting is not None:
+        monkeypatch.setenv("SUGO_UI_LANGUAGE", setting)
+    if lang is None:
+        monkeypatch.delenv("LANG", raising=False)
+    else:
+        monkeypatch.setenv("LANG", lang)
+    check = doctor._language()
+    assert (check.name, check.status, check.detail) == ("language", doctor.Status.OK, expected)
