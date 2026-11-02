@@ -52,3 +52,4 @@
 | [048](ADR-048-cli.md) | Command line: `sugo`, `stats`, `clip`, `doctor` | Accepted |
 | [049](ADR-049-mcp-server.md) | MCP server: `sugo mcp`, two tools, allowed roots | Accepted |
 | [050](ADR-050-text-edits.md) | Text edits, text normalisation and tracking URLs | Accepted |
+| [051](ADR-051-configuration-v0.1.md) | Basic TOML configuration for v0.1 | Accepted |

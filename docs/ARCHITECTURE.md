@@ -394,7 +394,7 @@ defaults < system (/etc/sugo/config.toml) < user (~/.config/sugo/config.toml)
          < environment (SUGO_LEVEL=quality) < command options / shell commands / MCP parameters
 ```
 
-TOML, pydantic validation, `platformdirs`. System config can **lock** keys (company policies). Security limits have defaults and **hard bounds** (e.g. archive nesting 0–3, compression ratio 10:1–1000:1, page timeout 5–600 s; sensitive-folder exclusions cannot be disabled).
+TOML, pydantic validation, `platformdirs`. The v0.1 subset (user and project files, five keys, `SUGO_*` variables) is in ADR-051. System config can **lock** keys (company policies). Security limits have defaults and **hard bounds** (e.g. archive nesting 0–3, compression ratio 10:1–1000:1, page timeout 5–600 s; sensitive-folder exclusions cannot be disabled).
 
 ```toml
 [general]

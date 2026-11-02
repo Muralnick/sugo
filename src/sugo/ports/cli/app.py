@@ -24,7 +24,7 @@ from rich.table import Table
 from rich.text import Text
 from typer.core import TyperGroup
 
-from sugo.core.constants import CHUNK_MAX_TOKENS, CHUNK_MIN_TOKENS
+from sugo.core.constants import CHUNK_MAX_TOKENS, CHUNK_MAX_TOKENS_LIMIT, CHUNK_MIN_TOKENS
 from sugo.ports.cli.doctor import Status, missing_lite_packages, run_checks
 from sugo.ports.errors import (
     ExitCode,
@@ -35,6 +35,7 @@ from sugo.ports.errors import (
 )
 
 if TYPE_CHECKING:
+    from sugo.config.settings import Settings
     from sugo.core.estimate import SavingsEstimate
     from sugo.core.pipeline import Conversion
     from sugo.storage.page_cache import PageCache
@@ -117,7 +118,8 @@ def convert_command(
         typer.Option(
             "--max-tokens",
             min=CHUNK_MIN_TOKENS,
-            help=f"Chunk size in tokens [default: {CHUNK_MAX_TOKENS}].",
+            max=CHUNK_MAX_TOKENS_LIMIT,
+            help=f"Chunk size in tokens [default: chunking.max_tokens, {CHUNK_MAX_TOKENS}].",
         ),
     ] = None,
     front_matter: Annotated[
@@ -144,8 +146,9 @@ def convert_command(
             "front matter goes only into Markdown output", param_hint="'--front-matter'"
         )
     targets = None if output is None else _targets(files, output, chunks=chunks)
-    chunk_tokens = (max_tokens or CHUNK_MAX_TOKENS) if chunks else None
     with _failures(json_output):
+        settings = _settings(quiet=json_output)
+        chunk_tokens = (max_tokens or settings.chunking.max_tokens) if chunks else None
         _require_lite()
         from sugo.core import pipeline
 
@@ -154,13 +157,17 @@ def convert_command(
         documents: list[dict[str, Any]] = []
         errors: list[PortError] = []
         partial = False
-        with _page_cache(enabled=not no_cache) as cache:
+        with _page_cache(enabled=not no_cache and settings.storage.cache == "persistent") as cache:
             for path in files:
                 source = path.as_posix()
                 try:
                     with _progress(f"Converting {source}", quiet=json_output):
                         conversion = pipeline.convert_file(
-                            path, cache=cache, max_chunk_tokens=chunk_tokens
+                            path,
+                            cache=cache,
+                            max_chunk_tokens=chunk_tokens,
+                            languages=settings.languages,
+                            strip_tracking_urls=settings.cleaning.strip_tracking_urls,
                         )
                     written = (
                         None
@@ -290,20 +297,28 @@ def stats_command(
             param_hint="'--provider'",
         )
     with _failures(json_output):
+        settings = _settings(quiet=json_output)
         _require_lite()
         from sugo.core import pipeline
         from sugo.core.estimate import estimate_json, estimate_savings
 
         source = file.as_posix()
         with (
-            _page_cache(enabled=True) as cache,
+            _page_cache(enabled=settings.storage.cache == "persistent") as cache,
             _progress(f"Converting {source}", quiet=json_output),
         ):
             try:
                 data = pipeline.read_input(file)
             except OSError as error:
                 raise unreadable(error) from error
-            conversion = pipeline.convert(data, cache=cache, source=source, count_raw_tokens=True)
+            conversion = pipeline.convert(
+                data,
+                cache=cache,
+                source=source,
+                count_raw_tokens=True,
+                languages=settings.languages,
+                strip_tracking_urls=settings.cleaning.strip_tracking_urls,
+            )
         estimate = estimate_savings(data, conversion, providers)
         if json_output:
             _write_json(
@@ -360,13 +375,22 @@ def clip_command(
 ) -> None:
     """Convert the image in the clipboard, e.g. a screenshot."""
     with _failures(json_output):
+        settings = _settings(quiet=json_output)
         _require_lite()
         from sugo.core import pipeline
         from sugo.ports.cli.clipboard import read_clipboard_image
 
         data = read_clipboard_image()
-        with _page_cache(enabled=True) as cache, _progress("Converting", quiet=json_output):
-            conversion = pipeline.convert(data, cache=cache)
+        with (
+            _page_cache(enabled=settings.storage.cache == "persistent") as cache,
+            _progress("Converting", quiet=json_output),
+        ):
+            conversion = pipeline.convert(
+                data,
+                cache=cache,
+                languages=settings.languages,
+                strip_tracking_urls=settings.cleaning.strip_tracking_urls,
+            )
         written = None
         if output is not None:
             _make_folder(output)
@@ -434,13 +458,41 @@ def mcp_command(
     except ValueError as error:
         raise typer.BadParameter(str(error), param_hint="'--root'") from None
     with _failures(json_output=False):
+        from sugo.config.settings import load
+
+        # The user's file only: neither a project file in the folder the agent
+        # was started in nor the agent's environment may change the settings.
+        loaded = load(project=False, environment=False)
+        _warn(loaded.warnings)
         _require_lite()
         from sugo.ports.mcp.server import serve
 
-        serve(roots)
+        serve(roots, loaded.settings)
 
 
 # --- shared -------------------------------------------------------------------
+
+
+def _settings(*, quiet: bool) -> "Settings":
+    """The effective settings; warnings go to stderr unless ``quiet``.
+
+    With --json, stderr carries only a JSON error, so warnings are left to
+    ``sugo doctor``.
+
+    Raises:
+        sugo.config.settings.ConfigError: If a file or variable is not valid.
+    """
+    from sugo.config.settings import load
+
+    loaded = load()
+    if not quiet:
+        _warn(loaded.warnings)
+    return loaded.settings
+
+
+def _warn(warnings: tuple[str, ...]) -> None:
+    for warning in warnings:
+        _stderr.print(Text(f"warning: {warning}"))
 
 
 def _require_lite() -> None:

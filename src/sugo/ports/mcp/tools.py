@@ -12,8 +12,8 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from sugo.config.settings import Settings
 from sugo.core.constants import (
-    CHUNK_MAX_TOKENS,
     MCP_DEFAULT_TOKENS,
     MCP_MAX_CURSOR_CHARS,
     MCP_MAX_PATH_CHARS,
@@ -121,9 +121,10 @@ def tool_list() -> list[dict[str, Any]]:
 class ToolRunner:
     """Runs tool calls against the allowed roots and the page cache."""
 
-    def __init__(self, roots: Roots, cache: PageCache | None) -> None:
+    def __init__(self, roots: Roots, cache: PageCache | None, settings: Settings) -> None:
         self._roots = roots
         self._cache = cache
+        self._settings = settings
         self._handlers: dict[str, Callable[[Any], list[str]]] = {
             "convert_document": self._convert_document,
             "estimate_savings": self._estimate_savings,
@@ -146,7 +147,9 @@ class ToolRunner:
             _read(allowed),
             cache=self._cache,
             source=allowed.source,
-            max_chunk_tokens=CHUNK_MAX_TOKENS if chunks else None,
+            max_chunk_tokens=self._settings.chunking.max_tokens if chunks else None,
+            languages=self._settings.languages,
+            strip_tracking_urls=self._settings.cleaning.strip_tracking_urls,
         )
         # The metadata repeats the source, so a long path takes from the text.
         budget = arguments.max_tokens - MCP_WRAPPER_TOKENS - count_tokens(allowed.source)
@@ -197,7 +200,14 @@ class ToolRunner:
             raise InvalidArgumentsError(f"unknown provider; choose from {', '.join(available)}")
         allowed = self._roots.check(arguments.path)
         data = _read(allowed)
-        conversion = convert(data, cache=self._cache, source=allowed.source, count_raw_tokens=True)
+        conversion = convert(
+            data,
+            cache=self._cache,
+            source=allowed.source,
+            count_raw_tokens=True,
+            languages=self._settings.languages,
+            strip_tracking_urls=self._settings.cleaning.strip_tracking_urls,
+        )
         estimate = estimate_savings(data, conversion, providers)
         return [json.dumps({"source": allowed.source, **estimate_json(estimate)})]
 

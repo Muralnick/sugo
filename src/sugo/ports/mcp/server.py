@@ -22,6 +22,7 @@ from typing import IO, Any
 
 from pydantic import ValidationError
 
+from sugo.config.settings import Settings
 from sugo.core.constants import MCP_MAX_MESSAGE_BYTES
 from sugo.ports.errors import PortError, from_exception
 from sugo.ports.mcp.access import Roots
@@ -123,7 +124,7 @@ class Server:
         )
 
 
-def serve(roots: Roots) -> None:
+def serve(roots: Roots, settings: Settings) -> None:
     """Serve MCP on this process's stdin and stdout until stdin closes."""
     protocol_out = os.fdopen(os.dup(sys.stdout.fileno()), "wb", buffering=0)
     sys.stdout.flush()
@@ -133,13 +134,14 @@ def serve(roots: Roots) -> None:
     from sugo.storage.page_cache import CacheUnavailableError
     from sugo.storage.paths import StorageDirError
 
+    cache: PageCache | None = None
+    if settings.storage.cache == "persistent":
+        try:
+            cache = PageCache.default()
+        except (CacheUnavailableError, StorageDirError, OSError):
+            _log.warning("the page cache is unavailable; using a temporary one per call")
     try:
-        cache: PageCache | None = PageCache.default()
-    except (CacheUnavailableError, StorageDirError, OSError):
-        _log.warning("the page cache is unavailable; using a temporary one per call")
-        cache = None
-    try:
-        run(Server(ToolRunner(roots, cache)), sys.stdin.buffer, protocol_out)
+        run(Server(ToolRunner(roots, cache, settings)), sys.stdin.buffer, protocol_out)
     finally:
         if cache is not None:
             cache.close()

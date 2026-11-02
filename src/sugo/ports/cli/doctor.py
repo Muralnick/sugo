@@ -73,7 +73,9 @@ def run_checks() -> list[Check]:
     else:
         checks.append(Check("level lite", Status.OK, _versions(LITE_PACKAGES.values())))
         checks.extend([_guarded("ocr models", _ocr_models), _guarded("pymupdf", _pymupdf)])
-    checks.extend([_guarded("tokenizer", _tokenizer), _cache(), _clipboard()])
+    checks.extend(
+        [_guarded("tokenizer", _tokenizer), _guarded("config", _config), _cache(), _clipboard()]
+    )
     return checks
 
 
@@ -121,6 +123,27 @@ def _tokenizer() -> Check:
 
     get_encoding()
     return Check("tokenizer", Status.OK, "o200k_base, SHA-256 verified")
+
+
+def _config() -> Check:
+    from sugo.config.settings import ConfigError, load, printable, user_config_path
+
+    try:
+        loaded = load()
+    except ConfigError as error:
+        return Check("config", Status.ERROR, str(error))
+    files = ", ".join(printable(str(path)) for path in loaded.sources) or (
+        f"defaults (none at {printable(str(user_config_path()))})"
+    )
+    # The MCP server reads the user file only (ADR-051): show what it applies too.
+    mcp = load(project=False, environment=False).settings
+    detail = (
+        f"{files}; languages {', '.join(loaded.settings.languages)}"
+        f"; sugo mcp: languages {', '.join(mcp.languages)}"
+    )
+    if loaded.warnings:
+        return Check("config", Status.WARNING, f"{detail}; " + "; ".join(loaded.warnings))
+    return Check("config", Status.OK, detail)
 
 
 def _cache() -> Check:

@@ -144,6 +144,8 @@ module = [
     "sugo.cleaners.*",
     "sugo.serializers.*",
     "sugo.ports.*",
+    "sugo.config.*",
+    "sugo.languages.*",
 ]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
@@ -189,6 +191,22 @@ source_modules = ["sugo.cleaners"]
 forbidden_modules = [
     "sugo.extractors",
     "sugo.ports",
+    "sugo.sources",
+    "sugo.models",
+    "sugo.setup",
+    "sugo._internal.net",
+]
+
+# Configuration reads TOML files and the environment, nothing else (ADR-051).
+[[tool.importlinter.contracts]]
+name = "Configuration only reads settings"
+type = "forbidden"
+source_modules = ["sugo.config"]
+forbidden_modules = [
+    "sugo.extractors",
+    "sugo.cleaners",
+    "sugo.ports",
+    "sugo.storage",
     "sugo.sources",
     "sugo.models",
     "sugo.setup",
