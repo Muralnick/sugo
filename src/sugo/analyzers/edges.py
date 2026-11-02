@@ -16,6 +16,11 @@ with digit runs masked: "Page 3 of 10" and "Page 4 of 10" share the pattern
 Only text a reader can see counts. Removed and flagged blocks are ignored:
 otherwise hidden copies of a clause on every page could make its one visible
 copy look like a repeated footer, and get it removed (THREAT_MODEL C).
+
+Some documents declare their headers and footers themselves, as Word does:
+the reader types them, without a position and once per section, so there is
+no position. ``declared_texts`` gives the cleaners those, and the statistics
+record the first page of each, whose copy stays (ADR-054).
 """
 
 import hashlib
@@ -24,7 +29,7 @@ import re
 import unicodedata
 from collections import defaultdict
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from types import MappingProxyType
 from typing import ClassVar
@@ -145,6 +150,11 @@ class EdgeStats:
     # (band, number system, page number minus page index) of page number
     # sequences, so "1" on the first page and "2" on the second match.
     page_numbers: frozenset[tuple[Band, NumberSystem, int]]
+    # (type, digest) of each header and footer a document declares -> the
+    # first page it is on: that copy stays, later identical ones go.
+    declared: Mapping[tuple[BlockType, bytes], int] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
 
     def digest(self) -> str:
         """A digest of these statistics, the same whatever order pages were observed in.
@@ -153,7 +163,13 @@ class EdgeStats:
         cache key (ADR-046): if any page reads differently, every page is
         cleaned again.
         """
-        canonical = repr((sorted(self.repeated.items()), sorted(self.page_numbers)))
+        canonical = repr(
+            (
+                sorted(self.repeated.items()),
+                sorted(self.page_numbers),
+                sorted(self.declared.items()),
+            )
+        )
         return hashlib.sha256(canonical.encode()).hexdigest()
 
     def repeated_edge(self, text: EdgeText, page_index: int) -> RepeatedEdge | None:
@@ -162,6 +178,10 @@ class EdgeStats:
         if repeated is None or not repeated.matches(text, page_index):
             return None
         return repeated
+
+    def first_declared(self, text: "DeclaredText") -> int | None:
+        """The first page holding a declared header or footer with the same text, if seen."""
+        return self.declared.get((text.type, text.digest))
 
     def is_page_number(self, text: EdgeText, page_index: int) -> bool:
         """Whether this text is the page's number in a sequence running through the document."""
@@ -185,6 +205,7 @@ class EdgeAnalyzer:
         # Substantive or not is a property of the pattern, the same on every copy.
         self._substantive: dict[tuple[Band, bytes], bool] = {}
         self._numbers: defaultdict[tuple[Band, NumberSystem, int], set[int]] = defaultdict(set)
+        self._declared: dict[tuple[BlockType, bytes], int] = {}
 
     def observe(self, page: Page) -> None:
         """Record the edge text of one page.
@@ -195,6 +216,9 @@ class EdgeAnalyzer:
         if page.index in self._seen:
             raise ValueError(f"page {page.index} observed twice")
         self._seen.add(page.index)
+        for declared in declared_texts(page):
+            first = self._declared.get((declared.type, declared.digest), page.index)
+            self._declared[(declared.type, declared.digest)] = min(first, page.index)
         for text in edge_texts(page):
             if text.page_number is not None:
                 system, value = text.page_number
@@ -212,7 +236,52 @@ class EdgeAnalyzer:
             if edge is not None:
                 repeated[key] = edge
         page_numbers = frozenset(key for key, pages in self._numbers.items() if _repeats(pages))
-        return EdgeStats(repeated=MappingProxyType(repeated), page_numbers=page_numbers)
+        return EdgeStats(
+            repeated=MappingProxyType(repeated),
+            page_numbers=page_numbers,
+            declared=MappingProxyType(dict(sorted(self._declared.items()))),
+        )
+
+
+@dataclass(frozen=True)
+class DeclaredText:
+    """A header, footer or page number the document declares itself, with no place on the page.
+
+    Word keeps headers and footers apart from the body, so the reader types
+    them and shows each once per section; there is no position for the edge
+    rules, only copies in later sections.
+    """
+
+    block_id: str
+    type: BlockType
+    # Digest of the normalised text, so statistics never hold document text.
+    digest: bytes
+    # Whether the whole text is a page number.
+    page_number: bool
+
+
+_DECLARED_TYPES = frozenset({BlockType.HEADER, BlockType.FOOTER, BlockType.PAGE_NUMBER})
+
+
+def declared_texts(page: Page) -> list[DeclaredText]:
+    """Return the headers, footers and page numbers a page declares without a position.
+
+    Skipped like edge texts: removed, flagged, empty or long blocks.
+    """
+    found = []
+    for block in page.blocks:
+        if block.type not in _DECLARED_TYPES or block.bbox is not None or not _furniture(block):
+            continue
+        text = _normalised(block.text)
+        found.append(
+            DeclaredText(
+                block_id=block.id,
+                type=block.type,
+                digest=hashlib.blake2b(text.encode(), digest_size=16).digest(),
+                page_number=_page_number(text) is not None,
+            )
+        )
+    return found
 
 
 def edge_texts(page: Page) -> list[EdgeText]:
@@ -225,10 +294,7 @@ def edge_texts(page: Page) -> list[EdgeText]:
     top: list[tuple[float, str, Block]] = []
     bottom: list[tuple[float, str, Block]] = []
     for block in page.blocks:
-        if block.removed or block.flags or block.type not in _EDGE_TYPES:
-            continue
-        # Longer text is a paragraph, never page furniture.
-        if block.bbox is None or not block.text.strip() or len(block.text) > MAX_EDGE_TEXT_CHARS:
+        if block.type not in _EDGE_TYPES or block.bbox is None or not _furniture(block):
             continue
         if block.bbox.y1 <= PAGE_EDGE_BAND:
             top.append((block.bbox.y0, block.id, block))
@@ -241,8 +307,25 @@ def edge_texts(page: Page) -> list[EdgeText]:
     ]
 
 
+def _furniture(block: Block) -> bool:
+    """Whether a block can be page furniture: seen, unflagged, short and not empty.
+
+    Longer text is a paragraph, never page furniture.
+    """
+    return (
+        not block.removed
+        and not block.flags
+        and bool(block.text.strip())
+        and len(block.text) <= MAX_EDGE_TEXT_CHARS
+    )
+
+
+def _normalised(text: str) -> str:
+    return " ".join(unicodedata.normalize("NFKC", text).casefold().split())
+
+
 def _edge_text(block: Block, band: Band) -> EdgeText:
-    text = " ".join(unicodedata.normalize("NFKC", block.text).casefold().split())
+    text = _normalised(block.text)
     # The text between digit runs, encoded unambiguously: masking with a
     # character such as "#" would let "ref # 1" and "ref 1 1" share a
     # pattern with a different count of numbers.

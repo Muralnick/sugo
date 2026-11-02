@@ -8,15 +8,24 @@ Short boilerplate ("Annual Report 2026", "Confidential") goes from every
 page. Longer text may be a clause someone repeated on every page so that it
 would be dropped as a footer (THREAT_MODEL C): its first copy is kept, and
 only the later identical copies go, so no content leaves the output.
+
+Headers and footers a document declares itself, such as Word's, have no
+place on the page and appear once per section: the first copy stays, even a
+short one, which may say what the document is ("DRAFT"), and the identical
+copies of later sections go (ADR-054).
 """
 
 from typing import ClassVar
 
-from sugo.analyzers.edges import Band, EdgeStats, edge_texts
+from sugo.analyzers.edges import Band, EdgeStats, declared_texts, edge_texts
 from sugo.core.decisions import Decision
-from sugo.core.models import Page
+from sugo.core.models import BlockType, Page
 
 _NAMES = {Band.TOP: "header", Band.BOTTOM: "footer"}
+_DECLARED = {
+    BlockType.HEADER: "running header declared by the document",
+    BlockType.FOOTER: "running footer declared by the document",
+}
 
 
 class HeaderFooterCleaner:
@@ -39,4 +48,9 @@ class HeaderFooterCleaner:
                     continue
                 reason += f"; first copy kept on page {repeated.first_page + 1}"
             decisions.append(Decision(block_id=text.block_id, reason=reason))
+        for declared in declared_texts(page):
+            first = stats.first_declared(declared)
+            if declared.type in _DECLARED and first is not None and first < page.index:
+                reason = f"{_DECLARED[declared.type]}; first copy kept on page {first + 1}"
+                decisions.append(Decision(block_id=declared.block_id, reason=reason))
         return decisions
