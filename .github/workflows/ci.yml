@@ -50,3 +50,27 @@ jobs:
 
       - name: Tests
         run: uv run pytest
+
+  windows:
+    # Every pull request also runs the tests on Windows (ARCHITECTURE §24): paths,
+    # console encoding and the PDF worker process differ there. Lint, types and
+    # import boundaries check the same code, so they run on Linux only; mypy on
+    # Windows would also flag the POSIX-only calls the code guards.
+    name: windows
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.13.0"
+          enable-cache: true
+
+      - name: Install locked environment
+        run: uv sync --locked
+
+      - name: Tests
+        run: uv run pytest
