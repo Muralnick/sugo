@@ -109,11 +109,15 @@ class InputKind(StrEnum):
     PDF = "pdf"
     IMAGE = "image"
     DOCX = "docx"
+    XLSX = "xlsx"
     XML = "xml"
 
 
+_OFFICE_KINDS = frozenset({InputKind.XML, InputKind.DOCX, InputKind.XLSX})
+
+
 class InputUnsupportedError(ValueError):
-    """The input is none of PDF, DOCX, a supported image or XML."""
+    """The input is none of PDF, DOCX, XLSX, a supported image or XML."""
 
     code: ClassVar[str] = "INPUT_UNSUPPORTED"
 
@@ -162,11 +166,11 @@ def convert_file(
     """Read a file and convert it; ``source`` defaults to the path as given.
 
     Raises:
-        InputUnsupportedError: If the file is none of PDF, DOCX, a supported image or XML.
+        InputUnsupportedError: If the file is none of PDF, DOCX, XLSX, a supported image or XML.
         OSError: If the file cannot be read.
         sugo.extractors.pymupdf.extract.PdfError: If a PDF is refused.
         sugo.extractors.image.loader.ImageLoadError: If an image is refused.
-        sugo.extractors.office.extract.OfficeError: If a DOCX or XML file is refused.
+        sugo.extractors.office.extract.OfficeError: If a DOCX, XLSX or XML file is refused.
     """
     return convert(
         read_input(path),
@@ -218,10 +222,10 @@ def convert(
 
     Raises:
         ValueError: If a language has no pack, or ``max_chunk_tokens`` is too small.
-        InputUnsupportedError: If the data is none of PDF, DOCX, a supported image or XML.
+        InputUnsupportedError: If the data is none of PDF, DOCX, XLSX, a supported image or XML.
         sugo.extractors.pymupdf.extract.PdfError: If a PDF is refused.
         sugo.extractors.image.loader.ImageLoadError: If an image is refused.
-        sugo.extractors.office.extract.OfficeError: If a DOCX or XML file is refused.
+        sugo.extractors.office.extract.OfficeError: If a DOCX, XLSX or XML file is refused.
     """
     kind = detect_kind(data)
     if max_chunk_tokens is not None and max_chunk_tokens < CHUNK_MIN_TOKENS:
@@ -252,20 +256,22 @@ def detect_kind(data: bytes) -> InputKind:
     Raises:
         sugo.extractors.office.extract.OfficeUnsupportedError: For a legacy
             or password-protected Office file.
-        InputUnsupportedError: If the data is none of PDF, DOCX, a supported image or XML.
+        InputUnsupportedError: If the data is none of PDF, DOCX, XLSX, a supported image or XML.
     """
     if PDF_SIGNATURE in data[:PDF_SIGNATURE_WINDOW]:
         return InputKind.PDF
     office.check_legacy(data)
     if office.is_docx(data):
         return InputKind.DOCX
+    if office.is_xlsx(data):
+        return InputKind.XLSX
     try:
         detect_format(data)
     except UnsupportedImageError:
         if office.looks_like_xml(data):
             return InputKind.XML
         raise InputUnsupportedError(
-            _("not a supported input: PDF, DOCX, PNG, JPEG, WEBP or XML expected")
+            _("not a supported input: PDF, DOCX, XLSX, PNG, JPEG, WEBP or XML expected")
         ) from None
     return InputKind.IMAGE
 
@@ -403,11 +409,13 @@ class _Job:
                 for page in office.extract_xml(self._data):
                     self._keep(page)
             return 1
-        if self._kind is InputKind.DOCX:
-            # Laid out whole in well under a second: read again rather than
-            # guessing the page count from the cache.
+        if self._kind in (InputKind.DOCX, InputKind.XLSX):
+            # Read again rather than guessing the page count from the cache:
+            # a document is laid out whole in well under a second, and a
+            # workbook's limits are checked on all its sheets anyway.
             count = 0
-            for page in office.extract_docx(self._data):
+            extract = office.extract_docx if self._kind is InputKind.DOCX else office.extract_xlsx
+            for page in extract(self._data):
                 self._keep(page)
                 count = page.index + 1
             return count
@@ -476,7 +484,7 @@ class _Job:
     def _is_failed(self, page: Page) -> bool:
         if self._kind is InputKind.PDF:
             return is_failed_page(page)
-        return self._kind in (InputKind.XML, InputKind.DOCX) and office.is_failed_page(page)
+        return self._kind in _OFFICE_KINDS and office.is_failed_page(page)
 
     def _key(self, index: int) -> bytes:
         return extraction_key(source_sha256=self._sha256, page_index=index, engine=self._engine)
@@ -492,6 +500,8 @@ class _Job:
             return extract_page(self._data, self._ocr())
         if self._kind is InputKind.DOCX:
             return next(page for page in office.extract_docx(self._data) if page.index == index)
+        if self._kind is InputKind.XLSX:
+            return next(page for page in office.extract_xlsx(self._data) if page.index == index)
         pages = (
             office.extract_xml(self._data)
             if self._kind is InputKind.XML
@@ -535,7 +545,7 @@ class _OnceOcr:
 def _engine_identity(kind: InputKind) -> str:
     # Library versions change what the engines produce; Sugo's own code and
     # model hashes are already part of every key (ADR-045).
-    if kind in (InputKind.XML, InputKind.DOCX):
+    if kind in _OFFICE_KINDS:
         return f"{kind.value}:defusedxml={version('defusedxml')}"
     libraries = ["rapidocr", "onnxruntime", "pillow"]
     if kind is InputKind.PDF:

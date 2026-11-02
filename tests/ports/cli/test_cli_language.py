@@ -55,7 +55,7 @@ def test_help_is_italian() -> None:
         assert text in root
     assert "Documenti, ridotti" in root
     convert = flat(run("convert", "--help").stdout)
-    for text in ("Argomenti", "File PDF, DOCX, PNG, JPEG, WEBP o XML.", "[obbligatorio]"):
+    for text in ("Argomenti", "File PDF, DOCX, XLSX, PNG, JPEG, WEBP o XML.", "[obbligatorio]"):
         assert text in convert
     assert "Dimensione dei chunk in token." in convert
 
@@ -95,8 +95,9 @@ def test_errors_and_hints_are_italian() -> None:
     result = run("notes.txt")
     assert result.exit_code == ExitCode.ERROR
     assert result.stderr == (
-        "notes.txt: errore INPUT_UNSUPPORTED: formato non supportato: attesi PDF, DOCX, PNG, "
-        "JPEG, WEBP o XML\n  suggerimento: Sugo legge file PDF, DOCX, PNG, JPEG, WEBP e XML.\n"
+        "notes.txt: errore INPUT_UNSUPPORTED: formato non supportato: attesi PDF, DOCX, XLSX, PNG, "
+        "JPEG, WEBP o XML\n  suggerimento: Sugo legge file PDF, DOCX, XLSX, PNG, JPEG, WEBP "
+        "e XML.\n"
     )
 
 
@@ -105,8 +106,8 @@ def test_json_output_stays_english() -> None:
     error = json.loads(result.stdout)["documents"][0]["error"]
     assert error == {
         "code": "INPUT_UNSUPPORTED",
-        "message": "not a supported input: PDF, DOCX, PNG, JPEG, WEBP or XML expected",
-        "hint": "Sugo reads PDF, DOCX, PNG, JPEG, WEBP and XML files.",
+        "message": "not a supported input: PDF, DOCX, XLSX, PNG, JPEG, WEBP or XML expected",
+        "hint": "Sugo reads PDF, DOCX, XLSX, PNG, JPEG, WEBP and XML files.",
         "details": {},
     }
     doctor = json.loads(run("doctor", "--json").stdout)

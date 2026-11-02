@@ -121,7 +121,9 @@ def test_input_is_routed_by_content_not_name(tmp_path: Path) -> None:
 
 
 def test_unsupported_input_is_refused() -> None:
-    with pytest.raises(InputUnsupportedError, match="PDF, DOCX, PNG, JPEG, WEBP or XML") as caught:
+    with pytest.raises(
+        InputUnsupportedError, match="PDF, DOCX, XLSX, PNG, JPEG, WEBP or XML"
+    ) as caught:
         detect_kind(b"PK\x03\x04 a zip or docx file")
     assert caught.value.code == "INPUT_UNSUPPORTED"
 
@@ -139,6 +141,18 @@ def test_word_documents_are_converted_and_legacy_ones_refused(cache: PageCache) 
     assert conversion.removed == {"hidden_text": 1}
     with pytest.raises(OfficeUnsupportedError):
         detect_kind(OLE_SIGNATURE + bytes(512))
+
+
+def test_workbooks_are_converted_with_hidden_sheets_removed(cache: PageCache) -> None:
+    from tests.extractors.office.xlsx_files import row, xlsx
+
+    data = xlsx(row("Name", "Total") + row("Rossi", "=3"), row("secret"), states={1: "hidden"})
+    assert detect_kind(data) is InputKind.XLSX
+    conversion = convert(data, cache=cache)
+    assert (conversion.kind, conversion.pages) == (InputKind.XLSX, 2)
+    assert "Rossi" in conversion.markdown
+    assert "secret" not in conversion.markdown
+    assert conversion.removed == {"hidden_text": 2}
 
 
 def test_xml_is_converted_and_cached(cache: PageCache) -> None:

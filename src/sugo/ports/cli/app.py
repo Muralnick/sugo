@@ -143,7 +143,9 @@ def convert_command(
         # Not exists=True: a missing file is reported with the others, not as a
         # usage error that would stop the whole batch.
         typer.Argument(
-            dir_okay=False, metavar="FILE...", help=N_("PDF, DOCX, PNG, JPEG, WEBP or XML files.")
+            dir_okay=False,
+            metavar="FILE...",
+            help=N_("PDF, DOCX, XLSX, PNG, JPEG, WEBP or XML files."),
         ),
     ],
     output: Annotated[

@@ -55,7 +55,7 @@ _DAMAGED = N_("The file may be damaged; open it and save it again.")
 _KNOWN: dict[str, tuple[ExitCode, str | None]] = {
     "INPUT_UNSUPPORTED": (
         ExitCode.ERROR,
-        N_("Sugo reads PDF, DOCX, PNG, JPEG, WEBP and XML files."),
+        N_("Sugo reads PDF, DOCX, XLSX, PNG, JPEG, WEBP and XML files."),
     ),
     "IMAGE_UNSUPPORTED": (ExitCode.ERROR, N_("Save the image as a still PNG, JPEG or WEBP.")),
     "IMAGE_INVALID": (ExitCode.ERROR, _DAMAGED),
@@ -71,7 +71,7 @@ _KNOWN: dict[str, tuple[ExitCode, str | None]] = {
     "OFFICE_TOO_LARGE": (ExitCode.SECURITY, N_("Split the document into smaller files.")),
     "OFFICE_UNSUPPORTED": (
         ExitCode.ERROR,
-        N_("Open it in Word or LibreOffice and save it as .docx, without a password."),
+        N_("Open it in Word or LibreOffice and save it as .docx or .xlsx, without a password."),
     ),
     "OFFICE_EXTRACTION_FAILED": (
         ExitCode.ERROR,

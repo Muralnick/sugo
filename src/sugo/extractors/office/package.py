@@ -6,14 +6,17 @@ external relationships are recorded but never followed. Each part is
 decompressed in bounded steps and counted as it comes: the sizes written in
 the archive are the attacker's, so they are never trusted.
 
-``word_document`` recognises a Word document from the raw bytes, without
-parsing XML, so Sugo's own process can route a file before the worker reads it.
+``word_document`` and ``excel_workbook`` recognise a Word document or an
+Excel workbook from the raw bytes, without parsing XML, so Sugo's own process
+can route a file before the worker reads it. ``stream`` lets a large part be
+parsed piece by piece; a part read twice counts once towards the total.
 """
 
 import io
 import posixpath
 import zipfile
 from dataclasses import dataclass
+from typing import IO
 
 from sugo.core.constants import (
     MAX_OFFICE_FILE_BYTES,
@@ -39,6 +42,14 @@ WORD_MAIN_TYPES = (
     b"application/vnd.ms-word.document.macroEnabled.main+xml",
     b"application/vnd.ms-word.template.macroEnabledTemplate.main+xml",
 )
+# Main parts of Excel workbooks, templates and their macro-enabled forms; the
+# binary .xlsb is not among them.
+EXCEL_MAIN_TYPES = (
+    b"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+    b"application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml",
+    b"application/vnd.ms-excel.sheet.macroEnabled.main+xml",
+    b"application/vnd.ms-excel.template.macroEnabled.main+xml",
+)
 _OFFICE_DOCUMENT = "/officeDocument"
 _CHUNK = 64 * 1024
 _ENCRYPTED_FLAG = 0x1
@@ -60,6 +71,15 @@ def word_document(data: bytes) -> bool:
 
     Reads the ZIP directory and one small entry; parses no XML.
     """
+    return _names_main_type(data, WORD_MAIN_TYPES)
+
+
+def excel_workbook(data: bytes) -> bool:
+    """Whether the data is a ZIP whose content types name an Excel main part."""
+    return _names_main_type(data, EXCEL_MAIN_TYPES)
+
+
+def _names_main_type(data: bytes, main_types: tuple[bytes, ...]) -> bool:
     if not data.startswith(ZIP_SIGNATURE):
         return False
     try:
@@ -72,7 +92,7 @@ def word_document(data: bytes) -> bool:
     except (zipfile.BadZipFile, KeyError, OSError, ValueError, EOFError, NotImplementedError):
         return False
     return len(types) <= OFFICE_MAX_CONTENT_TYPES_BYTES and any(
-        main in types for main in WORD_MAIN_TYPES
+        main in types for main in main_types
     )
 
 
@@ -99,6 +119,8 @@ class Package:
         # Part names are case-insensitive in the standard.
         self._infos = {info.filename.casefold(): info for info in infos}
         self._read_bytes = 0
+        # Parts already counted towards the total: one read twice counts once.
+        self._counted: set[str] = set()
 
     def has(self, name: str) -> bool:
         """Whether the package holds a part with this name (without the leading "/")."""
@@ -110,26 +132,36 @@ class Package:
         Raises:
             Refusal: OFFICE_TOO_LARGE, or OFFICE_INVALID if the part is missing or broken.
         """
+        chunks: list[bytes] = []
+        with self.stream(name) as entry:
+            while chunk := entry.read(_CHUNK):
+                chunks.append(chunk)
+        return b"".join(chunks)
+
+    def stream(self, name: str) -> IO[bytes]:
+        """A part as a file, decompressed within the limits as it is read.
+
+        Reading raises ``Refusal`` (OFFICE_TOO_LARGE or OFFICE_INVALID) once a
+        limit is passed or the data turns out broken.
+
+        Raises:
+            Refusal: OFFICE_INVALID if the part is missing or cannot be opened.
+        """
         info = self._infos.get(name.casefold())
         if info is None:
             raise Refusal("OFFICE_INVALID", _DAMAGED)
-        chunks: list[bytes] = []
-        size = 0
         try:
-            with self._archive.open(info) as entry:
-                while chunk := entry.read(_CHUNK):
-                    size += len(chunk)
-                    self._read_bytes += len(chunk)
-                    if size > OFFICE_MAX_PART_BYTES or self._read_bytes > OFFICE_MAX_TOTAL_BYTES:
-                        raise Refusal("OFFICE_TOO_LARGE", _TOO_LARGE)
-                    if size > OFFICE_RATIO_MIN_BYTES and size > OFFICE_MAX_RATIO * max(
-                        info.compress_size, 1
-                    ):
-                        raise Refusal("OFFICE_TOO_LARGE", _TOO_LARGE)
-                    chunks.append(chunk)
+            entry = self._archive.open(info)
         except (zipfile.BadZipFile, OSError, ValueError, EOFError, NotImplementedError):
             raise Refusal("OFFICE_INVALID", _DAMAGED) from None
-        return b"".join(chunks)
+        first = info.filename.casefold() not in self._counted
+        self._counted.add(info.filename.casefold())
+        return io.BufferedReader(_Counted(self, info, entry, counted=first), _CHUNK)
+
+    def _count(self, size: int) -> None:
+        self._read_bytes += size
+        if self._read_bytes > OFFICE_MAX_TOTAL_BYTES:
+            raise Refusal("OFFICE_TOO_LARGE", _TOO_LARGE)
 
     def xml(self, name: str) -> Element:
         """A part parsed as XML with ``defusedxml``.
@@ -184,6 +216,43 @@ class Package:
             ):
                 return relationship.target
         raise Refusal("OFFICE_INVALID", _DAMAGED)
+
+
+class _Counted(io.RawIOBase):
+    """One part's decompressed bytes, counted against the limits as they come."""
+
+    def __init__(
+        self, package: Package, info: zipfile.ZipInfo, entry: IO[bytes], *, counted: bool
+    ) -> None:
+        self._package = package
+        self._info = info
+        self._entry = entry
+        self._counts = counted
+        self._size = 0
+
+    def readable(self) -> bool:
+        return True
+
+    def readinto(self, buffer: "memoryview | bytearray") -> int:  # type: ignore[override]
+        try:
+            chunk = self._entry.read(min(len(buffer), _CHUNK))
+        except (zipfile.BadZipFile, OSError, ValueError, EOFError, NotImplementedError):
+            raise Refusal("OFFICE_INVALID", _DAMAGED) from None
+        self._size += len(chunk)
+        if self._counts:
+            self._package._count(len(chunk))
+        if self._size > OFFICE_MAX_PART_BYTES:
+            raise Refusal("OFFICE_TOO_LARGE", _TOO_LARGE)
+        if self._size > OFFICE_RATIO_MIN_BYTES and self._size > OFFICE_MAX_RATIO * max(
+            self._info.compress_size, 1
+        ):
+            raise Refusal("OFFICE_TOO_LARGE", _TOO_LARGE)
+        buffer[: len(chunk)] = chunk
+        return len(chunk)
+
+    def close(self) -> None:
+        self._entry.close()
+        super().close()
 
 
 def _resolve(folder: str, target: str) -> str:

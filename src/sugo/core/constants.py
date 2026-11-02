@@ -275,6 +275,21 @@ OFFICE_MAX_CONTENT_TYPES_BYTES: Final = 1024 * 1024
 # Text under this size, in half-points (2 pt), cannot be read on the page.
 DOCX_MIN_VISIBLE_HALF_POINTS: Final = 4
 
+# Workbook cells with a value read, over all sheets; and table cells written,
+# empty ones included, so that a few cells far apart cannot make a huge grid.
+XLSX_MAX_CELLS: Final = 2_000_000
+XLSX_MAX_GRID_CELLS: Final = 4_000_000
+# Cells with a value in one sheet. A sheet is one page, sent as one message
+# within the page time limit: measured, a million numeric cells take about
+# 20 s and 60 MB, too close to OFFICE_PAGE_TIMEOUT_S and OFFICE_MAX_MESSAGE_BYTES.
+XLSX_MAX_SHEET_CELLS: Final = 500_000
+# Characters of cell text in one sheet, hidden cells included: one long shared
+# string used by many cells must not fill the worker or the page message.
+XLSX_MAX_SHEET_TEXT: Final = 16_000_000
+# Excel's own grid: 1 048 576 rows and 16 384 columns (A to XFD).
+XLSX_MAX_ROWS: Final = 1_048_576
+XLSX_MAX_COLUMNS: Final = 16_384
+
 # The worker process, as for PDF (ADR-043): address space on Linux and macOS,
 # seconds to open and check a file and to return one page, restarts after a
 # page kills or stalls it, and the largest message it may send.

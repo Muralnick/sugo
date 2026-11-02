@@ -116,6 +116,37 @@ def test_word_documents_are_read_through_the_worker() -> None:
     assert [render(page.blocks) for page in extract.extract_docx(data)] == ["First", "Second"]
 
 
+def test_workbooks_are_read_through_the_worker_one_page_per_sheet() -> None:
+    from tests.extractors.office.xlsx_files import row, xlsx
+
+    data = xlsx(row("one"), row("two"), names=["A", "B"])
+    assert extract.is_xlsx(data)
+    assert not extract.is_docx(data)
+    assert [render(page.blocks) for page in extract.extract_xlsx(data)] == [
+        "# A\n\n|one|",
+        "# B\n\n|two|",
+    ]
+
+
+def test_a_sheet_broken_after_the_checks_is_reported_as_failed() -> None:
+    from tests.extractors.office.xlsx_files import row, xlsx
+
+    from sugo.extractors.office.protocol import Opened, PageFailed, PageRead
+    from sugo.extractors.office.worker import run
+
+    comments = b"<comments><broken></comments>"
+    data = xlsx(
+        row("fine"),
+        row("x"),
+        sheet_parts={1: {"comments": ("comments1.xml", "")}},
+        extra={"xl/comments1.xml": comments},
+    )
+    messages = list(run(data, "xlsx", 0))
+    assert isinstance(messages[0], Opened)
+    assert isinstance(messages[1], PageRead)
+    assert messages[2] == PageFailed(index=1)
+
+
 def test_damaged_and_legacy_office_files_are_refused() -> None:
     with pytest.raises(extract.OfficeError) as caught:
         list(extract.extract_docx(b"PK\x03\x04 not a zip"))
