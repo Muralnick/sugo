@@ -53,7 +53,10 @@ class PortError(Exception):
 # Hints are translated when the error is made, in the language active then.
 _DAMAGED = N_("The file may be damaged; open it and save it again.")
 _KNOWN: dict[str, tuple[ExitCode, str | None]] = {
-    "INPUT_UNSUPPORTED": (ExitCode.ERROR, N_("Sugo reads PDF, PNG, JPEG, WEBP and XML files.")),
+    "INPUT_UNSUPPORTED": (
+        ExitCode.ERROR,
+        N_("Sugo reads PDF, DOCX, PNG, JPEG, WEBP and XML files."),
+    ),
     "IMAGE_UNSUPPORTED": (ExitCode.ERROR, N_("Save the image as a still PNG, JPEG or WEBP.")),
     "IMAGE_INVALID": (ExitCode.ERROR, _DAMAGED),
     "IMAGE_TOO_LARGE": (ExitCode.SECURITY, N_("Reduce the image size, or split it.")),
@@ -64,6 +67,12 @@ _KNOWN: dict[str, tuple[ExitCode, str | None]] = {
     "PDF_EXTRACTION_FAILED": (ExitCode.ERROR, N_("Try again; if it fails again, run: sugo doctor")),
     "XML_INVALID": (ExitCode.ERROR, N_("Check that the file is well-formed XML without a DTD.")),
     "XML_TOO_LARGE": (ExitCode.SECURITY, N_("Split the XML file into smaller files.")),
+    "OFFICE_INVALID": (ExitCode.ERROR, _DAMAGED),
+    "OFFICE_TOO_LARGE": (ExitCode.SECURITY, N_("Split the document into smaller files.")),
+    "OFFICE_UNSUPPORTED": (
+        ExitCode.ERROR,
+        N_("Open it in Word or LibreOffice and save it as .docx, without a password."),
+    ),
     "OFFICE_EXTRACTION_FAILED": (
         ExitCode.ERROR,
         N_("Try again; if it fails again, run: sugo doctor"),

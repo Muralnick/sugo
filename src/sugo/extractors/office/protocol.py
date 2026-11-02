@@ -30,7 +30,9 @@ class Refused(_Model):
     """The worker refused the file; ``code`` is a stable error code."""
 
     kind: Literal["refused"] = "refused"
-    code: Literal["XML_INVALID", "XML_TOO_LARGE"]
+    code: Literal[
+        "XML_INVALID", "XML_TOO_LARGE", "OFFICE_INVALID", "OFFICE_TOO_LARGE", "OFFICE_UNSUPPORTED"
+    ]
     message: NonEmptyStr
 
 

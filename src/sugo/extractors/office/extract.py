@@ -1,4 +1,4 @@
-"""Read XML into IR pages through the isolated worker (ADR-054).
+"""Read XML and Word documents into IR pages through the isolated worker (ADR-054).
 
 The file is recognised by its content, checked for size here, then parsed by
 a worker process (``sugo.extractors.office.worker``) that streams back pages
@@ -15,6 +15,7 @@ from typing import ClassVar
 
 from sugo import i18n
 from sugo.core.constants import (
+    MAX_OFFICE_FILE_BYTES,
     MAX_XML_FILE_BYTES,
     OFFICE_MAX_MESSAGE_BYTES,
     OFFICE_MAX_WORKER_RESTARTS,
@@ -23,6 +24,8 @@ from sugo.core.constants import (
     XML_SNIFF_BYTES,
 )
 from sugo.core.models import Block, BlockFlag, BlockType, Page, PageOrigin
+from sugo.extractors.office import docx_reader, xml_reader
+from sugo.extractors.office.package import OLE_SIGNATURE, word_document
 from sugo.extractors.office.protocol import (
     Message,
     Opened,
@@ -31,7 +34,6 @@ from sugo.extractors.office.protocol import (
     Refused,
     parse_message,
 )
-from sugo.extractors.office.xml_reader import ENGINE_NAME
 from sugo.extractors.worker import ProtocolError, WorkerError, WorkerProcess, module_command
 from sugo.i18n import gettext as _
 
@@ -48,7 +50,34 @@ _BOMS = (
 )
 
 
-class XmlError(ValueError):
+_ENGINES = {"xml": xml_reader.ENGINE_NAME, "docx": docx_reader.ENGINE_NAME}
+
+
+class OfficeError(ValueError):
+    """The file is not an Office document Sugo can read."""
+
+    code: ClassVar[str] = "OFFICE_INVALID"
+
+
+class OfficeTooLargeError(OfficeError):
+    """The file exceeds the size or archive limits."""
+
+    code: ClassVar[str] = "OFFICE_TOO_LARGE"
+
+
+class OfficeUnsupportedError(OfficeError):
+    """A legacy or password-protected Office file."""
+
+    code: ClassVar[str] = "OFFICE_UNSUPPORTED"
+
+
+class OfficeExtractionError(OfficeError):
+    """The worker kept failing on this file."""
+
+    code: ClassVar[str] = "OFFICE_EXTRACTION_FAILED"
+
+
+class XmlError(OfficeError):
     """The file is not XML Sugo can read."""
 
     code: ClassVar[str] = "XML_INVALID"
@@ -60,10 +89,30 @@ class XmlTooLargeError(XmlError):
     code: ClassVar[str] = "XML_TOO_LARGE"
 
 
-class OfficeExtractionError(XmlError):
-    """The worker kept failing on this file."""
+_REFUSALS: dict[str, type[OfficeError]] = {
+    "XML_INVALID": XmlError,
+    "XML_TOO_LARGE": XmlTooLargeError,
+    "OFFICE_INVALID": OfficeError,
+    "OFFICE_TOO_LARGE": OfficeTooLargeError,
+    "OFFICE_UNSUPPORTED": OfficeUnsupportedError,
+}
 
-    code: ClassVar[str] = "OFFICE_EXTRACTION_FAILED"
+
+def is_docx(data: bytes) -> bool:
+    """Whether the data is a Word document (DOCX, DOTX, DOCM, DOTM), by its content."""
+    return word_document(data)
+
+
+def check_legacy(data: bytes) -> None:
+    """Refuse a compound file: a legacy Office file, or any password-protected one.
+
+    Raises:
+        OfficeUnsupportedError: If the data is a compound (OLE) file.
+    """
+    if data.startswith(OLE_SIGNATURE):
+        raise OfficeUnsupportedError(
+            _("legacy or password-protected Office files are not supported")
+        )
 
 
 def looks_like_xml(data: bytes) -> bool:
@@ -105,6 +154,25 @@ def extract_xml(
     return _pages(data, "xml", worker, open_timeout, page_timeout)
 
 
+def extract_docx(
+    data: bytes,
+    *,
+    worker: Sequence[str] = WORKER_COMMAND,
+    open_timeout: float = OFFICE_OPEN_TIMEOUT_S,
+    page_timeout: float = OFFICE_PAGE_TIMEOUT_S,
+) -> Iterator[Page]:
+    """Yield the pages of a Word document: parts split at page and section breaks.
+
+    Raises:
+        OfficeError: If the file is refused; subclasses say why.
+    """
+    if len(data) > MAX_OFFICE_FILE_BYTES:
+        raise OfficeTooLargeError(
+            _("Office file exceeds {limit} bytes").format(limit=MAX_OFFICE_FILE_BYTES)
+        )
+    return _pages(data, "docx", worker, open_timeout, page_timeout)
+
+
 def is_failed_page(page: Page) -> bool:
     """Whether a page is the illegible placeholder for one the worker could not read.
 
@@ -130,7 +198,7 @@ def _pages(
             pages = opened.pages
             try:
                 for index in range(first, pages):
-                    yield _page(worker, index, page_timeout)
+                    yield _page(worker, index, _ENGINES[kind], page_timeout)
                     first = index + 1
             except WorkerError:
                 restarts += 1
@@ -151,31 +219,31 @@ def _open(worker: "_Worker", timeout: float, known: int | None) -> Opened:
     if isinstance(message, Refused):
         # The worker sends fixed English sentences, marked for translation
         # where it writes them; never used as format strings.
-        error = XmlTooLargeError if message.code == "XML_TOO_LARGE" else XmlError
-        raise error(i18n.gettext(message.message))
+        raise _REFUSALS[message.code](i18n.gettext(message.message))
     if not isinstance(message, Opened) or (known is not None and message.pages != known):
         raise WorkerError
     return message
 
 
-def _page(worker: "_Worker", index: int, timeout: float) -> Page:
+def _page(worker: "_Worker", index: int, engine: str, timeout: float) -> Page:
     message = worker.message(timeout)
     if isinstance(message, PageFailed) and message.index == index:
         return _failed_page(index)
     if not isinstance(message, PageRead) or message.page.index != index:
         raise WorkerError
-    if any(block.origin_engine != ENGINE_NAME for block in message.page.blocks):
+    if any(block.origin_engine != engine for block in message.page.blocks):
         raise WorkerError
     return message.page
 
 
-# The only block of a page the worker could not read. The XML layout never
-# flags a block illegible, so this block is never confused with real text.
+# The only block of a page the worker could not read. The readers never flag
+# a paragraph illegible (only images and equations), so this block is never
+# confused with real content.
 _FAILED_BLOCK = Block(
     id="b0",
     type=BlockType.PARAGRAPH,
     reading_order=0,
-    origin_engine=ENGINE_NAME,
+    origin_engine="office-worker",
     flags=(BlockFlag.ILLEGIBLE,),
 )
 

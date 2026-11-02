@@ -253,6 +253,28 @@ XML_CREDENTIAL_NAMES: Final = frozenset(
     }
 )
 
+# Largest Office file read, as for PDF; Office files are ZIP archives of XML parts.
+MAX_OFFICE_FILE_BYTES: Final = 200 * 1024 * 1024
+
+# ZIP limits against archive bombs: entries, bytes of one part and of all parts
+# read, counted while decompressing (sizes in the archive are not trusted), and
+# the compression ratio of parts over a megabyte. XML compresses about 10:1.
+OFFICE_MAX_ENTRIES: Final = 10_000
+OFFICE_MAX_PART_BYTES: Final = 50 * 1024 * 1024
+OFFICE_MAX_TOTAL_BYTES: Final = 300 * 1024 * 1024
+OFFICE_MAX_RATIO: Final = 200
+OFFICE_RATIO_MIN_BYTES: Final = 1024 * 1024
+
+# Most XML elements in one Office part: a 500-page report has about half a million.
+OFFICE_MAX_PART_ELEMENTS: Final = 2_000_000
+
+# Bytes of [Content_Types].xml searched to recognise a Word document. The file
+# lists a few dozen parts; a larger one is not a document Sugo reads.
+OFFICE_MAX_CONTENT_TYPES_BYTES: Final = 1024 * 1024
+
+# Text under this size, in half-points (2 pt), cannot be read on the page.
+DOCX_MIN_VISIBLE_HALF_POINTS: Final = 4
+
 # The worker process, as for PDF (ADR-043): address space on Linux and macOS,
 # seconds to open and check a file and to return one page, restarts after a
 # page kills or stalls it, and the largest message it may send.
