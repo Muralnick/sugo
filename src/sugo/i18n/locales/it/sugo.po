@@ -365,14 +365,14 @@ msgstr "il PDF è protetto da una password"
 msgid "the PDF has more than {pages} pages"
 msgstr "il PDF ha più di {pages} pagine"
 
-msgid "a stream of the PDF cannot be decoded, so it cannot be checked"
-msgstr "un flusso del PDF non si può decodificare, quindi non si può controllare"
+msgid "the PDF's compression filters cannot be checked"
+msgstr "i filtri di compressione del PDF non si possono controllare"
 
 msgid "the PDF uses Brotli compression, refused until MuPDF fixes CVE-2026-111497"
 msgstr "il PDF usa la compressione Brotli, rifiutata finché MuPDF non corregge CVE-2026-111497"
 
-msgid "the PDF names a stream filter indirectly, which Sugo cannot check safely"
-msgstr "il PDF indica un filtro di flusso in modo indiretto, che Sugo non può controllare in sicurezza"
+msgid "the PDF writes a stream filter in a form Sugo cannot check safely"
+msgstr "il PDF scrive un filtro di flusso in una forma che Sugo non può controllare in sicurezza"
 
 msgid "the PDF worker failed to open the document"
 msgstr "il processo che legge i PDF non è riuscito ad aprire il documento"
