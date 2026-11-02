@@ -89,6 +89,9 @@ class BlockFlag(StrEnum):
     # The text stays, for the person who converts their own file; the MCP
     # server never sends a document with such a block to an agent (ADR-053).
     SECRET = "secret"  # noqa: S105  (a flag name, not a password)
+    # A picture too small to hold content, such as a bullet or an icon in an
+    # Office file: kept apart so a cleaner removes it with a reason (ADR-054).
+    DECORATIVE = "decorative"
 
 
 class EditKind(StrEnum):

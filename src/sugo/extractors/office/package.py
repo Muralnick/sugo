@@ -13,6 +13,7 @@ parsed piece by piece; a part read twice counts once towards the total.
 """
 
 import io
+import math
 import posixpath
 import re
 import zipfile
@@ -21,7 +22,9 @@ from typing import IO
 
 from sugo.core.constants import (
     MAX_OFFICE_FILE_BYTES,
+    OFFICE_EMU_PER_POINT,
     OFFICE_MAX_CONTENT_TYPES_BYTES,
+    OFFICE_MAX_COORDINATE,
     OFFICE_MAX_ENTRIES,
     OFFICE_MAX_PART_BYTES,
     OFFICE_MAX_PART_ELEMENTS,
@@ -30,6 +33,7 @@ from sugo.core.constants import (
     OFFICE_RATIO_MIN_BYTES,
     OFFICE_UNDERSTOOD_NAMESPACES,
 )
+from sugo.core.models import Page
 from sugo.extractors.office.xml_reader import (
     REQUIRED_NAMESPACES,
     Element,
@@ -78,11 +82,39 @@ _MAIN_TYPES = (
 # file:, white space or brackets that would break the link) stays plain text.
 SAFE_LINK = re.compile(r"(?:https?://|mailto:)[^\s()<>\[\]]+", re.IGNORECASE)
 _MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+_RELATIONSHIP_NAMESPACES = frozenset(
+    {
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        "http://purl.oclc.org/ooxml/officeDocument/relationships",
+    }
+)
+# Text bodies inside drawings: Word's text boxes and DrawingML's text, which
+# the readers lay out themselves, pictures included.
+_TEXT_BODIES = frozenset({"txbxContent", "txBody", "textbox"})
 _OFFICE_DOCUMENT = "/officeDocument"
 _CHUNK = 64 * 1024
 _ENCRYPTED_FLAG = 0x1
 _DAMAGED = N_("the Office file is damaged, or too large to read safely")
 _TOO_LARGE = N_("the Office file is too large to read safely")
+
+
+@dataclass(frozen=True)
+class Picture:
+    """A picture drawn from a package part, as a person sees it on the page."""
+
+    part: str
+    # Shares of the image cut off on the left, top, right and bottom: what a
+    # person never sees of it.
+    crop: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
+    # Height and width it is shown at, in points; None when the reader cannot
+    # tell. Zero is a size: a picture drawn with none is not seen.
+    height: float | None = None
+    width: float | None = None
+
+
+# A page as a reader lays it out, with each picture marked not converted, by
+# block id: Sugo's process reads them with OCR (ADR-054).
+type LaidOut = tuple[Page, dict[str, Picture]]
 
 
 @dataclass(frozen=True)
@@ -131,6 +163,124 @@ def excel_workbook(data: bytes) -> bool:
 def powerpoint_presentation(data: bytes) -> bool:
     """Whether the data is a ZIP whose content types name a PowerPoint main part."""
     return office_kind(data) == "pptx"
+
+
+def pictures_in(
+    drawing: Element,
+    relationships: dict[str, Relationship],
+    package: "Package",
+    *,
+    height: float | None = None,
+    width: float | None = None,
+) -> list["Picture"]:
+    """Every picture a drawing shows from a part inside the package, in document order.
+
+    ``height`` and ``width`` are the size the drawing is shown at, in points,
+    when the reader knows it. Linked pictures (external relationships) are
+    never followed, so they are not listed. Text boxes are left to the reader,
+    which lays out their text and pictures with their own hidden state, and
+    alternate content is read as Office reads it (``chosen_content``).
+    """
+    found: list[Picture] = []
+    stack = [drawing]
+    while stack:
+        element = stack.pop()
+        name = local_name(element.tag)
+        if name in _TEXT_BODIES:
+            continue
+        if element.tag == f"{{{_MC}}}AlternateContent":
+            branch = chosen_content(element)
+            stack.extend([] if branch is None else list(branch)[::-1])
+            continue
+        if name == "blipFill":
+            # DrawingML: a:blip names the part, a:srcRect the share cut off each side.
+            blip = next((child for child in element if local_name(child.tag) == "blip"), None)
+            part = _target(blip, "embed", relationships, package)
+            if part is not None:
+                crop = next((c for c in element if local_name(c.tag) == "srcRect"), None)
+                left, top, right, bottom = (
+                    _share(None if crop is None else crop.attrib.get(side))
+                    for side in ("l", "t", "r", "b")
+                )
+                found.append(Picture(part, _crop(left, top, right, bottom), height, width))
+            continue
+        if name == "imagedata":
+            # VML, in older documents and in fallbacks: v:imagedata and its crop attributes.
+            part = _target(element, "id", relationships, package)
+            if part is not None:
+                left, top, right, bottom = (
+                    _vml_share(element.attrib.get(side))
+                    for side in ("cropleft", "croptop", "cropright", "cropbottom")
+                )
+                found.append(Picture(part, _crop(left, top, right, bottom), height, width))
+        stack.extend(list(element)[::-1])
+    return found
+
+
+def shown_size(extent: Element | None) -> tuple[float | None, float | None]:
+    """Height and width, in points, of an extent element (``cx``, ``cy`` in EMU).
+
+    A missing or unreadable value is unknown (None); zero or less is no size,
+    a drawing nobody sees; a value past the standard's range is that range.
+    """
+
+    def points(value: str | None) -> float | None:
+        try:
+            emu = None if value is None else int(value)
+        except ValueError:
+            return None
+        if emu is None:
+            return None
+        return min(max(emu, 0), OFFICE_MAX_COORDINATE) / OFFICE_EMU_PER_POINT
+
+    if extent is None:
+        return None, None
+    return points(extent.attrib.get("cy")), points(extent.attrib.get("cx"))
+
+
+def _target(
+    element: Element | None, name: str, relationships: dict[str, Relationship], package: "Package"
+) -> str | None:
+    """The internal part a relationship attribute (``r:embed``, ``r:id``) points at."""
+    if element is None:
+        return None
+    for key, value in element.attrib.items():
+        namespace = key[1:].split("}", 1)[0] if key.startswith("{") else ""
+        if local_name(key) == name and namespace in _RELATIONSHIP_NAMESPACES:
+            target = relationships.get(value)
+            if target is not None and not target.external and package.has(target.target):
+                return target.target
+    return None
+
+
+def _share(value: str | None) -> float:
+    """A DrawingML percentage in thousandths of a percent (100 000 = all)."""
+    try:
+        return 0.0 if value is None else int(value) / 100_000
+    except ValueError:
+        return 0.0
+
+
+def _vml_share(value: str | None) -> float:
+    """A VML crop value: a fraction ("0.25") or 65 536ths ("16384f")."""
+    if value is None:
+        return 0.0
+    try:
+        share = float(value[:-1]) / 65_536 if value.endswith("f") else float(value)
+    except ValueError:
+        return 0.0
+    return share if math.isfinite(share) else 0.0
+
+
+def _crop(
+    left: float, top: float, right: float, bottom: float
+) -> tuple[float, float, float, float]:
+    """Shares cut off each side, within 0-1; a negative value pads the picture and cuts nothing."""
+
+    def unit(side: float) -> float:
+        return min(max(side, 0.0), 1.0)
+
+    return unit(left), unit(top), unit(right), unit(bottom)
 
 
 def chosen_content(alternate: Element) -> Element | None:

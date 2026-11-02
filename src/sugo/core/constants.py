@@ -344,6 +344,15 @@ OFFICE_UNDERSTOOD_NAMESPACES: Final = frozenset(
     }
 )
 
+# Pictures inside Office files read with OCR (ADR-054): at most this many in
+# one document, each OCR run taking a second or more; a picture smaller than
+# this many pixels on both sides is decoration (a bullet, a rule, an icon).
+OFFICE_MAX_PICTURES: Final = 200
+OFFICE_DECORATION_PIXELS: Final = 32
+# Text a picture shows smaller than this, in points, cannot be read on the
+# page: hidden, as for text in a document (DOCX_MIN_VISIBLE_HALF_POINTS).
+OFFICE_MIN_VISIBLE_POINTS: Final = 2.0
+
 # Text under this size, in half-points (2 pt), cannot be read on the page.
 DOCX_MIN_VISIBLE_HALF_POINTS: Final = 4
 
@@ -362,14 +371,14 @@ XLSX_MAX_SHEET_TEXT: Final = 16_000_000
 XLSX_MAX_ROWS: Final = 1_048_576
 XLSX_MAX_COLUMNS: Final = 16_384
 
-# Slide positions are in EMU: 12 700 to a point. A presentation that gives no
-# slide size gets PowerPoint's 16:9 default, 13.333 by 7.5 inches.
-PPTX_EMU_PER_POINT: Final = 12_700
+# Office positions and sizes are in EMU: 12 700 to a point. A presentation
+# that gives no slide size gets PowerPoint's 16:9 default, 13.333 by 7.5 inches.
+OFFICE_EMU_PER_POINT: Final = 12_700
 PPTX_DEFAULT_SLIDE_WIDTH_EMU: Final = 12_192_000
 PPTX_DEFAULT_SLIDE_HEIGHT_EMU: Final = 6_858_000
 # Coordinates beyond the standard's range (ST_Coordinate, about 27 million
 # inches) are not positions: such a shape is placed as if it had none.
-PPTX_MAX_COORDINATE: Final = 27_273_042_329_600
+OFFICE_MAX_COORDINATE: Final = 27_273_042_329_600
 # Table cells written in one presentation, empty ones and those a span covers
 # included: the serializer draws every cell of the grid, so a cell spanning a
 # billion columns must not reach it. As XLSX_MAX_GRID_CELLS; PowerPoint's own

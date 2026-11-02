@@ -45,7 +45,14 @@ from sugo.core.constants import (
     XML_MAX_DEPTH,
 )
 from sugo.core.models import Block, BlockFlag, BlockType, Page, PageOrigin, Table, TableCell
-from sugo.extractors.office.package import Package
+from sugo.extractors.office.package import (
+    LaidOut,
+    Package,
+    Picture,
+    chosen_content,
+    pictures_in,
+    shown_size,
+)
 from sugo.extractors.office.xml_reader import Element, Refusal, local_name
 from sugo.i18n import N_
 
@@ -62,6 +69,7 @@ _R = frozenset(
         "http://purl.oclc.org/ooxml/officeDocument/relationships",
     }
 )
+_MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
 _DAMAGED = N_("the Office file is damaged, or too large to read safely")
 _TOO_LARGE = N_("the Office file is too large to read safely")
 _TRUE = frozenset({"1", "true", "on"})
@@ -96,6 +104,16 @@ _FAKE_LEAP_DAY = 60
 
 def read_xlsx(data: bytes) -> tuple[int, Callable[[int], Page]]:
     """Check a workbook and return its number of pages and a function that reads one.
+
+    Raises:
+        Refusal: OFFICE_TOO_LARGE or OFFICE_INVALID, here or from the page function.
+    """
+    count, laid_out = lay_out_xlsx(data)
+    return count, lambda index: laid_out(index)[0]
+
+
+def lay_out_xlsx(data: bytes) -> tuple[int, Callable[[int], LaidOut]]:
+    """As ``read_xlsx``, each page with the parts of its pictures.
 
     Every sheet is scanned here, so the limits refuse the file before its
     first page; each page is laid out only when asked for.
@@ -336,14 +354,16 @@ class _Book:
 
     # --- Pages --------------------------------------------------------------
 
-    def page(self, index: int) -> Page:
-        """Lay out one sheet as a page.
+    def page(self, index: int) -> LaidOut:
+        """Lay out one sheet as a page, with the parts of its pictures.
 
         Raises:
             Refusal: OFFICE_INVALID or OFFICE_TOO_LARGE if the sheet's parts are broken.
         """
         sheet = self.sheets[index]
         blocks: list[tuple[BlockType, str, Table | None, tuple[BlockFlag, ...]]] = []
+        # Each picture marked not converted, by block number.
+        images: dict[int, Picture] = {}
         if sheet.name:
             blocks.append((BlockType.HEADING, sheet.name, None, ()))
         if sheet.part is None:
@@ -360,14 +380,21 @@ class _Book:
                 blocks.append(
                     (BlockType.PARAGRAPH, "\n".join(concealed), None, (BlockFlag.HIDDEN,))
                 )
-            not_converted = self._not_converted(sheet.part)
-            blocks.extend([(BlockType.IMAGE, "", None, (BlockFlag.ILLEGIBLE,))] * not_converted)
+            for image, image_hidden in self._not_converted(sheet.part):
+                if image is not None:
+                    images[len(blocks)] = image
+                flags = (
+                    (BlockFlag.ILLEGIBLE, BlockFlag.HIDDEN)
+                    if image_hidden
+                    else (BlockFlag.ILLEGIBLE,)
+                )
+                blocks.append((BlockType.IMAGE, "", None, flags))
         if sheet.hidden:
             blocks = [
                 (kind, text, table, (*flags, BlockFlag.HIDDEN))
                 for kind, text, table, flags in blocks
             ]
-        return Page(
+        page = Page(
             index=index,
             width=1.0,
             height=1.0,
@@ -386,6 +413,7 @@ class _Book:
                 for number, (kind, text, table, flags) in enumerate(blocks)
             ),
         )
+        return page, {f"b{number}": part for number, part in images.items()}
 
     def _read(
         self, grid: _Grid, level: int, element: Element, parent: Element, *, last_row: list[int]
@@ -460,13 +488,57 @@ class _Book:
                     found.append(content)
         return found
 
-    def _not_converted(self, part: str) -> int:
-        """Charts, images and pivot tables of a sheet: one block each, never guessed."""
-        count = sum(1 for _ in self._related(part, "/pivotTable"))
+    def _not_converted(self, part: str) -> list[tuple[Picture | None, bool]]:
+        """Pivot tables, then the charts and pictures a sheet's drawings anchor, in their order.
+
+        Each is marked not converted, never guessed; a picture is given with
+        its part, read with OCR in Sugo's process, and whether it is hidden.
+        """
+        found: list[tuple[Picture | None, bool]] = [
+            (None, False) for _ in self._related(part, "/pivotTable")
+        ]
         for drawing in self._related(part, "/drawing"):
-            count += sum(1 for _ in self._related(drawing, "/chart"))
-            count += sum(1 for _ in self._related(drawing, "/image"))
-        return count
+            relationships = self._package.relationships(drawing)
+            for anchor in self._package.xml(drawing):
+                # One-cell and absolute anchors give the size; two-cell ones do not.
+                extent = next((c for c in anchor if local_name(c.tag) == "ext"), None)
+                height, width = shown_size(extent) if extent is not None else (None, None)
+                # Each element with whether it, or a group around it, is hidden.
+                stack = [(anchor, False)]
+                while stack:
+                    element, hidden = stack.pop()
+                    name = local_name(element.tag)
+                    hidden = hidden or _drawn_hidden(element)
+                    if element.tag == f"{{{_MC}}}AlternateContent":
+                        branch = chosen_content(element)
+                        children = [] if branch is None else list(branch)
+                        stack.extend((child, hidden) for child in children[::-1])
+                    elif name in ("pic", "graphicFrame"):
+                        pictures: list[Picture | None] = []
+                        if name == "pic":
+                            pictures.extend(
+                                pictures_in(
+                                    element,
+                                    relationships,
+                                    self._package,
+                                    height=height,
+                                    width=width,
+                                )
+                            )
+                        found.extend((picture, hidden) for picture in pictures or [None])
+                    else:
+                        stack.extend((child, hidden) for child in list(element)[::-1])
+        return found
+
+
+def _drawn_hidden(drawn: Element) -> bool:
+    """Whether a picture, chart or group in a drawing is marked hidden (``cNvPr hidden``)."""
+    for properties in drawn:
+        if local_name(properties.tag).startswith("nv"):
+            for item in properties:
+                if local_name(item.tag) == "cNvPr":
+                    return _true(item.attrib.get("hidden"))
+    return False
 
 
 def _is_row(level: int, element: Element, parent: Element) -> bool:

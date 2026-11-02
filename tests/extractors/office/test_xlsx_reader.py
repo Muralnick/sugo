@@ -182,7 +182,12 @@ def test_zero_height_rows_and_zero_width_columns_are_hidden() -> None:
 
 
 def test_charts_images_pivot_tables_and_chart_sheets_are_not_converted() -> None:
-    drawing = f'<xdr:wsDr xmlns:xdr="{S}"/>'
+    drawing = (
+        f'<xdr:wsDr xmlns:xdr="{S}" xmlns:r="{R}"><xdr:twoCellAnchor><xdr:graphicFrame/>'
+        "</xdr:twoCellAnchor><xdr:twoCellAnchor><xdr:pic><xdr:blipFill>"
+        '<a:blip xmlns:a="urn:a" r:embed="i1"/></xdr:blipFill></xdr:pic></xdr:twoCellAnchor>'
+        "</xdr:wsDr>"
+    )
     drawing_rels = (
         f'<Relationships xmlns="{_PKG}">'
         f'<Relationship Id="c1" Type="{_REL}/chart" Target="../charts/chart1.xml"/>'

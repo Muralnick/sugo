@@ -13,8 +13,8 @@ crashing it is refused.
 
 import codecs
 import re
-from collections.abc import Iterator, Sequence
-from typing import ClassVar
+from collections.abc import Callable, Iterator, Sequence
+from typing import TYPE_CHECKING, ClassVar
 
 from sugo import i18n
 from sugo.core.constants import (
@@ -30,11 +30,14 @@ from sugo.core.models import Block, BlockFlag, BlockType, Page, PageOrigin
 from sugo.extractors.office import docx_reader, pptx_reader, xlsx_reader, xml_reader
 from sugo.extractors.office.package import (
     OLE_SIGNATURE,
+    LaidOut,
+    Picture,
     excel_workbook,
     office_kind,
     powerpoint_presentation,
     word_document,
 )
+from sugo.extractors.office.pictures import Pictures, is_picture
 from sugo.extractors.office.protocol import (
     Message,
     Opened,
@@ -45,6 +48,9 @@ from sugo.extractors.office.protocol import (
 )
 from sugo.extractors.worker import ProtocolError, WorkerError, WorkerProcess, module_command
 from sugo.i18n import gettext as _
+
+if TYPE_CHECKING:
+    from sugo.extractors.image.ocr_engine import OcrEngine
 
 WORKER_COMMAND: tuple[str, ...] = module_command("sugo.extractors.office.worker")
 
@@ -180,17 +186,24 @@ def extract_xml(
     """
     if len(data) > MAX_XML_FILE_BYTES:
         raise XmlTooLargeError(_("XML file exceeds {limit} bytes").format(limit=MAX_XML_FILE_BYTES))
-    return _pages(data, "xml", worker, open_timeout, page_timeout)
+    return _pages(data, "xml", worker, open_timeout, page_timeout, None, None)
 
 
 def extract_docx(
     data: bytes,
     *,
+    ocr: "Callable[[], OcrEngine] | None" = None,
+    pictures_for: Callable[[int], bool] | None = None,
     worker: Sequence[str] = WORKER_COMMAND,
     open_timeout: float = OFFICE_OPEN_TIMEOUT_S,
     page_timeout: float = OFFICE_PAGE_TIMEOUT_S,
 ) -> Iterator[Page]:
     """Yield the pages of a Word document: parts split at page and section breaks.
+
+    Pictures are read with OCR when ``ocr`` is given (it is called once, at
+    the first picture), on the pages ``pictures_for`` accepts (all by default);
+    the others stay marked not converted. The same holds for workbooks and
+    presentations.
 
     Raises:
         OfficeError: If the file is refused; subclasses say why.
@@ -199,12 +212,14 @@ def extract_docx(
         raise OfficeTooLargeError(
             _("Office file exceeds {limit} bytes").format(limit=MAX_OFFICE_FILE_BYTES)
         )
-    return _pages(data, "docx", worker, open_timeout, page_timeout)
+    return _pages(data, "docx", worker, open_timeout, page_timeout, ocr, pictures_for)
 
 
 def extract_xlsx(
     data: bytes,
     *,
+    ocr: "Callable[[], OcrEngine] | None" = None,
+    pictures_for: Callable[[int], bool] | None = None,
     worker: Sequence[str] = WORKER_COMMAND,
     open_timeout: float = OFFICE_OPEN_TIMEOUT_S,
     page_timeout: float = OFFICE_PAGE_TIMEOUT_S,
@@ -218,12 +233,14 @@ def extract_xlsx(
         raise OfficeTooLargeError(
             _("Office file exceeds {limit} bytes").format(limit=MAX_OFFICE_FILE_BYTES)
         )
-    return _pages(data, "xlsx", worker, open_timeout, page_timeout)
+    return _pages(data, "xlsx", worker, open_timeout, page_timeout, ocr, pictures_for)
 
 
 def extract_pptx(
     data: bytes,
     *,
+    ocr: "Callable[[], OcrEngine] | None" = None,
+    pictures_for: Callable[[int], bool] | None = None,
     worker: Sequence[str] = WORKER_COMMAND,
     open_timeout: float = OFFICE_OPEN_TIMEOUT_S,
     page_timeout: float = OFFICE_PAGE_TIMEOUT_S,
@@ -237,7 +254,7 @@ def extract_pptx(
         raise OfficeTooLargeError(
             _("Office file exceeds {limit} bytes").format(limit=MAX_OFFICE_FILE_BYTES)
         )
-    return _pages(data, "pptx", worker, open_timeout, page_timeout)
+    return _pages(data, "pptx", worker, open_timeout, page_timeout, ocr, pictures_for)
 
 
 def is_failed_page(page: Page) -> bool:
@@ -249,8 +266,15 @@ def is_failed_page(page: Page) -> bool:
 
 
 def _pages(
-    data: bytes, kind: str, command: Sequence[str], open_timeout: float, page_timeout: float
+    data: bytes,
+    kind: str,
+    command: Sequence[str],
+    open_timeout: float,
+    page_timeout: float,
+    ocr: "Callable[[], OcrEngine] | None",
+    pictures_for: Callable[[int], bool] | None,
 ) -> Iterator[Page]:
+    pictures = None if ocr is None else Pictures(data, ocr)
     pages: int | None = None
     first = 0
     restarts = 0
@@ -265,7 +289,10 @@ def _pages(
             pages = opened.pages
             try:
                 for index in range(first, pages):
-                    yield _page(worker, index, _ENGINES[kind], page_timeout)
+                    page, parts = _page(worker, index, _ENGINES[kind], page_timeout)
+                    if pictures is not None and (pictures_for is None or pictures_for(index)):
+                        page = pictures.apply(page, parts)
+                    yield page
                     first = index + 1
             except WorkerError:
                 restarts += 1
@@ -292,15 +319,24 @@ def _open(worker: "_Worker", timeout: float, known: int | None) -> Opened:
     return message
 
 
-def _page(worker: "_Worker", index: int, engine: str, timeout: float) -> Page:
+def _page(worker: "_Worker", index: int, engine: str, timeout: float) -> LaidOut:
+    """The next page, and the part of each picture on it by block id."""
     message = worker.message(timeout)
     if isinstance(message, PageFailed) and message.index == index:
-        return _failed_page(index)
+        return _failed_page(index), {}
     if not isinstance(message, PageRead) or message.page.index != index:
         raise WorkerError
     if any(block.origin_engine != engine for block in message.page.blocks):
         raise WorkerError
-    return message.page
+    blocks = {block.id: block for block in message.page.blocks}
+    parts = {
+        image.block: Picture(image.part, image.crop, image.height, image.width)
+        for image in message.images
+    }
+    # A picture names an image block marked not converted, nothing else.
+    if not all(block in blocks and is_picture(blocks[block]) for block in parts):
+        raise WorkerError
+    return message.page, parts
 
 
 # The only block of a page the worker could not read. The readers never flag

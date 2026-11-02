@@ -17,10 +17,11 @@ from sugo.core.constants import (
     MAX_XML_FILE_BYTES,
     OFFICE_WORKER_MEMORY_BYTES,
 )
-from sugo.core.models import Page
-from sugo.extractors.office.docx_reader import read_docx
-from sugo.extractors.office.pptx_reader import read_pptx
+from sugo.extractors.office.docx_reader import lay_out_docx
+from sugo.extractors.office.package import LaidOut
+from sugo.extractors.office.pptx_reader import lay_out_pptx
 from sugo.extractors.office.protocol import (
+    ImageRef,
     Message,
     Opened,
     PageFailed,
@@ -28,7 +29,7 @@ from sugo.extractors.office.protocol import (
     Refused,
     write_message,
 )
-from sugo.extractors.office.xlsx_reader import read_xlsx
+from sugo.extractors.office.xlsx_reader import lay_out_xlsx
 from sugo.extractors.office.xml_reader import Refusal, lay_out, parse
 from sugo.extractors.worker import limit_resources, private_stdout
 
@@ -64,20 +65,31 @@ def run(data: bytes, kind: str, first_page: int) -> Iterator[Message]:
     yield Opened(pages=count)
     for index in range(first_page, count):
         try:
-            yield PageRead(page=page(index))
+            laid_out, images = page(index)
+            refs = tuple(
+                ImageRef(
+                    block=block,
+                    part=image.part,
+                    crop=image.crop,
+                    height=image.height,
+                    width=image.width,
+                )
+                for block, image in images.items()
+            )
+            yield PageRead(page=laid_out, images=refs)
         except Refusal:
             yield PageFailed(index=index)
 
 
-def _laid_out(pages: list[Page]) -> tuple[int, Callable[[int], Page]]:
+def _laid_out(pages: list[LaidOut]) -> tuple[int, Callable[[int], LaidOut]]:
     return len(pages), pages.__getitem__
 
 
-_READERS: dict[str, Callable[[bytes], tuple[int, Callable[[int], Page]]]] = {
-    "xml": lambda data: _laid_out([lay_out(parse(data))]),
-    "docx": lambda data: _laid_out(read_docx(data)),
-    "xlsx": read_xlsx,
-    "pptx": read_pptx,
+_READERS: dict[str, Callable[[bytes], tuple[int, Callable[[int], LaidOut]]]] = {
+    "xml": lambda data: _laid_out([(lay_out(parse(data)), {})]),
+    "docx": lambda data: _laid_out(lay_out_docx(data)),
+    "xlsx": lay_out_xlsx,
+    "pptx": lay_out_pptx,
 }
 
 
