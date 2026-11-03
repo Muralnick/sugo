@@ -1,28 +1,175 @@
-# Sugo
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/sugo-logo-dark.svg">
+    <img src="docs/brand/sugo-logo.svg" alt="Logo di Sugo" width="120" height="120">
+  </picture>
+</p>
 
-**Documenti, ridotti.** Dai al tuo LLM il sugo, non l'acqua.
+<h1 align="center">Sugo</h1>
 
-Sugo converte PDF, screenshot, immagini, file Office, e-book, email e pagine web in Markdown pulito e compatto, pensato per sistemi RAG, agenti AI e chat con gli LLM. Elimina il rumore (intestazioni, piè di pagina, numeri di pagina, disclaimer, elementi d'interfaccia, immagini decorative) per inviare meno token senza perdere significato, tabelle o struttura. Tutto gira in locale, sul tuo computer.
+<p align="center">
+  <strong>Documenti, ridotti.</strong> Dai al tuo LLM il sugo, non l'acqua.
+</p>
+
+<p align="center">
+  <a href="https://github.com/Muralnick/sugo/actions/workflows/ci.yml"><img src="https://github.com/Muralnick/sugo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/python-3.12-3776ab" alt="Python 3.12">
+  <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-b23a22" alt="AGPL-3.0-or-later">
+  <img src="https://img.shields.io/badge/runs-100%25%20offline-2f7d4f" alt="Funziona 100% offline">
+</p>
+
+<p align="center">
+  🇬🇧 <a href="README.md">Read in English</a>
+</p>
+
+---
+
+Sugo trasforma PDF, file Office, screenshot e immagini in Markdown pulito e compatto, pensato per sistemi RAG, agenti AI e chat con gli LLM. Toglie ciò che costa solo token (intestazioni e piè di pagina ripetuti, numeri di pagina, testo nascosto, parametri di tracciamento, l'interfaccia dell'app intorno a uno screenshot) e tiene il contenuto, le tabelle e la struttura. Tutto gira sul tuo computer: nessuna API cloud, nessuna telemetria, niente viene inviato altrove.
 
 > "Il sugo del discorso" è il succo, l'essenza; e il sugo, in cucina, si **riduce** finché resta solo il sapore concentrato. È quello che Sugo fa con i tuoi documenti.
 
+## Cosa fa
+
+Un PDF di tre pagine, come lo passa al modello un normale estrattore di testo (le pagine 1 e 3 sono uguali):
+
+```text
+ACME S.p.A. - Annual Report 2025                Confidential
+3.2 Revenue
+Revenue grew by 12% in the second half, driven by the export market.
+Details: https://acme.example/report?utm_source=newsletter&utm_medium=email
+Page 14 of 120
+```
+
+Cosa stampa `sugo report.pdf`:
+
+```markdown
+ACME S.p.A. - Annual Report 2025
+
+# 3.1 Costs
+
+Costs fell by 3% thanks to the new suppliers.
+Details: https://acme.example/report
+
+# 3.2 Revenue
+
+Revenue grew by 12% in the second half, driven by the export market.
+Details: https://acme.example/report
+
+# 3.3 Outlook
+
+The board expects stable growth next year.
+Details: https://acme.example/report
+```
+
+L'intestazione resta una volta sola invece che su ogni pagina; i numeri di pagina, il "Confidential" ripetuto e i parametri di tracciamento spariscono; il testo è lo stesso. `sugo stats` misura la differenza: **da 180 a 97 token, il 46% in meno** su questo piccolo esempio. Ogni rimozione viene registrata con il cleaner che l'ha fatta e il motivo, così puoi sempre controllare cosa è stato tolto. Il testo illeggibile viene segnato come illeggibile, mai indovinato.
+
 ## Stato
 
-**Fase di architettura completata (ottobre 2026). Implementazione non ancora iniziata.** Il progetto completo è nella cartella [`docs/`](docs/) (in inglese). Il punto di partenza è [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+**Alpha.** La prima versione, la v0.1, è in via di completamento: tutto ciò che segue funziona già installando dal codice sorgente. Il pacchetto su PyPI arriverà con la v0.1.
 
-## Caratteristiche principali (previste)
+| Funziona oggi | In arrivo |
+|---|---|
+| PDF nativi, DOCX, XLSX, PPTX, XML | Cleaner per libri scansionati, EPUB, email, pagine web |
+| Immagini e screenshot con OCR locale (PNG, JPEG, WEBP) | Tabelle più grandi, livelli di motore `normal` e `quality` |
+| Riconoscimento di screenshot di chat e di codice | Giapponese, cinese, coreano |
+| Markdown, e chunk in JSON Lines per i database vettoriali | Shell interattiva, configurazione guidata |
+| Metriche dei token per provider (`sugo stats`) | Servizio in background e controllo delle cartelle |
+| Riga di comando, server MCP per agenti, pagina web locale | Profili di lavoro e ricette |
+| Interfaccia e regole del testo in inglese, italiano, spagnolo, francese, tedesco | |
 
-- **Screenshot al centro**: chat, codice, schermate e foto dal telefono diventano testo pulito, con gestione della dark mode ed eliminazione dei duplicati negli screenshot di scorrimento.
-- **Metriche oneste**: risparmio misurato per ogni fase e confrontato con il costo che ogni provider (Claude, Gemini, OpenAI) applicherebbe all'immagine originale, inclusi i casi in cui inviare l'immagine conviene.
-- **Tre livelli di motore**: `lite` (qualsiasi portatile da 8 GB), `normal` (tabelle complesse, Office), `quality` (GPU, modello visivo locale).
-- **Otto lingue**: italiano, spagnolo, inglese, francese, tedesco, giapponese, cinese mandarino, coreano.
-- **Per sviluppatori e agenti**: shell in stile Claude Code, server MCP per Claude Code, Codex e altri agenti, output `--json` ovunque.
-- **Per aziende e studi legali**: modalità offline, anonimizzazione dei dati personali, registro delle operazioni, output riproducibile.
-- **Supporto dedicato all'Italia**: PEC, fattura elettronica, codice fiscale e partita IVA, ricette per documenti legali italiani.
-- **Locale per principio**: nessuna API cloud, nessuna telemetria, mai.
+Il piano completo è nella [roadmap](docs/ROADMAP.md) (in inglese).
+
+## Avvio rapido
+
+Sugo richiede Python 3.12 e [uv](https://docs.astral.sh/uv/).
+
+```bash
+uv tool install git+https://github.com/Muralnick/sugo
+```
+
+Converti un file e stampa il suo Markdown:
+
+```bash
+sugo report.pdf
+```
+
+Altre cose che puoi fare:
+
+```bash
+sugo convert *.pdf -o out/            # un NOME.md per file, nella cartella out/
+sugo convert report.pdf --chunks      # chunk in JSON Lines, pronti per il RAG
+sugo stats screenshot.png             # token risparmiati, per provider LLM
+sugo clip                             # converte lo screenshot negli appunti
+sugo ui                               # apre la pagina web locale: trascini un file, ottieni il Markdown
+sugo doctor                           # controlla l'installazione
+```
+
+Aggiungi `--json` per un output leggibile da uno script.
+
+### Usarlo da un agente AI (MCP)
+
+Sugo può servire agenti come Claude Code o Codex tramite MCP. Legge solo dentro le cartelle che indichi:
+
+```bash
+claude mcp add sugo -- sugo mcp --root ~/Documenti
+```
+
+L'agente riceve due strumenti: `convert_document` ed `estimate_savings`.
+
+## File supportati
+
+| Tipo | Formati | Dimensione massima |
+|---|---|---|
+| Documenti | PDF (con testo), DOCX, XLSX, PPTX | 200 MB |
+| Immagini | PNG, JPEG, WEBP (screenshot, foto di testo) | 50 MB |
+| Dati | XML | 50 MB |
+
+I vecchi file `.doc`, `.xls` e `.ppt` e i file protetti da password non vengono letti: salvane prima una nuova copia.
+
+## Come funziona
+
+```mermaid
+flowchart LR
+    F[Il tuo file] --> E[Lettore<br/>PDF · Office · OCR · XML]
+    E --> IR[Documento → Pagina → Blocco]
+    IR --> C[Cleaner<br/>propongono rimozioni]
+    C --> K[Core<br/>le applica e le registra]
+    K --> M[Markdown]
+    K --> J[Chunk JSONL]
+    K --> S[Metriche dei token]
+```
+
+Ogni lettore trasforma il file nella stessa struttura di pagine e blocchi. I cleaner *propongono* soltanto le modifiche; il core le applica e segna ogni blocco rimosso con chi l'ha rimosso e perché, invece di cancellarlo. Per questo l'output è controllabile e riproducibile. Il progetto completo è in [ARCHITECTURE](docs/ARCHITECTURE.md) (in inglese).
+
+## Promesse
+
+Sono scritte nei [PRINCIPLES](PRINCIPLES.md) e verificate dai test:
+
+- **Locale per principio.** La conversione non ha mai bisogno di internet. Nessuna API cloud, nessuna telemetria.
+- **Niente congetture.** Il testo illeggibile viene segnato come illeggibile, mai riempito.
+- **Niente perso in silenzio.** Ogni rimozione viene registrata, con il suo motivo.
+- **Metriche oneste.** Il risparmio viene misurato, e Sugo ti dice anche quando inviare l'immagine originale costerebbe meno.
+- **Sicuro con file non fidati.** Limiti di dimensione e di tempo, XML letto in modo sicuro, modelli verificati con checksum. Vedi il [modello delle minacce](docs/THREAT_MODEL.md).
+
+## Documentazione
+
+La documentazione tecnica è in inglese.
+
+| Documento | Contenuto |
+|---|---|
+| [ARCHITECTURE](docs/ARCHITECTURE.md) | Progetto completo del sistema |
+| [FEATURES](docs/FEATURES.md) | Funzioni per livello di motore, profili di lavoro, formati supportati |
+| [THREAT_MODEL](docs/THREAT_MODEL.md) | Analisi di sicurezza |
+| [TESTING](docs/TESTING.md) | Test, benchmark, obiettivi di prestazione |
+| [ROADMAP](docs/ROADMAP.md) | Piano di sviluppo e contenuto della prima versione |
+| [ADR](docs/adr/) | Registro delle decisioni di architettura |
+| [PRINCIPLES](PRINCIPLES.md) | Le promesse che Sugo non infrange mai |
+| [AI_WORKFLOW](AI_WORKFLOW.md) | Come questo progetto viene costruito con l'aiuto dell'AI |
+
+## Contribuire e sicurezza
+
+Vedi [CONTRIBUTING](CONTRIBUTING.md). Le vulnerabilità vanno segnalate in privato, come descritto in [SECURITY](SECURITY.md), non nelle issue pubbliche.
 
 ## Licenza
 
 AGPL-3.0-or-later (vedi [ADR-010](docs/adr/ADR-010-license.md)).
-
-🇬🇧 [Read in English](README.md)
