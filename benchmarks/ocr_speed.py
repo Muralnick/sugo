@@ -8,13 +8,14 @@ load.
 """
 
 import json
-import resource
 import statistics
 import sys
 import time
 from io import BytesIO
 from pathlib import Path
 
+from _memory import peak_rss_mb
+from _text import character_error_rate
 from PIL import Image, ImageDraw, ImageFont
 
 from sugo.extractors.image.classifier import classify
@@ -34,18 +35,6 @@ SAMPLE_LINES = (
     "def total(items): return sum(items)",
     "Ciao Marco, ci vediamo alle 18:30?",
 )
-
-
-def _edit_distance(a: str, b: str) -> int:
-    previous = list(range(len(b) + 1))
-    for i, char_a in enumerate(a, 1):
-        current = [i]
-        for j, char_b in enumerate(b, 1):
-            current.append(
-                min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (char_a != char_b))
-            )
-        previous = current
-    return previous[-1]
 
 
 def _screenshot() -> tuple[bytes, list[str]]:
@@ -81,15 +70,13 @@ def main() -> None:
         timings.append(time.perf_counter() - start)
 
     read = [line.text for line in sorted(lines, key=lambda line: line.bbox.y0)]
-    errors = sum(_edit_distance(a, b) for a, b in zip(truth, read, strict=False))
-    errors += sum(len(line) for line in truth[len(read) :])
     result = {
         "image": f"{SIZE[0]}x{SIZE[1]}, {LINE_COUNT} lines",
         "model_load_s": round(load_seconds, 2),
         "warm_median_s": round(statistics.median(timings[1:]), 2),
-        "peak_rss_mb": round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024),
+        "peak_rss_mb": round(peak_rss_mb()),
         "lines_found": len(read),
-        "character_error_rate": round(errors / sum(len(line) for line in truth), 4),
+        "character_error_rate": character_error_rate(truth, read),
     }
     sys.stdout.write(json.dumps(result, indent=2) + "\n")
 
