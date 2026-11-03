@@ -116,6 +116,19 @@ claude mcp add sugo -- sugo mcp --root ~/Documenti
 
 L'agente riceve due strumenti: `convert_document` ed `estimate_savings`.
 
+## Su un computer vecchio
+
+Misurato il 3 novembre 2026 su un desktop del 2010: Intel Core i5-650 (2 core, 4 thread, senza AVX), 8 GB di RAM, SSD, nessuna GPU utilizzabile. È più debole della macchina da 8 GB e 4 core per cui Sugo è pensato.
+
+| Operazione | Risultato | Obiettivo |
+|---|---|---|
+| PDF nativo, 100 pagine, pulizia inclusa | 3,6 s, circa 28 pagine/s | ≥ 20 pagine/s |
+| Memoria massima, quel PDF | 98 MB | < 1 GB |
+| Screenshot fitto del telefono (30 righe) → testo, OCR | 30 righe su 30, 0% di errori sui caratteri, 411 MB | < 1 GB |
+| Stesso screenshot, tempo | 13,7 s | < 2 s |
+
+I documenti nativi restano ben dentro gli obiettivi anche su questa macchina. L'OCR è preciso ma lento su un processore senza AVX; renderlo più veloce è nella roadmap. Dettagli e script sono in [TESTING](docs/TESTING.md) (in inglese).
+
 ## File supportati
 
 | Tipo | Formati | Dimensione massima |
