@@ -56,6 +56,10 @@ The tiny models nearly meet the < 2 s target but break Japanese, one of the v0.1
 | Downloading models on first use | Needs the model module and the network; bundled models work offline today |
 | Pillow-SIMD or OpenCV for decoding | Pillow is already required and is the better-audited decoder surface |
 
+## Decision update (2026-11-03, step 8)
+
+Japanese and Chinese moved out of v0.1 scope on 2026-10-30 (ROADMAP.md), removing tiny's original blocker (it breaks Japanese). Re-measured anyway, on the actual reference machine (i5-10300H; the 7.4 s and 2.1 s figures above were from a machine ARCHITECTURE.md §25 had mislabelled as the reference machine): small models warm at **1.5 s, 347 MB, 0% character error** (`benchmarks/ocr_speed.py`) — already under the < 2 s target. With the target already met on verified reference hardware, and small keeping Japanese ready for v0.2 at no cost, there is no remaining reason to add a second model tier. **Final: small models only, no tiny tier.** ARCHITECTURE.md §25 closed.
+
 ## Consequences
 
 - `sugo[lite]` weighs about 170 MB installed, most of it OpenCV and ONNX Runtime.
