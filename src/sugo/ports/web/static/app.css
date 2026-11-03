@@ -13,6 +13,8 @@
   --good: #2f7d4f;
   --warn: #8a5a00;
   --error: #a3001b;
+  --logo: #d9482b;
+  --logo-fg: #ffffff;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.05), 0 4px 16px rgb(0 0 0 / 0.04);
   --radius: 12px;
 }
@@ -30,6 +32,8 @@
     --good: #6cc391;
     --warn: #e2b04a;
     --error: #ff7a8a;
+    --logo: #f08a5d;
+    --logo-fg: #161513;
     --shadow: none;
   }
 }
@@ -63,12 +67,9 @@ body {
   gap: 8px;
 }
 .brand { display: flex; align-items: center; gap: 10px; padding: 12px 0; }
-.logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #e8795f, var(--accent) 70%);
-}
+.logo { width: 32px; height: 32px; flex: none; }
+.logo-splat { fill: var(--logo); }
+.logo-s { fill: none; stroke: var(--logo-fg); stroke-width: 4.6; stroke-linecap: round; }
 .brand-name { font-size: 1.3rem; font-weight: 700; letter-spacing: 0.02em; }
 
 .tabs { display: flex; gap: 4px; }
