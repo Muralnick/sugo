@@ -1,6 +1,6 @@
 [project]
 name = "sugo"
-version = "0.0.0"
+version = "0.1.0a1"
 description = "Documents, reduced: local conversion of documents and screenshots into compact Markdown for LLMs and RAG."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -15,11 +15,9 @@ dependencies = [
     "typer>=0.27.3,<0.28",
 ]
 classifiers = [
-    "Development Status :: 1 - Planning",
+    "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3.12",
     "Typing :: Typed",
-    # Blocks accidental uploads until the v0.1 release (roadmap step 9).
-    "Private :: Do Not Upload",
 ]
 
 [project.scripts]
