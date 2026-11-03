@@ -75,7 +75,7 @@ Ed è veloce anche su un computer normale, non solo su uno nuovo: su un desktop 
 
 ## Stato
 
-**Alpha.** La prima versione, la v0.1, è in via di completamento: tutto ciò che segue funziona già installando dal codice sorgente. Il pacchetto su PyPI arriverà con la v0.1.
+**Alpha.** La prima versione, la v0.1, è in via di completamento: tutto ciò che segue funziona già installando dal codice sorgente, o da un'alpha manuale già su PyPI. La release v0.1 firmata e stabile (pipeline completa: SBOM, attestazioni Sigstore, PyPI Trusted Publishing) è ancora in preparazione.
 
 | Funziona oggi | In arrivo |
 |---|---|
@@ -96,6 +96,14 @@ Sugo richiede Python 3.12 e [uv](https://docs.astral.sh/uv/).
 ```bash
 uv tool install git+https://github.com/Muralnick/sugo
 ```
+
+C'è anche un'alpha su PyPI, pubblicata a mano in anticipo sulla release v0.1 firmata, con il nome `sugo-cli` (il nome "sugo" è già registrato su PyPI da un progetto estraneo e vuoto — è aperta una richiesta di trasferimento del nome):
+
+```bash
+uv tool install --prerelease allow "sugo-cli[lite]"
+```
+
+Il comando installato è comunque `sugo` in entrambi i casi.
 
 Converti un file e stampa il suo Markdown:
 
