@@ -148,11 +148,15 @@ def _int(value: str | None) -> int | None:
 
 
 def _descendants(element: Element, name: str) -> Iterator[Element]:
+    """The outermost ``w:name`` elements below, in order; alternate content as Office reads it."""
     stack = list(element)[::-1]
     while stack:
         current = stack.pop()
         if _is_w(current, name):
             yield current
+        elif _ns(current.tag) == _MC and local_name(current.tag) == "AlternateContent":
+            branch = chosen_content(current)
+            stack.extend([] if branch is None else list(branch)[::-1])
         else:
             stack.extend(list(current)[::-1])
 

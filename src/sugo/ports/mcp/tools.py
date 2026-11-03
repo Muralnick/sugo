@@ -86,6 +86,9 @@ class InvalidArgumentsError(ValueError):
 
 
 _PRIVATE_KEY = re.compile(MCP_PRIVATE_KEY_PATTERN, re.IGNORECASE)
+# Table cells join their lines with "<br>", which would split a wrapped key
+# header where the pattern expects white space.
+_LINE_BREAK_TAG = re.compile(r"<br\s*/?>", re.IGNORECASE)
 
 _READ_ONLY = {
     "readOnlyHint": True,
@@ -161,15 +164,19 @@ class ToolRunner:
         budget = arguments.max_tokens - MCP_WRAPPER_TOKENS - count_tokens(allowed.source)
         if budget < MCP_MIN_TOKENS // 2:
             raise InvalidArgumentsError("the path is too long for this max_tokens; raise it")
+        # Checked on the text itself in both modes: in a chunk's JSON a line
+        # break is written "\n" and would hide a wrapped key header.
+        _refuse_private_keys(conversion.markdown)
         if chunks:
             from sugo.exporters.jsonl import jsonl_lines
 
+            for chunk in conversion.chunks:
+                _refuse_private_keys(chunk.text, *chunk.heading_path)
             content = "".join(jsonl_lines(conversion.chunks))
             _refuse_private_keys(content)
             pages = paginate_lines(content.splitlines(keepends=True), budget)
         else:
             content = conversion.markdown
-            _refuse_private_keys(content)
             pages = paginate_text(content, budget)
         digest = hashlib.sha256(content.encode("utf-8", "surrogatepass")).hexdigest()
         index = 0
@@ -220,17 +227,18 @@ class ToolRunner:
         return [json.dumps({"source": allowed.source, **estimate_json(estimate)})]
 
 
-def _refuse_private_keys(content: str) -> None:
+def _refuse_private_keys(*texts: str) -> None:
     """Refuse a document whose text holds a PEM private key (ADR-053).
 
     Checked on the whole text before any part is returned, so every part of
-    such a document gets the same refusal.
+    such a document gets the same refusal. A ``<br>`` counts as white space.
 
     Raises:
         PortError: CONTENT_EXCLUDED.
     """
-    if _PRIVATE_KEY.search(content):
-        raise _content_excluded("This file holds a private key; Sugo never sends it to agents.")
+    for text in texts:
+        if _PRIVATE_KEY.search(_LINE_BREAK_TAG.sub(" ", text)):
+            raise _content_excluded("This file holds a private key; Sugo never sends it to agents.")
 
 
 def _content_excluded(message: str) -> PortError:

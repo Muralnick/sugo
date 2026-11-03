@@ -1,5 +1,6 @@
 """Tests for the section chunker: sections, size limit, splitting, ids and no lost text."""
 
+import time
 from collections.abc import Sequence
 
 from hypothesis import given, settings
@@ -208,6 +209,15 @@ def test_split_keeps_cjk_text_exactly() -> None:
     chunks = chunk([page(0, para("p", text))], max_tokens=40)
     assert len(chunks) > 1
     assert "".join(c.text for c in chunks) == text
+
+
+def test_long_run_of_punctuation_stays_fast() -> None:
+    # Was quadratic: 40 000 full stops took 11 s to split (security review).
+    text = "." * 100_000 + "a"
+    start = time.perf_counter()
+    chunks = chunk([page(0, para("p", text))], max_tokens=512)
+    assert time.perf_counter() - start < 2
+    assert len(chunks) > 1
 
 
 def test_split_keeps_line_breaks() -> None:

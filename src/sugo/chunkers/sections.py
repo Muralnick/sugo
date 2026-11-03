@@ -39,8 +39,10 @@ from sugo.serializers.markdown import render, render_widest
 # Where a paragraph may be cut: after a sentence end and the spaces after
 # it ("3.14" is not one), after CJK sentence punctuation (ideographic full
 # stop, fullwidth ! and ?, written without a space), or after a line break.
-# The match stays with the text before it.
-_SENTENCE_BREAK = re.compile(r"[.!?;:]+\s+|[\u3002\uff01\uff1f]+\s*|\n+")
+# The match stays with the text before it. A sentence end starts only at the
+# beginning of a run of punctuation and never gives characters back, so a
+# long run without a space after it costs linear time, not quadratic.
+_SENTENCE_BREAK = re.compile(r"(?<![.!?;:])[.!?;:]++\s+|[\u3002\uff01\uff1f]+\s*|\n+")
 # Where a run of text may be cut between words: after its spaces.
 _WORD_BREAK = re.compile(r"\s+")
 # Below this many tokens from the limit, the open chunk is counted exactly.

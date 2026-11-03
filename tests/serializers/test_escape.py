@@ -1,5 +1,7 @@
 """Tests for minimal Markdown escaping: structure is neutralised, plain text untouched."""
 
+import time
+
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
@@ -105,6 +107,14 @@ def test_heading_made_only_of_hashes_keeps_them() -> None:
 def test_backslashes_before_the_marker_stay_literal(text: str, expected: str) -> None:
     # An odd number of backslashes before "[" escapes it: the marker stays text.
     assert escape_line(text) == expected
+
+
+def test_long_run_of_backslashes_stays_fast() -> None:
+    # Was quadratic: 40 000 backslashes took 6 s (security review).
+    text = "a" + "\\" * 1_000_000 + "b"
+    start = time.perf_counter()
+    assert escape_line(text) == text
+    assert time.perf_counter() - start < 2
 
 
 def test_tab_indentation_is_measured_as_markdown_reads_it() -> None:

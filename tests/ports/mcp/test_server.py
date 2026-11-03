@@ -11,6 +11,7 @@ from typing import Any
 
 import pymupdf
 import pytest
+from tests.extractors.office.xlsx_files import row, xlsx
 from typer.testing import CliRunner
 
 from sugo.config.settings import Settings
@@ -200,6 +201,50 @@ def test_documents_holding_a_private_key_are_refused(
     error = json.loads(result["content"][0]["text"])["error"]
     assert error["code"] == "CONTENT_EXCLUDED"
     assert "setup" not in error["message"]
+
+
+@pytest.mark.parametrize("output", ["markdown", "chunks"])
+@pytest.mark.parametrize(
+    "header",
+    [
+        ["-----BEGIN OPENSSH PRIVATE", "KEY-----"],
+        ["-----BEGIN OPENSSH PRIVATE KEY", "-----"],
+    ],
+)
+def test_private_key_headers_split_across_lines_are_refused(
+    server: Server, root: Path, output: str, header: list[str]
+) -> None:
+    # A narrow column wraps the header; in chunks the break is JSON's "\n".
+    document = pymupdf.open()
+    page = document.new_page()
+    for line, text in enumerate(["Server setup notes", *header, "b3BlbnNzaC1rZXktdjEAAAAA"]):
+        page.insert_text((72, 72 + line * 14), text, fontsize=10)
+    (root / "setup.pdf").write_bytes(document.tobytes())
+    result = call(server, "convert_document", path="setup.pdf", output=output)["result"]
+    assert result["isError"] is True
+    assert json.loads(result["content"][0]["text"])["error"]["code"] == "CONTENT_EXCLUDED"
+
+
+@pytest.mark.parametrize("output", ["markdown", "chunks"])
+@pytest.mark.parametrize("value", ["-----BEGIN RSA PRIVATE\nKEY-----", "PRIVATE KEY\n-----"])
+def test_private_key_headers_split_in_a_table_cell_are_refused(
+    server: Server, root: Path, output: str, value: str
+) -> None:
+    # The table joins the cell's lines with "<br>".
+    (root / "servers.xlsx").write_bytes(xlsx(row("Name", "Value") + row("web", value)))
+    result = call(server, "convert_document", path="servers.xlsx", output=output)["result"]
+    assert result["isError"] is True
+    assert json.loads(result["content"][0]["text"])["error"]["code"] == "CONTENT_EXCLUDED"
+
+
+@pytest.mark.parametrize("output", ["markdown", "chunks"])
+def test_table_cells_without_a_private_key_are_returned(
+    server: Server, root: Path, output: str
+) -> None:
+    (root / "servers.xlsx").write_bytes(xlsx(row("Name", "Note") + row("web", "private\nkey -")))
+    result = call(server, "convert_document", path="servers.xlsx", output=output)["result"]
+    assert result.get("isError") is not True
+    assert "private<br>key -" in result["content"][1]["text"]
 
 
 @pytest.mark.parametrize(

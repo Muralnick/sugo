@@ -109,10 +109,11 @@ def _text_lines(text: str) -> list[str]:
     item above or become code.
     """
     lines = [line if line.strip() else "" for line in text.splitlines()]
-    while not lines[0]:
-        del lines[0]
-    while not lines[-1]:
-        del lines[-1]
+    # Found once and sliced, rather than deleted from the front one at a time,
+    # so a long run of leading or trailing blank lines costs linear time.
+    first = next(n for n, line in enumerate(lines) if line)
+    last = len(lines) - 1 - next(n for n, line in enumerate(reversed(lines)) if line)
+    lines = lines[first : last + 1]
     return [line.lstrip() if n == 0 or not lines[n - 1] else line for n, line in enumerate(lines)]
 
 
