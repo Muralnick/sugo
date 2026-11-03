@@ -23,7 +23,7 @@ from typing import IO, Any
 from pydantic import ValidationError
 
 from sugo.config.settings import Settings
-from sugo.core.constants import MCP_MAX_MESSAGE_BYTES
+from sugo.core.constants import DISTRIBUTION_NAME, MCP_MAX_MESSAGE_BYTES
 from sugo.ports.errors import PortError, from_exception
 from sugo.ports.mcp.access import Roots
 from sugo.ports.mcp.tools import TOOLS, InvalidArgumentsError, ToolRunner, tool_list
@@ -194,7 +194,7 @@ def _initialize(params: dict[str, Any]) -> dict[str, Any]:
     return {
         "protocolVersion": chosen,
         "capabilities": {"tools": {"listChanged": False}},
-        "serverInfo": {"name": "sugo", "version": version("sugo")},
+        "serverInfo": {"name": "sugo", "version": version(DISTRIBUTION_NAME)},
         "instructions": _INSTRUCTIONS,
     }
 

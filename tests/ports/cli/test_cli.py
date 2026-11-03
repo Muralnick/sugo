@@ -13,6 +13,7 @@ from typer.testing import CliRunner, Result
 
 from sugo.config.settings import Settings
 from sugo.core import pipeline
+from sugo.core.constants import DISTRIBUTION_NAME
 from sugo.core.pipeline import Conversion, InputKind
 from sugo.extractors.pymupdf.extract import PdfTooLargeError
 from sugo.ports.cli import app as cli
@@ -78,7 +79,7 @@ def converted(**changes: object) -> Conversion:
 
 
 def test_version_and_help() -> None:
-    assert run("--version").stdout.strip() == package_version("sugo")
+    assert run("--version").stdout.strip() == package_version(DISTRIBUTION_NAME)
     help_text = run("--help").stdout
     for command in ("convert", "stats", "clip", "doctor"):
         assert command in help_text
@@ -239,7 +240,7 @@ def test_missing_lite_level_exits_with_5(monkeypatch: pytest.MonkeyPatch) -> Non
     result = run("report.pdf")
     assert result.exit_code == ExitCode.MISSING
     assert "LEVEL_MISSING" in result.stderr
-    assert 'pip install "sugo[lite]"' in result.stderr
+    assert f'pip install "{DISTRIBUTION_NAME}[lite]"' in result.stderr
     as_json = run("report.pdf", "--json")
     assert json.loads(as_json.stderr)["error"]["details"] == {"missing": ["rapidocr"]}
     assert as_json.stdout == ""

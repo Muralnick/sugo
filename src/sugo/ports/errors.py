@@ -11,7 +11,7 @@ from enum import IntEnum
 from typing import Any
 
 from sugo import i18n
-from sugo.core.constants import MAX_INPUT_BYTES
+from sugo.core.constants import DISTRIBUTION_NAME, MAX_INPUT_BYTES
 from sugo.i18n import N_
 from sugo.i18n import gettext as _
 
@@ -94,7 +94,7 @@ def level_missing(packages: list[str]) -> PortError:
         code="LEVEL_MISSING",
         message=_("The lite level is not installed."),
         exit_code=ExitCode.MISSING,
-        hint='pip install "sugo[lite]"',
+        hint=f'pip install "{DISTRIBUTION_NAME}[lite]"',
         details={"missing": packages},
     )
 

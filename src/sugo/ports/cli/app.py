@@ -27,7 +27,12 @@ from rich.table import Table
 from rich.text import Text
 
 from sugo import i18n
-from sugo.core.constants import CHUNK_MAX_TOKENS, CHUNK_MAX_TOKENS_LIMIT, CHUNK_MIN_TOKENS
+from sugo.core.constants import (
+    CHUNK_MAX_TOKENS,
+    CHUNK_MAX_TOKENS_LIMIT,
+    CHUNK_MIN_TOKENS,
+    DISTRIBUTION_NAME,
+)
 from sugo.i18n import N_, ngettext
 from sugo.i18n import gettext as _
 from sugo.ports.cache import page_cache as _page_cache
@@ -114,7 +119,7 @@ def _ui_language(args: list[str]) -> str:
 def _show_version(value: bool) -> None:
     # Eager: runs while options are parsed, before a command is required.
     if value:
-        _write(version("sugo") + "\n")
+        _write(version(DISTRIBUTION_NAME) + "\n")
         raise typer.Exit()
 
 

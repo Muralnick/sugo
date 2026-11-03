@@ -1,5 +1,5 @@
 [project]
-name = "sugo"
+name = "sugo-cli"
 version = "0.1.0a1"
 description = "Documents, reduced: local conversion of documents and screenshots into compact Markdown for LLMs and RAG."
 readme = "README.md"
@@ -39,7 +39,7 @@ lite = [
 # Development tools only; see ADR-035. Exact versions and hashes live in uv.lock.
 dev = [
     # Tests exercise every level, so the dev environment installs its extras.
-    "sugo[lite]",
+    "sugo-cli[lite]",
     "hypothesis>=6.169.1",
     "import-linter>=2.15",
     "mypy>=2.4.0",
@@ -62,6 +62,11 @@ exclude-newer = "14 days"
 [tool.uv.workspace]
 # Official packs, each a separate distribution (ADR-032).
 members = ["packs/*"]
+
+[tool.uv.build-backend]
+# The distribution is "sugo-cli" (ADR-033 amendment: "sugo" is squatted on
+# PyPI), but the importable package and the `sugo` command stay as they are.
+module-name = "sugo"
 
 # --- ruff -----------------------------------------------------------------
 

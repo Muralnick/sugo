@@ -471,8 +471,8 @@ msgstr "sconosciuto"
 msgid "level lite"
 msgstr "livello lite"
 
-msgid "missing {packages}: pip install \"sugo[lite]\""
-msgstr "mancano {packages}: pip install \"sugo[lite]\""
+msgid "missing {packages}: pip install \"{distribution}[lite]\""
+msgstr "mancano {packages}: pip install \"{distribution}[lite]\""
 
 msgid "not installed"
 msgstr "non installato"
