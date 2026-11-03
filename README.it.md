@@ -63,7 +63,15 @@ Details: https://acme.example/report
 
 L'intestazione resta una volta sola invece che su ogni pagina; i numeri di pagina, il "Confidential" ripetuto e i parametri di tracciamento spariscono; il testo è lo stesso. `sugo stats` misura la differenza: **da 180 a 97 token, il 46% in meno** su questo piccolo esempio. Ogni rimozione viene registrata con il cleaner che l'ha fatta e il motivo, così puoi sempre controllare cosa è stato tolto. Il testo illeggibile viene segnato come illeggibile, mai indovinato.
 
-Su un corpus di prova in cinque lingue — relazioni con intestazioni ripetute e numeri di pagina, un vero regolamento UE preso da EUR-Lex, e screenshot di chat e codice — non si perde nulla di sostanziale, e mandare il Markdown di uno screenshot invece dell'immagine costa il 94-98% in meno con le formule di Claude, Gemini e OpenAI (dettagli in [TESTING](docs/TESTING.md)).
+Lo stesso vale su un corpus di prova in cinque lingue, senza perdere nulla di sostanziale in nessun documento:
+
+| Documento | Token risparmiati |
+|---|---|
+| Relazione con intestazione, piè di pagina e numeri di pagina ripetuti | 33–38% |
+| Screenshot di chat o codice, Markdown invece dell'immagine | 94–98% in meno (Claude, Gemini, OpenAI) |
+| Un vero regolamento UE da EUR-Lex, testo legale per lo più sostanziale | 2,9–3,5% |
+
+Ed è veloce anche su un computer normale, non solo su uno nuovo: su un desktop del 2010 con 2 core e senza GPU, un PDF di 100 pagine si converte in 3,6 s e uno screenshot di telefono in 13,7 s (numeri completi in [TESTING](docs/TESTING.md)).
 
 ## Stato
 

@@ -63,7 +63,15 @@ Details: https://acme.example/report
 
 The header is kept once instead of on every page; the page numbers, the repeated "Confidential" and the tracking parameters are gone; the text is the same. `sugo stats` measures the difference: **180 → 97 tokens, 46% saved** on this small example. Every removal is recorded with the cleaner that made it and the reason, so you can always check what was dropped. Text that cannot be read is marked as illegible, never guessed.
 
-Across a benchmark corpus in five languages — reports with running headers and page numbers, a real EU regulation from EUR-Lex, and chat and code screenshots — nothing substantive was lost, and sending a screenshot's Markdown instead of the image itself cost 94–98% less across Claude, Gemini and OpenAI (details in [TESTING](docs/TESTING.md)).
+The same holds across a benchmark corpus in five languages, with no content lost on any document:
+
+| Document | Tokens saved |
+|---|---|
+| Report with a running header, footer and page numbers | 33–38% |
+| Chat or code screenshot, Markdown vs. sending the image itself | 94–98% cheaper (Claude, Gemini, OpenAI) |
+| A real EU regulation from EUR-Lex, mostly substantive legal text | 2.9–3.5% |
+
+And it stays fast on an ordinary computer, not just a new one: on a 2010 desktop with 2 cores and no GPU, a 100-page PDF converts in 3.6 s and a phone screenshot in 13.7 s (full numbers in [TESTING](docs/TESTING.md)).
 
 ## Status
 
