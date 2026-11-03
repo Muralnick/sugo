@@ -195,6 +195,9 @@ def test_page_style_and_script_are_served_with_strict_headers(server: WebServer)
     assert script.headers["content-type"] == "text/javascript; charset=utf-8"
     assert script.body == (STATIC / "app.js").read_bytes()
     assert request(server, path="/app.css").headers["content-type"] == "text/css; charset=utf-8"
+    icon = request(server, path="/favicon.svg")
+    assert icon.headers["content-type"] == "image/svg+xml"
+    assert icon.body == (STATIC / "favicon.svg").read_bytes()
 
 
 @pytest.mark.parametrize(
@@ -210,6 +213,14 @@ def test_the_page_has_no_inline_script_nor_external_resource() -> None:
     assert re.findall(r"<script[^>]*>", page) == ['<script src="/app.js" defer>']
     assert "http" not in page.lower()  # Nothing from outside: no CDN, font or analytics.
     assert re.search(r"\son[a-z]+\s*=", page) is None  # No inline event handlers.
+
+
+def test_the_icon_is_a_plain_drawing() -> None:
+    # An SVG file can carry scripts, links and styles; the icon has none of them.
+    icon = (STATIC / "favicon.svg").read_text(encoding="utf-8").lower()
+    for part in ("<script", "<style", "<a ", "<foreignobject", "<image", "href"):
+        assert part not in icon
+    assert re.search(r"\son[a-z]+\s*=", icon) is None  # No event handlers.
 
 
 def test_the_script_never_inserts_html() -> None:

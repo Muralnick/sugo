@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/sugo-logo-dark.svg">
+  <img src="docs/brand/sugo-logo.svg" alt="" width="96" height="96">
+</picture>
+
 # Sugo
 
 **Documents, reduced.** Feed your LLM the sauce, not the water.
