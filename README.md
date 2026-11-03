@@ -75,7 +75,7 @@ And it stays fast on an ordinary computer, not just a new one: on a 2010 desktop
 
 ## Status
 
-**Alpha.** The first release, v0.1, is being finished: everything below works today from a source install. The PyPI package comes with v0.1.
+**Alpha.** The first release, v0.1, is being finished: everything below works today from a source install, or from an early manual alpha already on PyPI. The signed, stable v0.1 release (full supply-chain pipeline: SBOM, Sigstore attestations, PyPI Trusted Publishing) is still being prepared.
 
 | Works today | Coming next |
 |---|---|
@@ -96,6 +96,14 @@ Sugo needs Python 3.12 and [uv](https://docs.astral.sh/uv/).
 ```bash
 uv tool install git+https://github.com/Muralnick/sugo
 ```
+
+An early alpha is also on PyPI, published by hand ahead of the signed v0.1 release, under the name `sugo-cli` (`sugo` itself is already registered on PyPI by an unrelated, empty project — a name transfer request is open):
+
+```bash
+uv tool install --prerelease allow "sugo-cli[lite]"
+```
+
+The installed command is `sugo` either way.
 
 Convert a file and print its Markdown:
 
