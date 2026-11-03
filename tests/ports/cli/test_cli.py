@@ -1,6 +1,7 @@
 """Tests for the sugo command: output streams, exit codes, files written and error reports."""
 
 import json
+from importlib.metadata import version as package_version
 from io import BytesIO
 from pathlib import Path
 from types import MappingProxyType
@@ -77,7 +78,7 @@ def converted(**changes: object) -> Conversion:
 
 
 def test_version_and_help() -> None:
-    assert run("--version").stdout.strip() == "0.0.0"
+    assert run("--version").stdout.strip() == package_version("sugo")
     help_text = run("--help").stdout
     for command in ("convert", "stats", "clip", "doctor"):
         assert command in help_text
