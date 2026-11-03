@@ -74,8 +74,20 @@ Measured so far (targets unchanged until a decision is recorded):
 |---|---|---|
 | Dense phone screenshot (30 lines) → text, warm, `lite` small models | 7.4 s, 411 MB peak, 0% character errors (October 2026) | `benchmarks/ocr_speed.py` |
 | Same, on a 2010 desktop (i5-650: 2 cores, 4 threads, no AVX; 8 GB) | 13.7 s, 411 MB peak, 0% character errors (2026-11-03) | `benchmarks/ocr_speed.py` |
-| Native PDF, 100 generated pages with header, footer and page numbers, `--no-cache`, same desktop | 3.6 s including startup (about 28 pages/s), 98 MB peak (2026-11-03) | `/usr/bin/time -f "%e s %M KB" sugo convert --no-cache` |
-| CLI startup (`sugo --help`), same desktop | 0.47 s median of 5 (2026-11-03) | shell timing |
+| Same, on the reference machine (i5-10300H) | 1.5 s, 347 MB peak, 0% character errors (2026-11-03) | `benchmarks/ocr_speed.py` |
+| Native PDF, 100 generated pages with header, footer and page numbers, `--no-cache`, same 2010 desktop | 3.6 s including startup (about 28 pages/s), 98 MB peak (2026-11-03) | `/usr/bin/time -f "%e s %M KB" sugo convert --no-cache` |
+| CLI startup (`sugo --help`), same 2010 desktop | 0.47 s median of 5 (2026-11-03) | shell timing |
+
+Step 8 corpus benchmark, on the reference machine (i5-10300H), `lite`, 31 documents in Italian, Spanish, French, German and English — synthetic PDFs, an XLSX table, chat and code screenshots, and the real text of EU Regulation 261/2004 from EUR-Lex (2026-11-03, `benchmarks/corpus_bench.py`; full report in `benchmarks/results/`):
+
+| Document | Tokens saved | Content lost | Median time |
+|---|---|---|---|
+| Native PDF report (5 pages: running header, footer clause, page numbers) | 33–38% (avg 35%) | None | ~1.0 s |
+| EUR-Lex Regulation 261/2004 (12–14 pages of real legal text) | 2.9–3.5% (avg 3.2%) — mostly substantive text, little page furniture | None | ~1.2–1.3 s |
+| Chat or code screenshot, Markdown vs sending the image itself | 94–98.5% cheaper, across Claude, Gemini and OpenAI's own formulas | 0–7.1% OCR character error on accented text (it/es/fr); 0% on de/en | ~1.0 s |
+| Whole 31-document run | — | — | 372 MB peak RAM |
+
+The EUR-Lex sample is fetched separately (its text, not Sugo's typeset PDF, is the original: see `benchmarks/corpus_eur_lex.py` and the manifest it reads) and kept outside the repository with its licence and checksums (this section, above); `benchmarks/corpus_bench.py` runs the synthetic corpus alone when it is absent.
 
 ## Logging and diagnostics
 
