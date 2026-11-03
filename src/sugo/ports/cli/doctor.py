@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from importlib.metadata import PackageNotFoundError, version
 
+from sugo.core.constants import DISTRIBUTION_NAME
 from sugo.i18n import N_
 from sugo.i18n import gettext as _
 from sugo.storage.page_cache import CACHE_FILE_NAME
@@ -60,7 +61,7 @@ def missing_lite_packages() -> list[str]:
 def run_checks() -> list[Check]:
     """Run every check, in display order."""
     checks = [
-        Check("sugo", Status.OK, version("sugo")),
+        Check("sugo", Status.OK, version(DISTRIBUTION_NAME)),
         Check(
             "python",
             Status.OK,
@@ -76,8 +77,8 @@ def run_checks() -> list[Check]:
             Check(
                 N_("level lite"),
                 Status.ERROR,
-                _('missing {packages}: pip install "sugo[lite]"').format(
-                    packages=", ".join(missing)
+                _('missing {packages}: pip install "{distribution}[lite]"').format(
+                    packages=", ".join(missing), distribution=DISTRIBUTION_NAME
                 ),
             )
         )

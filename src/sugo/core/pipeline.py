@@ -40,6 +40,7 @@ from sugo.cleaners.ui_chrome import UiChromeCleaner
 from sugo.core.chunks import Chunk
 from sugo.core.constants import (
     CHUNK_MIN_TOKENS,
+    DISTRIBUTION_NAME,
     MAX_INPUT_BYTES,
 )
 from sugo.core.decisions import InvalidDecisionError, Proposal, apply_decisions
@@ -359,7 +360,7 @@ class _Job:
         # A cleaned page depends on every page of the document, through the
         # statistics: if any page reads differently, all are cleaned again.
         cleaning = f"{self._options.cleaning()};{stats.digest()};{lexicon.digest()}"
-        sugo_version = version("sugo")
+        sugo_version = version(DISTRIBUTION_NAME)
         config_hash = self._options.config_hash()
         chunker = (
             None
