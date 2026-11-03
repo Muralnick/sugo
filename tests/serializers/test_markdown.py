@@ -2,6 +2,7 @@
 the invariants that nothing readable is lost and nothing is invented."""
 
 import re
+import time
 from io import BytesIO
 
 import pytest
@@ -205,6 +206,13 @@ class TestLayout:
 
     def test_code_ending_with_a_newline_gets_no_empty_line(self) -> None:
         assert render([block(BlockType.CODE, "x = 1\n")]) == "```\nx = 1\n```"
+
+    def test_long_run_of_leading_blank_lines_stays_fast(self) -> None:
+        # Was quadratic: deleting blank lines from the front one at a time (security review).
+        text = "\n" * 1_000_000 + "x"
+        start = time.perf_counter()
+        assert render([block(BlockType.PARAGRAPH, text)]) == "x"
+        assert time.perf_counter() - start < 2
 
 
 _TEXT_TYPES = [

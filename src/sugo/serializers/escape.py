@@ -26,8 +26,10 @@ _SPEAKER = re.compile(rf"^({'|'.join(side.value for side in ChatSide)}):")
 # A heading ending with "#"s, or made only of them, would lose them as a closer.
 _HEADING_CLOSER = re.compile(r"(^|\s)(#+)(\s*)$")
 # Backslashes already in the text before the marker are doubled, so they stay
-# literal and the marker's own backslash still escapes it.
-_MARKER = re.compile(rf"(\\*){re.escape(ILLEGIBLE_MARKER)}")
+# literal and the marker's own backslash still escapes it. A match starts only
+# at the beginning of a run of backslashes and never gives them back, so a
+# long run without the marker costs linear time, not quadratic.
+_MARKER = re.compile(rf"(?<!\\)(\\*+){re.escape(ILLEGIBLE_MARKER)}")
 # C0 controls but tab and line feed, DEL and C1. The line-breaking ones (CR,
 # VT, FF, FS, GS, RS, NEL) become line feeds; the rest are dropped.
 _LINE_BREAKS = frozenset({0x0D, 0x0B, 0x0C, 0x1C, 0x1D, 0x1E, 0x85})

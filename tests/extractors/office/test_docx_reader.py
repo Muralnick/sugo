@@ -2,6 +2,7 @@
 
 import io
 import zipfile
+from collections.abc import Callable
 
 import pytest
 from tests.extractors.office.docx_files import docx, p
@@ -203,6 +204,85 @@ def test_alternate_content_is_chosen_as_office_chooses_it(declared: str, shown: 
         + "</w:txbxContent></w:pict></mc:Fallback></mc:AlternateContent></w:r></w:p>"
     )
     assert text(body) == shown
+
+
+def cite(kind: str) -> str:
+    return f'<w:p><w:r><w:t>Body</w:t></w:r><w:r><w:{kind}Reference w:id="2"/></w:r></w:p>'
+
+
+def shape(content: str) -> str:
+    """A WordprocessingML shape holding a text box."""
+    return f"<wps:wsp><wps:txbx><w:txbxContent>{p(content)}</w:txbxContent></wps:txbx></wps:wsp>"
+
+
+_DRAWING = (
+    'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" '
+    'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"'
+)
+# Alternate content outside a paragraph's runs: the body and parts ("{}" marks
+# where it stands) and what each of its branches holds there.
+PLACES: dict[str, tuple[str, dict[str, str], Callable[[str], str]]] = {
+    "table cell": ("<w:tbl><w:tr><w:tc>{}</w:tc></w:tr></w:tbl>", {}, p),
+    "footnote": (cite("footnote"), {"footnotes": '<w:footnote w:id="2">{}</w:footnote>'}, p),
+    "endnote": (cite("endnote"), {"endnotes": '<w:endnote w:id="2">{}</w:endnote>'}, p),
+    "comment": (cite("comment"), {"comments": '<w:comment w:id="2">{}</w:comment>'}, p),
+    "header": (
+        p("Body") + '<w:sectPr><w:headerReference r:id="pheader"/></w:sectPr>',
+        {"header": "{}"},
+        p,
+    ),
+    "footer": (
+        p("Body") + '<w:sectPr><w:footerReference r:id="pfooter"/></w:sectPr>',
+        {"footer": "{}"},
+        p,
+    ),
+    "text box in a drawing": (
+        f"<w:p><w:r><w:drawing><wp:anchor {_DRAWING}><a:graphic><a:graphicData>"
+        "{}</a:graphicData></a:graphic></wp:anchor></w:drawing></w:r></w:p>",
+        {},
+        shape,
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("declared", "shown", "unread"),
+    [
+        (
+            'xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"',
+            "chosen",
+            "fallback",
+        ),
+        ('xmlns:wps="urn:attacker"', "fallback", "chosen"),
+    ],
+)
+@pytest.mark.parametrize("place", sorted(PLACES))
+def test_alternate_content_outside_runs_is_read_as_office_reads_it(
+    place: str, declared: str, shown: str, unread: str
+) -> None:
+    mc = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+    body, parts, branch = PLACES[place]
+    alternate = (
+        f'<mc:AlternateContent xmlns:mc="{mc}" {declared}>'
+        f'<mc:Choice Requires="wps">{branch("chosen")}</mc:Choice>'
+        f"<mc:Fallback>{branch('fallback')}</mc:Fallback></mc:AlternateContent>"
+    )
+    found = pages(
+        body.format(alternate),
+        parts={name: part.format(alternate) for name, part in parts.items()},
+    )
+    # Every block's text, hidden or not, and every table cell's.
+    read = " ".join(
+        piece
+        for page in found
+        for block in page.blocks
+        for piece in (
+            block.text,
+            *(cell.text for cell in (block.table.cells if block.table else ())),
+        )
+    )
+    assert shown in read
+    assert unread not in read
 
 
 def test_word_documents_are_recognised_without_parsing_xml() -> None:

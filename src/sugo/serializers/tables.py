@@ -30,8 +30,10 @@ from sugo.serializers.escape import drop_controls, escape_line_start, escape_mar
 Grid = list[list[str]]
 
 # Backslashes ending a cell or before a "|" would escape the pipe after them
-# and merge two cells; doubled, they stay literal.
-_PIPE_BACKSLASHES = re.compile(r"\\+(?=\||$)")
+# and merge two cells; doubled, they stay literal. A match starts only at the
+# beginning of a run of backslashes and never gives them back, so a long run
+# without a "|" or end after it costs linear time, not quadratic.
+_PIPE_BACKSLASHES = re.compile(r"(?<!\\)\\++(?=\||$)")
 # A row of dash cells (":--", "-:") reads as a delimiter row and would turn
 # the row above it into a header.
 _DELIMITER_CELL = re.compile(r":?-+:?")

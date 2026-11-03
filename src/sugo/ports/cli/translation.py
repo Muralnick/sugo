@@ -26,6 +26,13 @@ from sugo import i18n
 from sugo.i18n import N_
 from sugo.i18n import gettext as _
 
+# Typer forces its error and help console into terminal mode (ANSI escapes,
+# including ESC) under GITHUB_ACTIONS, FORCE_COLOR or PY_COLORS, even when
+# output is not a terminal at all (piped, redirected, or Click's test runner).
+# That bypasses this CLI's own policy (colours auto-detected, NO_COLOR
+# honoured; module docstring) and could put raw escapes in piped output.
+typer.rich_utils.FORCE_TERMINAL = None
+
 # Typer's constants translated once, at import: their English source text.
 TYPER_CONSTANTS = {
     "DEPRECATED_STRING": "(deprecated) ",

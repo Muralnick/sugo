@@ -1,5 +1,7 @@
 """Tests for adaptive tables: the cheapest format that keeps the structure (ADR-002)."""
 
+import time
+
 from sugo.core.models import Table, TableCell
 from sugo.serializers.tables import render_table
 
@@ -125,3 +127,10 @@ class TestCellEncoding:
     def test_value_ending_with_backslash_skips_row_sentences(self) -> None:
         t = table([["Path", "Owner"], ["C:\\", "root"]], header_rows=1)
         assert render_table(t, length) == "Path|Owner\n-|-\nC:\\\\|root"
+
+    def test_long_run_of_backslashes_stays_fast(self) -> None:
+        # Was quadratic: a long backslash run not followed by "|" or end (security review).
+        t = table([["\\" * 1_000_000 + "x", "b"]])
+        start = time.perf_counter()
+        assert render_table(t, flat) == "\\" * 1_000_000 + "x|b"
+        assert time.perf_counter() - start < 2

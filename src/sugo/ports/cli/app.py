@@ -53,6 +53,12 @@ _stdout = Console(markup=False, highlight=False)
 _STATUS_STYLES = {Status.OK: "green", Status.WARNING: "yellow", Status.ERROR: "bold red"}
 _STATUS_NAMES = {Status.OK: N_("ok"), Status.WARNING: N_("warning"), Status.ERROR: N_("error")}
 _KIND_NAMES = {"pdf": N_("pdf"), "image": N_("image")}
+# C0 controls, DEL and C1. A file name can hold ESC, which a terminal would run
+# as an escape sequence (CWE-150, ADR-048). Messages show them escaped, as
+# \x1b, so the user can still tell which file it is; JSON escapes them as
+# \u009b, so programs read the name unchanged. json.dumps escapes C0 itself.
+_SHOWN_CONTROLS = {code: f"\\x{code:02x}" for code in (*range(0x00, 0x20), *range(0x7F, 0xA0))}
+_JSON_CONTROLS = {code: f"\\u{code:04x}" for code in range(0x7F, 0xA0)}
 
 
 class _DefaultConvert(TranslatedGroup):
@@ -254,7 +260,9 @@ def _targets(files: list[Path], output: Path, *, chunks: bool) -> dict[Path, lis
         if key in seen and seen[key].resolve() != path.resolve():
             raise typer.BadParameter(
                 _("{first} and {second} would both write {name}.md").format(
-                    first=seen[key].as_posix(), second=path.as_posix(), name=path.stem
+                    first=_shown(seen[key].as_posix()),
+                    second=_shown(path.as_posix()),
+                    name=_shown(path.stem),
                 ),
                 param_hint="FILES",
             )
@@ -262,7 +270,7 @@ def _targets(files: list[Path], output: Path, *, chunks: bool) -> dict[Path, lis
         names = [output / f"{path.stem}.md"] + ([output / f"{path.stem}.jsonl"] if chunks else [])
         if any(name.resolve() in inputs for name in names):
             raise typer.BadParameter(
-                _("writing {name}.md would overwrite an input file").format(name=path.stem),
+                _("writing {name}.md would overwrite an input file").format(name=_shown(path.stem)),
                 param_hint="'-o'",
             )
         targets[path] = names
@@ -299,7 +307,7 @@ def _print_result(conversion: "Conversion", *, chunks: bool, front_matter: bool)
         from sugo.exporters.jsonl import jsonl_lines
 
         for line in jsonl_lines(conversion.chunks):
-            _write(line)
+            _write(line.translate(_JSON_CONTROLS))
         return
     if front_matter:
         from sugo.exporters.markdown import front_matter as render_front_matter
@@ -391,7 +399,7 @@ def stats_command(
 def _print_stats(source: str, estimate: "SavingsEstimate") -> None:
     pages = ngettext("{count} page", "{count} pages", estimate.pages).format(count=estimate.pages)
     kind = i18n.gettext(_KIND_NAMES.get(estimate.kind.value, estimate.kind.value))
-    _stdout.print(Text(f"{source}: {kind}, {pages}"))
+    _stdout.print(Text(f"{_shown(source)}: {kind}, {pages}"))
     text = estimate.text
     summary = _("Text before and after cleaning: {before} -> {after} tokens ({saved:.1f}% saved)")
     _stdout.print(
@@ -614,8 +622,13 @@ def _english_for_json(json_output: bool) -> None:
         use_language("en")
 
 
+def _shown(name: str) -> str:
+    """A file name as messages show it: controls escaped, ordinary names unchanged."""
+    return name.translate(_SHOWN_CONTROLS)
+
+
 def _converting(source: str) -> str:
-    return _("Converting {source}").format(source=source)
+    return _("Converting {source}").format(source=_shown(source))
 
 
 def _warn(warnings: tuple[str, ...]) -> None:
@@ -647,7 +660,10 @@ def _failures(json_output: bool) -> Iterator[None]:
         if error is None:
             raise
         if json_output:
-            _stderr.file.write(json.dumps({"error": error.as_json()}, ensure_ascii=False) + "\n")
+            _stderr.file.write(
+                json.dumps({"error": error.as_json()}, ensure_ascii=False).translate(_JSON_CONTROLS)
+                + "\n"
+            )
         else:
             _say_error(error)
         raise typer.Exit(error.exit_code) from None
@@ -715,8 +731,9 @@ def _failed_json(source: str, error: PortError) -> dict[str, Any]:
 
 
 def _say_converted(source: str, conversion: "Conversion", written: list[str] | None) -> None:
+    source = _shown(source)
     if written is not None:
-        _stderr.print(Text(f"{source} -> {', '.join(written)}"))
+        _stderr.print(Text(f"{source} -> {', '.join(map(_shown, written))}"))
     if conversion.failed_pages:
         pages = ", ".join(str(page) for page in conversion.failed_pages)
         message = ngettext(
@@ -730,7 +747,7 @@ def _say_converted(source: str, conversion: "Conversion", written: list[str] | N
 def _say_error(error: PortError, source: str | None = None) -> None:
     line = Text()
     if source is not None:
-        line.append(f"{source}: ")
+        line.append(f"{_shown(source)}: ")
     line.append(_("error"), style="bold red")
     line.append(f" {error.code}: {error.message}")
     _stderr.print(line)
@@ -744,4 +761,4 @@ def _write(text: str) -> None:
 
 
 def _write_json(value: object) -> None:
-    _write(json.dumps(value, ensure_ascii=False) + "\n")
+    _write(json.dumps(value, ensure_ascii=False).translate(_JSON_CONTROLS) + "\n")
