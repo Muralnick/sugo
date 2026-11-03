@@ -73,6 +73,9 @@ Measured so far (targets unchanged until a decision is recorded):
 | Operation | Measured | Script |
 |---|---|---|
 | Dense phone screenshot (30 lines) → text, warm, `lite` small models | 7.4 s, 411 MB peak, 0% character errors (October 2026) | `benchmarks/ocr_speed.py` |
+| Same, on a 2010 desktop (i5-650: 2 cores, 4 threads, no AVX; 8 GB) | 13.7 s, 411 MB peak, 0% character errors (2026-11-03) | `benchmarks/ocr_speed.py` |
+| Native PDF, 100 generated pages with header, footer and page numbers, `--no-cache`, same desktop | 3.6 s including startup (about 28 pages/s), 98 MB peak (2026-11-03) | `/usr/bin/time -f "%e s %M KB" sugo convert --no-cache` |
+| CLI startup (`sugo --help`), same desktop | 0.47 s median of 5 (2026-11-03) | shell timing |
 
 ## Logging and diagnostics
 
