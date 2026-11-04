@@ -40,6 +40,7 @@ lite = [
 dev = [
     # Tests exercise every level, so the dev environment installs its extras.
     "sugo-cli[lite]",
+    "cyclonedx-bom>=7.5.0",
     "hypothesis>=6.169.1",
     "import-linter>=2.15",
     "mypy>=2.4.0",

@@ -16,6 +16,12 @@ still change, with notice, before 1.0).
   re-converts the file with the receipt's own stored settings and reports
   what differs, by block id only, never the text. Published schema:
   `schemas/receipt-v1.schema.json`.
+- Release pipeline (ADR-033, roadmap step 9, PyPI only for now): on a
+  `vX.Y.Z` tag push, builds the sdist and wheel twice to check they're
+  reproducible, generates a CycloneDX SBOM (including the bundled OCR
+  models and the tokenizer vocabulary), attests build provenance via
+  Sigstore, and publishes to PyPI over OIDC Trusted Publishing after a
+  manual approval gate.
 
 ## [0.1.0a1] - 2026-11-03
 
