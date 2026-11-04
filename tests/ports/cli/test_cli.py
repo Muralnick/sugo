@@ -335,6 +335,21 @@ def test_verify_reports_a_tampered_receipt_without_quoting_text(workdir: Path) -
     assert "ACME" not in json.dumps(as_json)
 
 
+@pytest.mark.usefixtures("workdir")
+def test_verify_escapes_a_hostile_block_id_from_the_receipt(workdir: Path) -> None:
+    # A receipt can come from someone else (ADR-056): a crafted block id must
+    # not run as a terminal escape sequence (ADR-048, CWE-150), like a file name.
+    run("report.pdf", "-o", "out", "--receipt")
+    receipt_path = workdir / "out" / "report.receipt.json"
+    tampered = json.loads(receipt_path.read_text(encoding="utf-8"))
+    tampered["removed"][0]["block_id"] = "\x1b[31mRED\x1b[0m"
+    receipt_path.write_text(json.dumps(tampered), encoding="utf-8")
+    result = run("verify", "report.pdf", "out/report.receipt.json")
+    assert result.exit_code == ExitCode.ERROR
+    assert "\x1b" not in result.stdout
+    assert "\\x1b[31mRED\\x1b[0m" in result.stdout
+
+
 # --- stats --------------------------------------------------------------------
 
 

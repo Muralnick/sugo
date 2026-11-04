@@ -764,7 +764,9 @@ def _print_verify_result(source: str, differences: list[dict[str, Any]]) -> None
             line = _("  {category}, page {page}, block {block_id}: {kind}").format(
                 category=difference["category"],
                 page=difference["page"],
-                block_id=difference["block_id"],
+                # block_id comes from the receipt, which can come from someone
+                # else (ADR-056): escaped like any file name (ADR-048, CWE-150).
+                block_id=_shown(str(difference["block_id"])),
                 kind=difference["kind"],
             )
         _stdout.print(Text(line))
