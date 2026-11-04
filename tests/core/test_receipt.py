@@ -4,15 +4,15 @@ from sugo.core.models import BlockType, EditKind
 from sugo.core.receipt import EditRecord, Receipt, RemovalRecord, diff_receipts
 
 
-def receipt(**removed_overrides: object) -> Receipt:
-    base = {
-        "page": 1,
-        "block_id": "b1",
-        "block_type": BlockType.PARAGRAPH,
-        "removed_by": "header_footer",
-        "reason": "repeated on every page",
-        "text": "ACME Corp",
-    }
+def receipt(*, block_id: str = "b1", reason: str = "repeated on every page") -> Receipt:
+    removal = RemovalRecord(
+        page=1,
+        block_id=block_id,
+        block_type=BlockType.PARAGRAPH,
+        removed_by="header_footer",
+        reason=reason,
+        text="ACME Corp",
+    )
     return Receipt(
         source="a.pdf",
         source_sha256="a" * 64,
@@ -24,7 +24,7 @@ def receipt(**removed_overrides: object) -> Receipt:
         failed_pages=(),
         tokens_before=10,
         tokens_after=7,
-        removed=(RemovalRecord(**{**base, **removed_overrides}),),
+        removed=(removal,),
         edited=(),
         flagged=(),
     )
