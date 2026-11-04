@@ -169,6 +169,7 @@ def test_only_failure_exits_with_its_own_code() -> None:
         ["."],  # Folders are not inputs in v0.1.
         ["report.pdf", "--chunks", "--front-matter"],  # Front matter needs Markdown.
         ["report.pdf", "--json", "--front-matter"],
+        ["report.pdf", "--receipt"],  # Needs -o or --json.
     ],
 )
 def test_usage_errors_exit_with_2(args: list[str]) -> None:
@@ -259,6 +260,99 @@ def test_persistent_cache_is_used_unless_disabled(tmp_path: Path) -> None:
     assert not database.exists()
     run("report.pdf")
     assert database.exists()
+
+
+# --- receipt and verify --------------------------------------------------------
+
+
+@pytest.mark.usefixtures("workdir")
+def test_receipt_is_written_alongside_the_markdown(workdir: Path) -> None:
+    result = run("report.pdf", "-o", "out", "--receipt")
+    assert result.exit_code == ExitCode.OK
+    receipt_path = workdir / "out" / "report.receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert receipt["schema_version"] == "1.0"
+    assert {r["removed_by"] for r in receipt["removed"]} == {"headers_footers", "page_numbers"}
+    assert "report.pdf -> out/report.md, out/report.receipt.json" in result.stderr
+
+
+@pytest.mark.usefixtures("workdir")
+def test_receipt_appears_inline_in_json_without_output() -> None:
+    result = run("report.pdf", "--receipt", "--json")
+    document = json.loads(result.stdout)["documents"][0]
+    assert document["receipt"]["schema_version"] == "1.0"
+    assert document["receipt"]["tokens_before"] > document["receipt"]["tokens_after"]
+    no_receipt = json.loads(run("report.pdf", "--json").stdout)["documents"][0]
+    assert "receipt" not in no_receipt
+
+
+@pytest.mark.usefixtures("workdir")
+def test_verify_confirms_a_matching_receipt(workdir: Path) -> None:
+    run("report.pdf", "-o", "out", "--receipt")
+    result = run("verify", "report.pdf", "out/report.receipt.json")
+    assert result.exit_code == ExitCode.OK
+    assert "report.pdf: matches the receipt" in result.stdout
+    as_json = json.loads(run("verify", "report.pdf", "out/report.receipt.json", "--json").stdout)
+    assert as_json == {"match": True, "version_drifted": False, "differences": []}
+
+
+@pytest.mark.usefixtures("workdir")
+def test_verify_does_not_warn_over_chunk_size_alone(workdir: Path) -> None:
+    # max_chunk_tokens is part of config_hash but irrelevant to cleaning, and
+    # verify never chunks: a receipt made alongside --chunks must still verify
+    # cleanly (it used to always report a spurious config drift).
+    run("report.pdf", "-o", "out", "--receipt", "--chunks")
+    as_json = json.loads(run("verify", "report.pdf", "out/report.receipt.json", "--json").stdout)
+    assert as_json == {"match": True, "version_drifted": False, "differences": []}
+
+
+@pytest.mark.usefixtures("workdir")
+def test_verify_refuses_a_different_edition_of_the_file(workdir: Path) -> None:
+    run("report.pdf", "-o", "out", "--receipt")
+    (workdir / "report.pdf").write_bytes(report(pages=5))
+    result = run("verify", "report.pdf", "out/report.receipt.json")
+    assert result.exit_code == ExitCode.ERROR
+    assert "FILE_CHANGED" in result.stderr
+
+
+@pytest.mark.usefixtures("workdir")
+def test_verify_refuses_an_invalid_receipt(workdir: Path) -> None:
+    (workdir / "bad.receipt.json").write_text("not json")
+    result = run("verify", "report.pdf", "bad.receipt.json")
+    assert result.exit_code == ExitCode.ERROR
+    assert "RECEIPT_INVALID" in result.stderr
+
+
+@pytest.mark.usefixtures("workdir")
+def test_verify_reports_a_tampered_receipt_without_quoting_text(workdir: Path) -> None:
+    run("report.pdf", "-o", "out", "--receipt")
+    receipt_path = workdir / "out" / "report.receipt.json"
+    tampered = json.loads(receipt_path.read_text(encoding="utf-8"))
+    tampered["removed"] = []
+    receipt_path.write_text(json.dumps(tampered), encoding="utf-8")
+    plain = run("verify", "report.pdf", "out/report.receipt.json")
+    assert plain.exit_code == ExitCode.ERROR
+    assert "does not match the receipt" in plain.stdout
+    assert "ACME" not in plain.stdout
+    as_json = json.loads(run("verify", "report.pdf", "out/report.receipt.json", "--json").stdout)
+    assert as_json["match"] is False
+    assert any(d["category"] == "removed" and d["kind"] == "extra" for d in as_json["differences"])
+    assert "ACME" not in json.dumps(as_json)
+
+
+@pytest.mark.usefixtures("workdir")
+def test_verify_escapes_a_hostile_block_id_from_the_receipt(workdir: Path) -> None:
+    # A receipt can come from someone else (ADR-056): a crafted block id must
+    # not run as a terminal escape sequence (ADR-048, CWE-150), like a file name.
+    run("report.pdf", "-o", "out", "--receipt")
+    receipt_path = workdir / "out" / "report.receipt.json"
+    tampered = json.loads(receipt_path.read_text(encoding="utf-8"))
+    tampered["removed"][0]["block_id"] = "\x1b[31mRED\x1b[0m"
+    receipt_path.write_text(json.dumps(tampered), encoding="utf-8")
+    result = run("verify", "report.pdf", "out/report.receipt.json")
+    assert result.exit_code == ExitCode.ERROR
+    assert "\x1b" not in result.stdout
+    assert "\\x1b[31mRED\\x1b[0m" in result.stdout
 
 
 # --- stats --------------------------------------------------------------------

@@ -57,4 +57,4 @@
 | [053](ADR-053-mcp-secret-exclusions.md) | Wider secret exclusions for the MCP server | Proposed |
 | [054](ADR-054-office-xml-reader.md) | Light Office and XML reader | Proposed |
 | [055](ADR-055-web-ui-v0.1.md) | Local web interface for v0.1 (`sugo ui`) | Accepted |
-| [056](ADR-056-conversion-receipt.md) | Conversion receipt and `sugo verify` | Proposed |
+| [056](ADR-056-conversion-receipt.md) | Conversion receipt and `sugo verify` | Accepted |
