@@ -9,6 +9,8 @@
 
 Docling and MarkItDown are **not** Sugo dependencies. They were installed once, in a disposable virtualenv outside this repo, purely to run this comparison, and removed afterward — `uv sync` never touches them.
 
+> **Correction, 2026-11-04 (same day):** the first version of this page scored OCR screenshots with `benchmarks/_text.py`'s `character_error_rate`, which compares truth lines and output lines position-by-position. That is fair for Sugo's own output (it preserves the ground truth's line order) but it isn't fair to a tool that recognizes the same words correctly and merges or reorders the lines — the position-zipped comparison then counts those as fully wrong. It had made Docling's screenshot OCR look badly garbled (character error rate up to 1.62) when the actual text it recognized was almost entirely correct. This page now scores OCR documents with a position-independent fuzzy match instead (each ground-truth line against its best-matching substring of the output, wherever it falls). Docling's content-issue count dropped from 13/31 to 6/31 as a result; Sugo's (3/31) and MarkItDown's (17/31, genuinely empty output on every screenshot) were not affected. See the per-document table below for the corrected numbers.
+
 ## Why pair every number with content loss
 
 [ADR-030](../adr/ADR-030-testing-benchmarks.md) already states the rule this project tests itself against: "savings-only metrics hides content loss." This comparison exists to show Sugo holds up under that same rule against two well-known alternatives — so every "tokens saved" figure below is shown next to how much of the ground truth actually survived. A tool that returns an empty string "saves" 100% of the tokens; that is data loss, not compression, and the table below calls it that.
@@ -18,7 +20,7 @@ Docling and MarkItDown are **not** Sugo dependencies. They were installed once, 
 | | Sugo (`lite`, v0.1) | Docling 2.147.0 | MarkItDown 0.1.9 `[all]` |
 |---|---|---|---|
 | Conversions that completed | 31/31 | 31/31 | 31/31 |
-| Documents with lost or garbled content | **3 / 31** | 13 / 31 | 17 / 31 |
+| Documents with lost or garbled content | **3 / 31** | 6 / 31 | 17 / 31 |
 | Median tokens saved vs. raw text | 0.0%† | 27.7%‡ | −0.2%‡ |
 | Mean tokens saved vs. raw text | 6.3% | 11.1% | 29.8%‡ |
 | Median time per document | 1.23 s | 4.55 s | 0.025 s |
@@ -37,7 +39,7 @@ Docling and MarkItDown are **not** Sugo dependencies. They were installed once, 
 
 **Docling**
 - Converts every document, including real OCR on screenshots via its own layout and recognition models — the only one of the three that attempts this without an LLM.
-- That OCR is unreliable on this corpus: every one of the 11 screenshots is garbled, several so badly that the edit distance exceeds the length of the correct text (character error rate above 1.0).
+- Character recognition itself is good: on the 5 code screenshots and 2 of the 6 chat screenshots, every word it reads is correct. Its real weakness on this corpus is reading **order**, not recognition: on 4 of 6 chat screenshots it reads the two message columns out of their true left/right/left/right sequence (grouping by spatial column instead of by time), merging some bubbles into the wrong paragraph — the words are right, the conversation order isn't. On the one dark-mode screenshot, recognition itself does degrade (a real character error rate of 0.18).
 - Drops one legal clause each on 2 of the 5 EUR-Lex PDFs.
 - The slowest tool here: 2.5–26 s per document, because its layout model runs on every page, every time, even a two-line price table.
 - This isn't a case of Sugo rejecting Docling: the roadmap already plans to call Docling internally at a future `normal` level for complex Office layouts ([ROADMAP.md](../ROADMAP.md), [ADR-007](../adr/ADR-007-engine-levels.md)). This comparison is about Docling used standalone as the whole pipeline, which is how most people reach for it today.
@@ -54,36 +56,36 @@ Docling and MarkItDown are **not** Sugo dependencies. They were installed once, 
 | report_it.pdf | 38.0% | - | 1.16 | 47.9% | - | 10.04 | -1.3% | - | 0.16 |
 | two_column_it.pdf | 0.0% | - | 1.12 | -2.9% | - | 2.55 | -0.5% | - | 0.09 |
 | table_it.xlsx | 0.0% | - | 0.89 | -46.9% | - | 0.01 | -34.4% | - | 0.02 |
-| chat_it.png | 0.0% | CER 0.01 | 1.32 | 27.7% | CER 0.69 | 5.00 | 100.0% | CER 1.00 | 0.01 |
-| code_it.png | 0.0% | - | 1.26 | 34.5% | CER 1.62 | 2.92 | 100.0% | CER 1.00 | 0.01 |
+| chat_it.png | 0.0% | CER 0.01 | 1.32 | 27.7% | CER 0.01 | 5.00 | 100.0% | CER 1.00 | 0.01 |
+| code_it.png | 0.0% | - | 1.26 | 34.5% | - | 2.92 | 100.0% | CER 1.00 | 0.01 |
 | report_es.pdf | 33.6% | - | 1.12 | 38.4% | - | 9.58 | -1.5% | - | 0.12 |
 | two_column_es.pdf | 0.0% | - | 1.12 | -2.9% | - | 2.59 | -0.5% | - | 0.06 |
 | table_es.xlsx | 0.0% | - | 0.85 | -48.3% | - | 0.01 | -34.5% | - | 0.02 |
-| chat_es.png | 0.0% | CER 0.06 | 1.37 | 31.7% | CER 0.72 | 4.55 | 100.0% | CER 1.00 | 0.01 |
-| code_es.png | 0.0% | - | 1.36 | 34.5% | CER 1.62 | 2.71 | 100.0% | CER 1.00 | 0.01 |
+| chat_es.png | 0.0% | CER 0.06 | 1.37 | 31.7% | CER 0.06 | 4.55 | 100.0% | CER 1.00 | 0.01 |
+| code_es.png | 0.0% | - | 1.36 | 34.5% | - | 2.71 | 100.0% | CER 1.00 | 0.01 |
 | report_fr.pdf | 33.3% | - | 1.16 | 39.0% | - | 9.36 | -1.4% | - | 0.11 |
 | two_column_fr.pdf | 0.0% | - | 1.09 | -2.8% | - | 2.54 | -0.5% | - | 0.06 |
 | table_fr.xlsx | 0.0% | - | 0.83 | -48.3% | - | 0.01 | -34.5% | - | 0.01 |
-| chat_fr.png | 2.4% | CER 0.07 | 1.34 | 28.6% | CER 0.83 | 4.68 | 100.0% | CER 1.00 | 0.01 |
-| code_fr.png | 0.0% | - | 1.24 | 34.5% | CER 1.62 | 2.78 | 100.0% | CER 1.00 | 0.01 |
+| chat_fr.png | 2.4% | CER 0.07 | 1.34 | 28.6% | CER 0.06 | 4.68 | 100.0% | CER 1.00 | 0.01 |
+| code_fr.png | 0.0% | - | 1.24 | 34.5% | - | 2.78 | 100.0% | CER 1.00 | 0.01 |
 | report_de.pdf | 36.9% | - | 1.15 | 39.2% | - | 9.66 | -1.5% | - | 0.10 |
 | two_column_de.pdf | 0.0% | - | 1.09 | -3.1% | - | 2.55 | -0.5% | - | 0.06 |
 | table_de.xlsx | 0.0% | - | 0.81 | -35.5% | - | 0.01 | -22.6% | - | 0.02 |
-| chat_de.png | 0.0% | - | 1.41 | 30.4% | CER 0.91 | 4.75 | 100.0% | CER 1.00 | 0.01 |
-| code_de.png | 0.0% | - | 1.29 | 34.5% | CER 1.62 | 2.86 | 100.0% | CER 1.00 | 0.01 |
+| chat_de.png | 0.0% | - | 1.41 | 30.4% | - | 4.75 | 100.0% | CER 1.00 | 0.01 |
+| code_de.png | 0.0% | - | 1.29 | 34.5% | - | 2.86 | 100.0% | CER 1.00 | 0.01 |
 | report_en.pdf | 34.2% | - | 1.11 | 39.1% | - | 10.95 | -1.6% | - | 0.10 |
 | two_column_en.pdf | 0.0% | - | 1.09 | -3.1% | - | 2.65 | -0.5% | - | 0.06 |
 | table_en.xlsx | 0.0% | - | 0.85 | -55.6% | - | 0.01 | -40.7% | missing 3 | 0.01 |
-| chat_en.png | 0.0% | - | 1.33 | 32.6% | CER 1.04 | 5.18 | 100.0% | CER 1.00 | 0.01 |
-| code_en.png | 0.0% | - | 1.23 | 34.5% | CER 1.62 | 3.12 | 100.0% | CER 1.00 | 0.01 |
-| chat_en_dark.png | 0.0% | - | 1.35 | 30.2% | CER 1.23 | 18.64 | 100.0% | CER 1.00 | 0.01 |
+| chat_en.png | 0.0% | - | 1.33 | 32.6% | - | 5.18 | 100.0% | CER 1.00 | 0.01 |
+| code_en.png | 0.0% | - | 1.23 | 34.5% | - | 3.12 | 100.0% | CER 1.00 | 0.01 |
+| chat_en_dark.png | 0.0% | - | 1.35 | 30.2% | CER 0.18 | 18.64 | 100.0% | CER 1.00 | 0.01 |
 | eur_lex_261_2004_en.pdf | 3.5% | - | 1.38 | 7.0% | missing 1 | 21.11 | -0.2% | missing 2 | 1.62 |
 | eur_lex_261_2004_it.pdf | 2.9% | - | 1.45 | 5.8% | - | 22.15 | -0.2% | missing 4 | 1.71 |
 | eur_lex_261_2004_es.pdf | 3.1% | - | 1.43 | 7.6% | - | 21.69 | -0.2% | missing 2 | 1.79 |
 | eur_lex_261_2004_fr.pdf | 3.1% | - | 1.45 | 7.1% | - | 21.62 | -0.2% | missing 2 | 1.77 |
 | eur_lex_261_2004_de.pdf | 3.2% | - | 1.92 | 7.5% | missing 1 | 26.38 | -0.2% | missing 7 | 1.79 |
 
-"saved%" is tokens saved vs. the raw extracted text, counted with the same tokenizer for all three tools. "issue" is the character error rate (OCR documents) or the number of ground-truth paragraphs missing from the output (native-text documents); "-" means no issue found.
+"saved%" is tokens saved vs. the raw extracted text, counted with the same tokenizer for all three tools. "issue" is the character error rate (OCR documents, order-independent — see note 8 below) or the number of ground-truth paragraphs missing from the output (native-text documents); "-" means no issue found.
 
 ## Method and honesty notes — read before citing a single number
 
@@ -94,3 +96,4 @@ Docling and MarkItDown are **not** Sugo dependencies. They were installed once, 
 5. MarkItDown supports an optional LLM-backed image-description mode that was not configured here; its 0% OCR result reflects the no-LLM default, which is what most installs actually run.
 6. All three tools ran in their default configuration — none was tuned for this corpus.
 7. Docling and MarkItDown were installed in a throwaway virtualenv outside this repository and fully removed afterward, including the model weights Docling downloads to the local Hugging Face cache; they are not, and must not become, project dependencies without their own ADR.
+8. The OCR "issue" column is an order-independent character error rate: each ground-truth line is matched against its best-fitting substring anywhere in the tool's output (free start/end gaps in the edit-distance alignment), not against the output line in the same position. This matters because Docling and MarkItDown don't necessarily split their output into the same lines as the ground truth — a tool that recognizes the right words but joins or reorders the lines should not be scored as if it had produced the wrong words. Sugo's own screenshots results are unaffected by this choice, since its output already preserves line order; Docling's content-issue count changed from an earlier, line-position-dependent version of this page (13/31) to the corrected 6/31 — see the correction note above.

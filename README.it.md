@@ -79,8 +79,8 @@ Misurato contro due alternative note, sullo stesso corpus di prova di 31 documen
 
 | | Sugo | Docling | MarkItDown |
 |---|:---:|:---:|:---:|
-| Documenti convertiti senza perdere o rovinare nulla | **28 / 31** | 18 / 31 | 14 / 31 |
-| OCR su screenshot di chat/codice | ✅ accurato | ⚠️ illeggibile | ❌ output vuoto |
+| Documenti convertiti senza perdere o rovinare nulla | **28 / 31** | 25 / 31 | 14 / 31 |
+| OCR su screenshot di chat/codice | ✅ accurato | ⚠️ parole giuste, ordine sbagliato in alcune chat | ❌ output vuoto |
 | Legge i PDF di base | ✅ | ✅ | ❌ serve un'estensione |
 | Vero regolamento UE in PDF, ogni clausola mantenuta | ✅ | ⚠️ 2 PDF su 5 perdono una clausola | ❌ ognuno ne perde 2–7 |
 
