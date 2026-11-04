@@ -73,6 +73,19 @@ Lo stesso vale su un corpus di prova in cinque lingue, senza perdere nulla di so
 
 Ed è veloce anche su un computer normale, non solo su uno nuovo: su un desktop del 2010 con 2 core e senza GPU, un PDF di 100 pagine si converte in 3,6 s e uno screenshot di telefono in 13,7 s (numeri completi in [TESTING](docs/TESTING.md)).
 
+## Come si confronta
+
+Misurato contro due alternative note, sullo stesso corpus di prova di 31 documenti, con lo stesso tokenizer e la stessa verifica del contenuto — metodo completo, dati grezzi e limiti in [docs/comparisons](docs/comparisons/sugo-vs-docling-markitdown.md) (in inglese):
+
+| | Sugo | Docling | MarkItDown |
+|---|:---:|:---:|:---:|
+| Documenti convertiti senza perdere o rovinare nulla | **28 / 31** | 18 / 31 | 14 / 31 |
+| OCR su screenshot di chat/codice | ✅ accurato | ⚠️ illeggibile | ❌ output vuoto |
+| Legge i PDF di base | ✅ | ✅ | ❌ serve un'estensione |
+| Vero regolamento UE in PDF, ogni clausola mantenuta | ✅ | ⚠️ 2 PDF su 5 perdono una clausola | ❌ ognuno ne perde 2–7 |
+
+Uno strumento che perde contenuto "risparmia" token solo sulla carta — non è compressione, è perdita di dati. Ogni numero qui sopra è affiancato a quanto è davvero sopravvissuto alla conversione.
+
 ## Stato
 
 **Alpha.** La prima versione, la v0.1, è in via di completamento: tutto ciò che segue funziona già installando dal codice sorgente, o da un'alpha manuale già su PyPI. La release v0.1 firmata e stabile (pipeline completa: SBOM, attestazioni Sigstore, PyPI Trusted Publishing) è ancora in preparazione.
