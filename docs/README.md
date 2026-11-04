@@ -8,3 +8,4 @@
 | [TESTING.md](TESTING.md) | Tests, benchmarks, performance targets, logging |
 | [ROADMAP.md](ROADMAP.md) | First release scope and development steps |
 | [adr/](adr/) | 36 architecture decision records |
+| [comparisons/](comparisons/) | Measured comparisons against other tools |
