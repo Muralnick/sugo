@@ -293,12 +293,17 @@ def test_verify_confirms_a_matching_receipt(workdir: Path) -> None:
     assert result.exit_code == ExitCode.OK
     assert "report.pdf: matches the receipt" in result.stdout
     as_json = json.loads(run("verify", "report.pdf", "out/report.receipt.json", "--json").stdout)
-    assert as_json == {
-        "match": True,
-        "version_drifted": False,
-        "config_drifted": False,
-        "differences": [],
-    }
+    assert as_json == {"match": True, "version_drifted": False, "differences": []}
+
+
+@pytest.mark.usefixtures("workdir")
+def test_verify_does_not_warn_over_chunk_size_alone(workdir: Path) -> None:
+    # max_chunk_tokens is part of config_hash but irrelevant to cleaning, and
+    # verify never chunks: a receipt made alongside --chunks must still verify
+    # cleanly (it used to always report a spurious config drift).
+    run("report.pdf", "-o", "out", "--receipt", "--chunks")
+    as_json = json.loads(run("verify", "report.pdf", "out/report.receipt.json", "--json").stdout)
+    assert as_json == {"match": True, "version_drifted": False, "differences": []}
 
 
 @pytest.mark.usefixtures("workdir")

@@ -149,7 +149,7 @@ def test_receipt_write_round_trips(tmp_path: Path) -> None:
     write_receipt(target, receipt)
     raw = target.read_bytes()
     assert Receipt.model_validate_json(raw) == receipt
-    assert not raw.endswith(b"\n")
+    assert raw.endswith(b"\n")
     # UTF-8 text is kept as is, not escaped, except the line separator JSON leaves raw.
     assert "Città".encode() in raw
     assert chr(0x2028).encode() not in raw

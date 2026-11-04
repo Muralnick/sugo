@@ -60,9 +60,9 @@ sugo verify FILE RECEIPT [--json]
 - `sugo verify FILE RECEIPT`: re-reads `FILE`, re-converts it with the `languages` and `strip_tracking_urls` stored on the receipt itself (maintainer decision, 2026-11-04: the receipt is self-sufficient — it carries the actual settings, not just `config_hash`'s digest of them, so `verify` never needs the caller to remember or re-supply the original flags), and structurally compares the result:
   - `source_sha256` differs → refuses immediately with the new error code `FILE_CHANGED`, exit 1: the receipt is for a different edition of the document.
   - A receipt that is not valid JSON or not schema 1.0 → the new error code `RECEIPT_INVALID`, exit 1.
-  - `sugo_version` or `config_hash` differs → warns (stderr) that an exact match cannot be guaranteed across versions/configs, then still compares and reports what it finds.
+  - `sugo_version` differs → warns (stderr) that an exact match cannot be guaranteed across versions, then still compares and reports what it finds. `config_hash` is **not** compared here: `languages` and `strip_tracking_urls` are already forced equal (they come from the receipt itself), and `config_hash` also carries `max_chunk_tokens`, which `verify` never sets — comparing it would warn on every receipt made alongside `--chunks` even when nothing relevant changed.
   - Otherwise compares `removed`, `edited`, `flagged` and `tokens_after` entry-by-entry and prints the result itself — block ids and pages only, never text (principle 11). Like `sugo doctor`, the command reports everything itself and then sets the exit code directly (0 match, 1 mismatch), rather than wrapping a already-printed result in a second error object.
-  - `--json` prints `{"match": bool, "version_drifted": bool, "config_drifted": bool, "differences": [...]}`, each difference naming its `category` (`removed`/`edited`/`flagged`/`tokens_after`), `kind` (`missing`/`extra`/`changed`), `page` and `block_id` — again without text.
+  - `--json` prints `{"match": bool, "version_drifted": bool, "differences": [...]}`, each difference naming its `category` (`removed`/`edited`/`flagged`/`tokens_after`), `kind` (`missing`/`extra`/`changed`), `page` and `block_id` — again without text.
 
 ### Out of scope (deferred, maintainer decision 2026-11-04)
 

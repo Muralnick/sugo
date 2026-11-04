@@ -703,13 +703,16 @@ def verify_command(
             )
         if fresh.receipt is None:
             raise RuntimeError("internal error: receipt=True did not produce a receipt")
+        # languages and strip_tracking_urls are forced equal above (the receipt is
+        # self-sufficient), so only the Sugo version itself can make cleaning
+        # disagree; config_hash also carries max_chunk_tokens, which verify never
+        # sets, so comparing it here would warn on every receipt made with --chunks.
         version_drifted = fresh.sugo_version != stored.sugo_version
-        config_drifted = fresh.config_hash != stored.config_hash
-        if not json_output and (version_drifted or config_drifted):
+        if not json_output and version_drifted:
             _stderr.print(
                 Text(
                     _(
-                        "warning: re-converted with a different version or configuration; "
+                        "warning: re-converted with a different Sugo version; "
                         "an exact match is not guaranteed"
                     ),
                     style="yellow",
@@ -721,7 +724,6 @@ def verify_command(
                 {
                     "match": not differences,
                     "version_drifted": version_drifted,
-                    "config_drifted": config_drifted,
                     "differences": differences,
                 }
             )
@@ -736,7 +738,9 @@ def _load_receipt(path: Path) -> "Receipt":
     from sugo.core.receipt import Receipt
 
     try:
-        data = path.read_text(encoding="utf-8")
+        # Bytes, not text: pydantic-core validates the JSON itself and turns
+        # invalid UTF-8 into a ValidationError below, never a UnicodeDecodeError.
+        data = path.read_bytes()
     except OSError as error:
         raise unreadable(error) from error
     try:

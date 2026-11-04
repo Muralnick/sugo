@@ -135,9 +135,16 @@ def _diff(
 ) -> list[dict[str, Any]]:
     """Each item is a ``RemovalRecord``, ``EditRecord`` or ``FlaggedBlock``: any
     record with ``page`` and ``block_id`` fields."""
+
+    # A block can have more than one edit, so (page, block_id) alone does not
+    # order them deterministically; model_dump_json breaks the tie on the rest
+    # of the record (principle 6: same input, same output, including this).
+    def key(item: Any) -> tuple[int, str, str]:
+        return (item.page, item.block_id, item.model_dump_json())
+
     stored_set, fresh_set = set(stored_items), set(fresh_items)
-    missing = sorted(stored_set - fresh_set, key=lambda item: (item.page, item.block_id))
-    extra = sorted(fresh_set - stored_set, key=lambda item: (item.page, item.block_id))
+    missing = sorted(stored_set - fresh_set, key=key)
+    extra = sorted(fresh_set - stored_set, key=key)
     return [
         {"category": category, "kind": kind, "page": item.page, "block_id": item.block_id}
         for kind, items in (("missing", missing), ("extra", extra))

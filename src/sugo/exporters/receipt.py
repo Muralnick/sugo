@@ -18,4 +18,4 @@ _LINE_SEPARATORS = str.maketrans(
 
 def write_receipt(path: Path, receipt: Receipt) -> None:
     """Write the receipt to ``path``, replacing it atomically."""
-    write_text_atomic(path, (receipt.model_dump_json().translate(_LINE_SEPARATORS),))
+    write_text_atomic(path, (receipt.model_dump_json().translate(_LINE_SEPARATORS), "\n"))

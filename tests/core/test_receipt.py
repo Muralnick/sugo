@@ -1,7 +1,7 @@
 """Tests for the receipt model and the differences ``sugo verify`` reports (ADR-056)."""
 
-from sugo.core.models import BlockType
-from sugo.core.receipt import Receipt, RemovalRecord, diff_receipts
+from sugo.core.models import BlockType, EditKind
+from sugo.core.receipt import EditRecord, Receipt, RemovalRecord, diff_receipts
 
 
 def receipt(**removed_overrides: object) -> Receipt:
@@ -59,6 +59,41 @@ def test_changed_tokens_after_is_its_own_entry() -> None:
         "stored": 7,
         "fresh": 99,
     } in differences
+
+
+def without_removed(base: Receipt, **edited_override: object) -> Receipt:
+    return Receipt(**{**base.model_dump(), "removed": (), **edited_override})
+
+
+def test_two_edits_on_the_same_block_sort_deterministically() -> None:
+    # Same (page, block_id): the tie-break must not depend on hash randomization.
+    edits = (
+        EditRecord(
+            page=1,
+            block_id="b1",
+            edited_by="text_normalization",
+            kind=EditKind.NORMALIZE,
+            reason="ligature",
+            original="ﬁ",
+            replacement="fi",
+        ),
+        EditRecord(
+            page=1,
+            block_id="b1",
+            edited_by="tracking_urls",
+            kind=EditKind.DELETE,
+            reason="tracker",
+            original="?utm_source=x",
+            replacement="",
+        ),
+    )
+    stored = without_removed(receipt())
+    fresh = without_removed(receipt(), edited=edits)
+    first = diff_receipts(stored, fresh)
+    second = diff_receipts(stored, fresh)
+    assert first == second
+    assert {d["kind"] for d in first} == {"extra"}
+    assert len(first) == 2
 
 
 def test_never_quotes_removed_text() -> None:
