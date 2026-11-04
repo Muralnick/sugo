@@ -1,0 +1,1254 @@
+{
+  "rows": [
+    {
+      "name": "report_it.pdf",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 374,
+          "tokens_after": 232,
+          "saved_percent": 37.97,
+          "median_s": 1.1609,
+          "markdown_chars": 742,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 374,
+          "tokens_after": 195,
+          "saved_percent": 47.86,
+          "median_s": 10.0373,
+          "markdown_chars": 634,
+          "missing_text": []
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 374,
+          "tokens_after": 379,
+          "saved_percent": -1.34,
+          "median_s": 0.1586,
+          "markdown_chars": 1184,
+          "missing_text": []
+        }
+      }
+    },
+    {
+      "name": "two_column_it.pdf",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 209,
+          "tokens_after": 209,
+          "saved_percent": 0.0,
+          "median_s": 1.1195,
+          "markdown_chars": 646,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 209,
+          "tokens_after": 215,
+          "saved_percent": -2.87,
+          "median_s": 2.5466,
+          "markdown_chars": 653,
+          "missing_text": []
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 209,
+          "tokens_after": 210,
+          "saved_percent": -0.48,
+          "median_s": 0.0898,
+          "markdown_chars": 654,
+          "missing_text": []
+        }
+      }
+    },
+    {
+      "name": "table_it.xlsx",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 32,
+          "tokens_after": 32,
+          "saved_percent": 0.0,
+          "median_s": 0.8862,
+          "markdown_chars": 61,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 32,
+          "tokens_after": 47,
+          "saved_percent": -46.88,
+          "median_s": 0.0078,
+          "markdown_chars": 129,
+          "missing_text": []
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 32,
+          "tokens_after": 43,
+          "saved_percent": -34.38,
+          "median_s": 0.0246,
+          "markdown_chars": 95,
+          "missing_text": []
+        }
+      }
+    },
+    {
+      "name": "chat_it.png",
+      "needs_ocr": true,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 47,
+          "tokens_after": 47,
+          "saved_percent": 0.0,
+          "median_s": 1.3204,
+          "markdown_chars": 136,
+          "character_error_rate": 0.0108
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 47,
+          "tokens_after": 34,
+          "saved_percent": 27.66,
+          "median_s": 4.9974,
+          "markdown_chars": 101,
+          "character_error_rate": 0.6882
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 47,
+          "tokens_after": 0,
+          "saved_percent": 100.0,
+          "median_s": 0.0111,
+          "markdown_chars": 0,
+          "character_error_rate": 1.0
+        }
+      }
+    },
+    {
+      "name": "code_it.png",
+      "needs_ocr": true,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 29,
+          "saved_percent": 0.0,
+          "median_s": 1.257,
+          "markdown_chars": 100,
+          "character_error_rate": 0.0
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 19,
+          "saved_percent": 34.48,
+          "median_s": 2.9207,
+          "markdown_chars": 82,
+          "character_error_rate": 1.6154
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 0,
+          "saved_percent": 100.0,
+          "median_s": 0.01,
+          "markdown_chars": 0,
+          "character_error_rate": 1.0
+        }
+      }
+    },
+    {
+      "name": "report_es.pdf",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 339,
+          "tokens_after": 225,
+          "saved_percent": 33.63,
+          "median_s": 1.1235,
+          "markdown_chars": 756,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 339,
+          "tokens_after": 209,
+          "saved_percent": 38.35,
+          "median_s": 9.5767,
+          "markdown_chars": 668,
+          "missing_text": []
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 339,
+          "tokens_after": 344,
+          "saved_percent": -1.47,
+          "median_s": 0.117,
+          "markdown_chars": 1194,
+          "missing_text": []
+        }
+      }
+    },
+    {
+      "name": "two_column_es.pdf",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 209,
+          "tokens_after": 209,
+          "saved_percent": 0.0,
+          "median_s": 1.1196,
+          "markdown_chars": 658,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 209,
+          "tokens_after": 215,
+          "saved_percent": -2.87,
+          "median_s": 2.5888,
+          "markdown_chars": 665,
+          "missing_text": []
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 209,
+          "tokens_after": 210,
+          "saved_percent": -0.48,
+          "median_s": 0.0592,
+          "markdown_chars": 666,
+          "missing_text": []
+        }
+      }
+    },
+    {
+      "name": "table_es.xlsx",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 29,
+          "saved_percent": 0.0,
+          "median_s": 0.8539,
+          "markdown_chars": 59,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 43,
+          "saved_percent": -48.28,
+          "median_s": 0.0057,
+          "markdown_chars": 129,
+          "missing_text": []
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 39,
+          "saved_percent": -34.48,
+          "median_s": 0.0168,
+          "markdown_chars": 93,
+          "missing_text": []
+        }
+      }
+    },
+    {
+      "name": "chat_es.png",
+      "needs_ocr": true,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 41,
+          "tokens_after": 41,
+          "saved_percent": 0.0,
+          "median_s": 1.3662,
+          "markdown_chars": 147,
+          "character_error_rate": 0.0636
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 41,
+          "tokens_after": 28,
+          "saved_percent": 31.71,
+          "median_s": 4.5492,
+          "markdown_chars": 112,
+          "character_error_rate": 0.7182
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 41,
+          "tokens_after": 0,
+          "saved_percent": 100.0,
+          "median_s": 0.0071,
+          "markdown_chars": 0,
+          "character_error_rate": 1.0
+        }
+      }
+    },
+    {
+      "name": "code_es.png",
+      "needs_ocr": true,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 29,
+          "saved_percent": 0.0,
+          "median_s": 1.3616,
+          "markdown_chars": 100,
+          "character_error_rate": 0.0
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 19,
+          "saved_percent": 34.48,
+          "median_s": 2.705,
+          "markdown_chars": 82,
+          "character_error_rate": 1.6154
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 0,
+          "saved_percent": 100.0,
+          "median_s": 0.0079,
+          "markdown_chars": 0,
+          "character_error_rate": 1.0
+        }
+      }
+    },
+    {
+      "name": "report_fr.pdf",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 354,
+          "tokens_after": 236,
+          "saved_percent": 33.33,
+          "median_s": 1.1598,
+          "markdown_chars": 753,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 354,
+          "tokens_after": 216,
+          "saved_percent": 38.98,
+          "median_s": 9.3583,
+          "markdown_chars": 654,
+          "missing_text": []
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 354,
+          "tokens_after": 359,
+          "saved_percent": -1.41,
+          "median_s": 0.108,
+          "markdown_chars": 1219,
+          "missing_text": []
+        }
+      }
+    },
+    {
+      "name": "two_column_fr.pdf",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 215,
+          "tokens_after": 215,
+          "saved_percent": 0.0,
+          "median_s": 1.0886,
+          "markdown_chars": 646,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 215,
+          "tokens_after": 221,
+          "saved_percent": -2.79,
+          "median_s": 2.5399,
+          "markdown_chars": 653,
+          "missing_text": []
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 215,
+          "tokens_after": 216,
+          "saved_percent": -0.47,
+          "median_s": 0.0578,
+          "markdown_chars": 654,
+          "missing_text": []
+        }
+      }
+    },
+    {
+      "name": "table_fr.xlsx",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 29,
+          "saved_percent": 0.0,
+          "median_s": 0.8326,
+          "markdown_chars": 56,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 43,
+          "saved_percent": -48.28,
+          "median_s": 0.0065,
+          "markdown_chars": 114,
+          "missing_text": []
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 39,
+          "saved_percent": -34.48,
+          "median_s": 0.0147,
+          "markdown_chars": 90,
+          "missing_text": []
+        }
+      }
+    },
+    {
+      "name": "chat_fr.png",
+      "needs_ocr": true,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 42,
+          "tokens_after": 41,
+          "saved_percent": 2.38,
+          "median_s": 1.3409,
+          "markdown_chars": 136,
+          "character_error_rate": 0.0707
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 42,
+          "tokens_after": 30,
+          "saved_percent": 28.57,
+          "median_s": 4.6796,
+          "markdown_chars": 100,
+          "character_error_rate": 0.8283
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 42,
+          "tokens_after": 0,
+          "saved_percent": 100.0,
+          "median_s": 0.0073,
+          "markdown_chars": 0,
+          "character_error_rate": 1.0
+        }
+      }
+    },
+    {
+      "name": "code_fr.png",
+      "needs_ocr": true,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 29,
+          "saved_percent": 0.0,
+          "median_s": 1.2446,
+          "markdown_chars": 100,
+          "character_error_rate": 0.0
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 19,
+          "saved_percent": 34.48,
+          "median_s": 2.7822,
+          "markdown_chars": 82,
+          "character_error_rate": 1.6154
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 0,
+          "saved_percent": 100.0,
+          "median_s": 0.0084,
+          "markdown_chars": 0,
+          "character_error_rate": 1.0
+        }
+      }
+    },
+    {
+      "name": "report_de.pdf",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 339,
+          "tokens_after": 214,
+          "saved_percent": 36.87,
+          "median_s": 1.1463,
+          "markdown_chars": 726,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 339,
+          "tokens_after": 206,
+          "saved_percent": 39.23,
+          "median_s": 9.6623,
+          "markdown_chars": 664,
+          "missing_text": []
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 339,
+          "tokens_after": 344,
+          "saved_percent": -1.47,
+          "median_s": 0.1041,
+          "markdown_chars": 1204,
+          "missing_text": []
+        }
+      }
+    },
+    {
+      "name": "two_column_de.pdf",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 191,
+          "tokens_after": 191,
+          "saved_percent": 0.0,
+          "median_s": 1.0919,
+          "markdown_chars": 652,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 191,
+          "tokens_after": 197,
+          "saved_percent": -3.14,
+          "median_s": 2.5502,
+          "markdown_chars": 659,
+          "missing_text": []
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 191,
+          "tokens_after": 192,
+          "saved_percent": -0.52,
+          "median_s": 0.057,
+          "markdown_chars": 660,
+          "missing_text": []
+        }
+      }
+    },
+    {
+      "name": "table_de.xlsx",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 31,
+          "tokens_after": 31,
+          "saved_percent": 0.0,
+          "median_s": 0.8124,
+          "markdown_chars": 60,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 31,
+          "tokens_after": 42,
+          "saved_percent": -35.48,
+          "median_s": 0.0059,
+          "markdown_chars": 119,
+          "missing_text": []
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 31,
+          "tokens_after": 38,
+          "saved_percent": -22.58,
+          "median_s": 0.0161,
+          "markdown_chars": 94,
+          "missing_text": []
+        }
+      }
+    },
+    {
+      "name": "chat_de.png",
+      "needs_ocr": true,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 46,
+          "tokens_after": 46,
+          "saved_percent": 0.0,
+          "median_s": 1.4139,
+          "markdown_chars": 155,
+          "character_error_rate": 0.0
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 46,
+          "tokens_after": 32,
+          "saved_percent": 30.43,
+          "median_s": 4.7539,
+          "markdown_chars": 119,
+          "character_error_rate": 0.9099
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 46,
+          "tokens_after": 0,
+          "saved_percent": 100.0,
+          "median_s": 0.0086,
+          "markdown_chars": 0,
+          "character_error_rate": 1.0
+        }
+      }
+    },
+    {
+      "name": "code_de.png",
+      "needs_ocr": true,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 29,
+          "saved_percent": 0.0,
+          "median_s": 1.2871,
+          "markdown_chars": 100,
+          "character_error_rate": 0.0
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 19,
+          "saved_percent": 34.48,
+          "median_s": 2.8596,
+          "markdown_chars": 82,
+          "character_error_rate": 1.6154
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 0,
+          "saved_percent": 100.0,
+          "median_s": 0.0089,
+          "markdown_chars": 0,
+          "character_error_rate": 1.0
+        }
+      }
+    },
+    {
+      "name": "report_en.pdf",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 304,
+          "tokens_after": 200,
+          "saved_percent": 34.21,
+          "median_s": 1.1051,
+          "markdown_chars": 691,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 304,
+          "tokens_after": 185,
+          "saved_percent": 39.14,
+          "median_s": 10.9526,
+          "markdown_chars": 629,
+          "missing_text": []
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 304,
+          "tokens_after": 309,
+          "saved_percent": -1.64,
+          "median_s": 0.1026,
+          "markdown_chars": 1144,
+          "missing_text": []
+        }
+      }
+    },
+    {
+      "name": "two_column_en.pdf",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 191,
+          "tokens_after": 191,
+          "saved_percent": 0.0,
+          "median_s": 1.086,
+          "markdown_chars": 634,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 191,
+          "tokens_after": 197,
+          "saved_percent": -3.14,
+          "median_s": 2.6487,
+          "markdown_chars": 641,
+          "missing_text": []
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 191,
+          "tokens_after": 192,
+          "saved_percent": -0.52,
+          "median_s": 0.0555,
+          "markdown_chars": 642,
+          "missing_text": []
+        }
+      }
+    },
+    {
+      "name": "table_en.xlsx",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 27,
+          "tokens_after": 27,
+          "saved_percent": 0.0,
+          "median_s": 0.854,
+          "markdown_chars": 60,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 27,
+          "tokens_after": 42,
+          "saved_percent": -55.56,
+          "median_s": 0.0061,
+          "markdown_chars": 119,
+          "missing_text": []
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 27,
+          "tokens_after": 38,
+          "saved_percent": -40.74,
+          "median_s": 0.0141,
+          "markdown_chars": 91,
+          "missing_text": [
+            "2.50",
+            "1.20",
+            "4.80"
+          ]
+        }
+      }
+    },
+    {
+      "name": "chat_en.png",
+      "needs_ocr": true,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 43,
+          "tokens_after": 43,
+          "saved_percent": 0.0,
+          "median_s": 1.3329,
+          "markdown_chars": 154,
+          "character_error_rate": 0.0
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 43,
+          "tokens_after": 29,
+          "saved_percent": 32.56,
+          "median_s": 5.1787,
+          "markdown_chars": 118,
+          "character_error_rate": 1.0364
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 43,
+          "tokens_after": 0,
+          "saved_percent": 100.0,
+          "median_s": 0.009,
+          "markdown_chars": 0,
+          "character_error_rate": 1.0
+        }
+      }
+    },
+    {
+      "name": "code_en.png",
+      "needs_ocr": true,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 29,
+          "saved_percent": 0.0,
+          "median_s": 1.2347,
+          "markdown_chars": 100,
+          "character_error_rate": 0.0
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 19,
+          "saved_percent": 34.48,
+          "median_s": 3.1176,
+          "markdown_chars": 82,
+          "character_error_rate": 1.6154
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 29,
+          "tokens_after": 0,
+          "saved_percent": 100.0,
+          "median_s": 0.0062,
+          "markdown_chars": 0,
+          "character_error_rate": 1.0
+        }
+      }
+    },
+    {
+      "name": "chat_en_dark.png",
+      "needs_ocr": true,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 43,
+          "tokens_after": 43,
+          "saved_percent": 0.0,
+          "median_s": 1.3509,
+          "markdown_chars": 154,
+          "character_error_rate": 0.0
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 43,
+          "tokens_after": 30,
+          "saved_percent": 30.23,
+          "median_s": 18.6447,
+          "markdown_chars": 112,
+          "character_error_rate": 1.2273
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 43,
+          "tokens_after": 0,
+          "saved_percent": 100.0,
+          "median_s": 0.0084,
+          "markdown_chars": 0,
+          "character_error_rate": 1.0
+        }
+      }
+    },
+    {
+      "name": "eur_lex_261_2004_en.pdf",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 5748,
+          "tokens_after": 5548,
+          "saved_percent": 3.48,
+          "median_s": 1.3839,
+          "markdown_chars": 27141,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 5748,
+          "tokens_after": 5347,
+          "saved_percent": 6.98,
+          "median_s": 21.1057,
+          "markdown_chars": 27099,
+          "missing_text": [
+            "2. Paragraph 1(a) shall also apply to passengers whose flights form part of a package, except for the right to reimbursement where such right arises under Directive 90/314/EEC."
+          ]
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 5748,
+          "tokens_after": 5760,
+          "saved_percent": -0.21,
+          "median_s": 1.6189,
+          "markdown_chars": 27572,
+          "missing_text": [
+            "(6) The protection accorded to passengers departing from an airport located in a Member State should be extended to those leaving an airport located in a third country for one situated in a Member State, when a Community carrier operates the flight.",
+            "2. Paragraph 1(a) shall also apply to passengers whose flights form part of a package, except for the right to reimbursement where such right arises under Directive 90/314/EEC."
+          ]
+        }
+      }
+    },
+    {
+      "name": "eur_lex_261_2004_it.pdf",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 8300,
+          "tokens_after": 8058,
+          "saved_percent": 2.92,
+          "median_s": 1.4481,
+          "markdown_chars": 30375,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 8300,
+          "tokens_after": 7817,
+          "saved_percent": 5.82,
+          "median_s": 22.1471,
+          "markdown_chars": 30369,
+          "missing_text": []
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 8300,
+          "tokens_after": 8313,
+          "saved_percent": -0.16,
+          "median_s": 1.7063,
+          "markdown_chars": 30862,
+          "missing_text": [
+            "(6) La protezione accordata ai passeggeri in partenza da un aeroporto situato in uno Stato membro dovrebbe essere estesa ai passeggeri in partenza da un aeroporto situato in un paese terzo verso un aeroporto situato in uno Stato membro, se il volo è operato da un vettore comunitario.",
+            "(15) Dovrebbe essere considerata una circostanza eccezionale il caso in cui l'impatto di una decisione di gestione del traffico aereo in relazione ad un particolare aeromobile in un particolare giorno provochi un lungo ritardo, un ritardo che comporti un pernottamento o la cancellazione di uno o più voli per detto aeromobile, anche se tutte le ragionevoli misure sono state adottate dal vettore aereo interessato per evitare ritardi o cancellazioni.",
+            "b) è offerta l'assistenza del vettore operativo a norma dell'articolo 9, paragrafo 1, lettera a), e dell'articolo 9, paragrafo 2, nonché, in caso di volo alternativo quando l'orario di partenza che si può ragionevolmente prevedere per il nuovo volo è rinviato di almeno un giorno rispetto all'orario di partenza previsto per il volo cancellato, l'assistenza di cui all'articolo 9, paragrafo 1, lettere b) e c); e",
+            "3. Nell'applicare il presente articolo il vettore aereo operativo presta particolare attenzione ai bisogni delle persone con mobilità ridotta e dei loro accompagnatori, nonché ai bisogni dei bambini non accompagnati."
+          ]
+        }
+      }
+    },
+    {
+      "name": "eur_lex_261_2004_es.pdf",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 7366,
+          "tokens_after": 7136,
+          "saved_percent": 3.12,
+          "median_s": 1.4331,
+          "markdown_chars": 31301,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 7366,
+          "tokens_after": 6807,
+          "saved_percent": 7.59,
+          "median_s": 21.6904,
+          "markdown_chars": 31224,
+          "missing_text": []
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 7366,
+          "tokens_after": 7379,
+          "saved_percent": -0.18,
+          "median_s": 1.788,
+          "markdown_chars": 31776,
+          "missing_text": [
+            "b) que no sea superior a tres horas, para todos los vuelos intracomunitarios de más de 1500 kilómetros y para todos los demás vuelos de entre 1500 y 3500 kilómetros, o",
+            "2. El transportista aéreo encargado de efectuar un vuelo que deniegue el embarque o cancele un vuelo deberá proporcionar a cada uno de los pasajeros afectados un impreso en el que se indiquen las normas en materia de compensación y asistencia con arreglo al presente Reglamento. También deberá proporcionar un impreso equivalente a cada uno de los pasajeros afectados por un retraso de al menos dos horas. Los datos de contacto del organismo nacional a que se refiere el artículo 16 se proporcionarán al pasajero por escrito."
+          ]
+        }
+      }
+    },
+    {
+      "name": "eur_lex_261_2004_fr.pdf",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 7389,
+          "tokens_after": 7159,
+          "saved_percent": 3.11,
+          "median_s": 1.4529,
+          "markdown_chars": 30088,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 7389,
+          "tokens_after": 6865,
+          "saved_percent": 7.09,
+          "median_s": 21.6194,
+          "markdown_chars": 29986,
+          "missing_text": []
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 7389,
+          "tokens_after": 7402,
+          "saved_percent": -0.18,
+          "median_s": 1.7676,
+          "markdown_chars": 30551,
+          "missing_text": [
+            "(14) Tout comme dans le cadre de la convention de Montréal, les obligations des transporteurs aériens effectifs devraient être limitées ou leur responsabilité exonérée dans les cas où un événement est dû à des circonstances extraordinaires qui n'auraient pas pu être évitées même si toutes les mesures raisonnables avaient été prises. De telles circonstances peuvent se produire, en particulier, en cas d'instabilité politique, de conditions météorologiques incompatibles avec la réalisation du vol concerné, de risques liés à la sécurité, de défaillances imprévues pouvant affecter la sécurité du vol, ainsi que de grèves ayant une incidence sur les opérations d'un transporteur aérien effectif.",
+            "3. L'indemnisation visée au paragraphe 1 est payée en espèces, par virement bancaire électronique, par virement bancaire ou par chèque, ou, avec l'accord signé du passager, sous forme de bons de voyage et/ou d'autres services."
+          ]
+        }
+      }
+    },
+    {
+      "name": "eur_lex_261_2004_de.pdf",
+      "needs_ocr": false,
+      "tools": {
+        "sugo": {
+          "success": true,
+          "tokens_before": 7810,
+          "tokens_after": 7561,
+          "saved_percent": 3.19,
+          "median_s": 1.9208,
+          "markdown_chars": 31589,
+          "missing_text": []
+        },
+        "docling": {
+          "success": true,
+          "tokens_before": 7810,
+          "tokens_after": 7221,
+          "saved_percent": 7.54,
+          "median_s": 26.3818,
+          "markdown_chars": 31637,
+          "missing_text": [
+            "c) \"Luftfahrtunternehmen der Gemeinschaft\" ein Luftfahrtunternehmen mit einer gültigen Betriebsgenehmigung, die von einem Mitgliedstaat gemäß der Verordnung (EWG) Nr. 2407/92 des Rates vom 23. Juli 1992 über die Erteilung von Betriebsgenehmigungen an Luftfahrtunternehmen(5) erteilt wurde;"
+          ]
+        },
+        "markitdown": {
+          "success": true,
+          "tokens_before": 7810,
+          "tokens_after": 7824,
+          "saved_percent": -0.18,
+          "median_s": 1.7936,
+          "markdown_chars": 32163,
+          "missing_text": [
+            "(14) Wie nach dem Übereinkommen von Montreal sollten die Verpflichtungen für ausführende Luftfahrtunternehmen in den Fällen beschränkt oder ausgeschlossen sein, in denen ein Vorkommnis auf außergewöhnliche Umstände zurückgeht, die sich auch dann nicht hätten vermeiden lassen, wenn alle zumutbaren Maßnahmen ergriffen worden wären. Solche Umstände können insbesondere bei politischer Instabilität, mit der Durchführung des betreffenden Fluges nicht zu vereinbarenden Wetterbedingungen, Sicherheitsrisiken, unerwarteten Flugsicherheitsmängeln und den Betrieb eines ausführenden Luftfahrtunternehmens beeinträchtigenden Streiks eintreten.",
+            "(24) Am 2. Dezember 1987 haben das Königreich Spanien und das Vereinigte Königreich in London in einer gemeinsamen Erklärung ihrer Minister für auswärtige Angelegenheiten eine engere Zusammenarbeit bei der Benutzung des Flughafens Gibraltar vereinbart; diese Vereinbarung ist noch nicht wirksam.",
+            "c) \"Luftfahrtunternehmen der Gemeinschaft\" ein Luftfahrtunternehmen mit einer gültigen Betriebsgenehmigung, die von einem Mitgliedstaat gemäß der Verordnung (EWG) Nr. 2407/92 des Rates vom 23. Juli 1992 über die Erteilung von Betriebsgenehmigungen an Luftfahrtunternehmen(5) erteilt wurde;",
+            "(1) Ist für ein ausführendes Luftfahrtunternehmen nach vernünftigem Ermessen absehbar, dass Fluggästen die Beförderung zu verweigern ist, so versucht es zunächst, Fluggäste gegen eine entsprechende Gegenleistung unter Bedingungen, die zwischen dem betreffenden Fluggast und dem ausführenden Luftfahrtunternehmen zu vereinbaren sind, zum freiwilligen Verzicht auf ihre Buchungen zu bewegen. Die Freiwilligen sind gemäß Artikel 8 zu unterstützen, wobei die Unterstützungsleistungen zusätzlich zu dem in diesem Absatz genannten Ausgleich zu gewähren sind.",
+            "(3) Ein ausführendes Luftfahrtunternehmen ist nicht verpflichtet, Ausgleichszahlungen gemäß Artikel 7 zu leisten, wenn es nachweisen kann, dass die Annullierung auf außergewöhnliche Umstände zurückgeht, die sich auch dann nicht hätten vermeiden lassen, wenn alle zumutbaren Maßnahmen ergriffen worden wären.",
+            "(2) Absatz 1 Buchstabe a) gilt auch für Fluggäste, deren Flüge Bestandteil einer Pauschalreise sind, mit Ausnahme des Anspruchs auf Erstattung, sofern dieser sich aus der Richtlinie 90/314/EWG ergibt.",
+            "In Fällen, in denen ein ausführendes Luftfahrtunternehmen eine Ausgleichszahlung leistet oder die sonstigen sich aus dieser Verordnung ergebenden Verpflichtungen erfuellt, kann keine Bestimmung dieser Verordnung in dem Sinne ausgelegt werden, dass sie das Recht des Luftfahrtunternehmens beschränkt, nach geltendem Recht bei anderen Personen, auch Dritten, Regress zu nehmen. Insbesondere beschränkt diese Verordnung in keiner Weise das Recht des ausführenden Luftfahrtunternehmens, Erstattung von einem Reiseunternehmen oder einer anderen Person zu verlangen, mit der es in einer Vertragsbeziehung steht. Gleichfalls kann keine Bestimmung dieser Verordnung in dem Sinne ausgelegt werden, dass sie das Recht eines Reiseunternehmens oder eines nicht zu den Fluggästen zählenden Dritten, mit dem das ausführende Luftfahrtunternehmen in einer Vertragsbeziehung steht, beschränkt, vom ausführenden Luftfahrtunternehmen gemäß den anwendbaren einschlägigen Rechtsvorschriften eine Erstattung oder Entschädigung zu verlangen."
+          ]
+        }
+      }
+    }
+  ],
+  "summary": {
+    "sugo": {
+      "documents_total": 31,
+      "conversions_ok": 31,
+      "failures": [],
+      "median_saved_percent": 0.0,
+      "mean_saved_percent": 6.26,
+      "median_seconds": 1.2347,
+      "content_issue_count": 3,
+      "content_issues": [
+        {
+          "name": "chat_it.png",
+          "character_error_rate": 0.0108
+        },
+        {
+          "name": "chat_es.png",
+          "character_error_rate": 0.0636
+        },
+        {
+          "name": "chat_fr.png",
+          "character_error_rate": 0.0707
+        }
+      ]
+    },
+    "docling": {
+      "documents_total": 31,
+      "conversions_ok": 31,
+      "failures": [],
+      "median_saved_percent": 27.66,
+      "mean_saved_percent": 11.06,
+      "median_seconds": 4.5492,
+      "content_issue_count": 13,
+      "content_issues": [
+        {
+          "name": "chat_it.png",
+          "character_error_rate": 0.6882
+        },
+        {
+          "name": "code_it.png",
+          "character_error_rate": 1.6154
+        },
+        {
+          "name": "chat_es.png",
+          "character_error_rate": 0.7182
+        },
+        {
+          "name": "code_es.png",
+          "character_error_rate": 1.6154
+        },
+        {
+          "name": "chat_fr.png",
+          "character_error_rate": 0.8283
+        },
+        {
+          "name": "code_fr.png",
+          "character_error_rate": 1.6154
+        },
+        {
+          "name": "chat_de.png",
+          "character_error_rate": 0.9099
+        },
+        {
+          "name": "code_de.png",
+          "character_error_rate": 1.6154
+        },
+        {
+          "name": "chat_en.png",
+          "character_error_rate": 1.0364
+        },
+        {
+          "name": "code_en.png",
+          "character_error_rate": 1.6154
+        },
+        {
+          "name": "chat_en_dark.png",
+          "character_error_rate": 1.2273
+        },
+        {
+          "name": "eur_lex_261_2004_en.pdf",
+          "missing_text": [
+            "2. Paragraph 1(a) shall also apply to passengers whose flights form part of a package, except for the right to reimbursement where such right arises under Directive 90/314/EEC."
+          ]
+        },
+        {
+          "name": "eur_lex_261_2004_de.pdf",
+          "missing_text": [
+            "c) \"Luftfahrtunternehmen der Gemeinschaft\" ein Luftfahrtunternehmen mit einer gültigen Betriebsgenehmigung, die von einem Mitgliedstaat gemäß der Verordnung (EWG) Nr. 2407/92 des Rates vom 23. Juli 1992 über die Erteilung von Betriebsgenehmigungen an Luftfahrtunternehmen(5) erteilt wurde;"
+          ]
+        }
+      ]
+    },
+    "markitdown": {
+      "documents_total": 31,
+      "conversions_ok": 31,
+      "failures": [],
+      "median_saved_percent": -0.21,
+      "mean_saved_percent": 29.76,
+      "median_seconds": 0.0246,
+      "content_issue_count": 17,
+      "content_issues": [
+        {
+          "name": "chat_it.png",
+          "character_error_rate": 1.0
+        },
+        {
+          "name": "code_it.png",
+          "character_error_rate": 1.0
+        },
+        {
+          "name": "chat_es.png",
+          "character_error_rate": 1.0
+        },
+        {
+          "name": "code_es.png",
+          "character_error_rate": 1.0
+        },
+        {
+          "name": "chat_fr.png",
+          "character_error_rate": 1.0
+        },
+        {
+          "name": "code_fr.png",
+          "character_error_rate": 1.0
+        },
+        {
+          "name": "chat_de.png",
+          "character_error_rate": 1.0
+        },
+        {
+          "name": "code_de.png",
+          "character_error_rate": 1.0
+        },
+        {
+          "name": "table_en.xlsx",
+          "missing_text": [
+            "2.50",
+            "1.20",
+            "4.80"
+          ]
+        },
+        {
+          "name": "chat_en.png",
+          "character_error_rate": 1.0
+        },
+        {
+          "name": "code_en.png",
+          "character_error_rate": 1.0
+        },
+        {
+          "name": "chat_en_dark.png",
+          "character_error_rate": 1.0
+        },
+        {
+          "name": "eur_lex_261_2004_en.pdf",
+          "missing_text": [
+            "(6) The protection accorded to passengers departing from an airport located in a Member State should be extended to those leaving an airport located in a third country for one situated in a Member State, when a Community carrier operates the flight.",
+            "2. Paragraph 1(a) shall also apply to passengers whose flights form part of a package, except for the right to reimbursement where such right arises under Directive 90/314/EEC."
+          ]
+        },
+        {
+          "name": "eur_lex_261_2004_it.pdf",
+          "missing_text": [
+            "(6) La protezione accordata ai passeggeri in partenza da un aeroporto situato in uno Stato membro dovrebbe essere estesa ai passeggeri in partenza da un aeroporto situato in un paese terzo verso un aeroporto situato in uno Stato membro, se il volo è operato da un vettore comunitario.",
+            "(15) Dovrebbe essere considerata una circostanza eccezionale il caso in cui l'impatto di una decisione di gestione del traffico aereo in relazione ad un particolare aeromobile in un particolare giorno provochi un lungo ritardo, un ritardo che comporti un pernottamento o la cancellazione di uno o più voli per detto aeromobile, anche se tutte le ragionevoli misure sono state adottate dal vettore aereo interessato per evitare ritardi o cancellazioni.",
+            "b) è offerta l'assistenza del vettore operativo a norma dell'articolo 9, paragrafo 1, lettera a), e dell'articolo 9, paragrafo 2, nonché, in caso di volo alternativo quando l'orario di partenza che si può ragionevolmente prevedere per il nuovo volo è rinviato di almeno un giorno rispetto all'orario di partenza previsto per il volo cancellato, l'assistenza di cui all'articolo 9, paragrafo 1, lettere b) e c); e",
+            "3. Nell'applicare il presente articolo il vettore aereo operativo presta particolare attenzione ai bisogni delle persone con mobilità ridotta e dei loro accompagnatori, nonché ai bisogni dei bambini non accompagnati."
+          ]
+        },
+        {
+          "name": "eur_lex_261_2004_es.pdf",
+          "missing_text": [
+            "b) que no sea superior a tres horas, para todos los vuelos intracomunitarios de más de 1500 kilómetros y para todos los demás vuelos de entre 1500 y 3500 kilómetros, o",
+            "2. El transportista aéreo encargado de efectuar un vuelo que deniegue el embarque o cancele un vuelo deberá proporcionar a cada uno de los pasajeros afectados un impreso en el que se indiquen las normas en materia de compensación y asistencia con arreglo al presente Reglamento. También deberá proporcionar un impreso equivalente a cada uno de los pasajeros afectados por un retraso de al menos dos horas. Los datos de contacto del organismo nacional a que se refiere el artículo 16 se proporcionarán al pasajero por escrito."
+          ]
+        },
+        {
+          "name": "eur_lex_261_2004_fr.pdf",
+          "missing_text": [
+            "(14) Tout comme dans le cadre de la convention de Montréal, les obligations des transporteurs aériens effectifs devraient être limitées ou leur responsabilité exonérée dans les cas où un événement est dû à des circonstances extraordinaires qui n'auraient pas pu être évitées même si toutes les mesures raisonnables avaient été prises. De telles circonstances peuvent se produire, en particulier, en cas d'instabilité politique, de conditions météorologiques incompatibles avec la réalisation du vol concerné, de risques liés à la sécurité, de défaillances imprévues pouvant affecter la sécurité du vol, ainsi que de grèves ayant une incidence sur les opérations d'un transporteur aérien effectif.",
+            "3. L'indemnisation visée au paragraphe 1 est payée en espèces, par virement bancaire électronique, par virement bancaire ou par chèque, ou, avec l'accord signé du passager, sous forme de bons de voyage et/ou d'autres services."
+          ]
+        },
+        {
+          "name": "eur_lex_261_2004_de.pdf",
+          "missing_text": [
+            "(14) Wie nach dem Übereinkommen von Montreal sollten die Verpflichtungen für ausführende Luftfahrtunternehmen in den Fällen beschränkt oder ausgeschlossen sein, in denen ein Vorkommnis auf außergewöhnliche Umstände zurückgeht, die sich auch dann nicht hätten vermeiden lassen, wenn alle zumutbaren Maßnahmen ergriffen worden wären. Solche Umstände können insbesondere bei politischer Instabilität, mit der Durchführung des betreffenden Fluges nicht zu vereinbarenden Wetterbedingungen, Sicherheitsrisiken, unerwarteten Flugsicherheitsmängeln und den Betrieb eines ausführenden Luftfahrtunternehmens beeinträchtigenden Streiks eintreten.",
+            "(24) Am 2. Dezember 1987 haben das Königreich Spanien und das Vereinigte Königreich in London in einer gemeinsamen Erklärung ihrer Minister für auswärtige Angelegenheiten eine engere Zusammenarbeit bei der Benutzung des Flughafens Gibraltar vereinbart; diese Vereinbarung ist noch nicht wirksam.",
+            "c) \"Luftfahrtunternehmen der Gemeinschaft\" ein Luftfahrtunternehmen mit einer gültigen Betriebsgenehmigung, die von einem Mitgliedstaat gemäß der Verordnung (EWG) Nr. 2407/92 des Rates vom 23. Juli 1992 über die Erteilung von Betriebsgenehmigungen an Luftfahrtunternehmen(5) erteilt wurde;",
+            "(1) Ist für ein ausführendes Luftfahrtunternehmen nach vernünftigem Ermessen absehbar, dass Fluggästen die Beförderung zu verweigern ist, so versucht es zunächst, Fluggäste gegen eine entsprechende Gegenleistung unter Bedingungen, die zwischen dem betreffenden Fluggast und dem ausführenden Luftfahrtunternehmen zu vereinbaren sind, zum freiwilligen Verzicht auf ihre Buchungen zu bewegen. Die Freiwilligen sind gemäß Artikel 8 zu unterstützen, wobei die Unterstützungsleistungen zusätzlich zu dem in diesem Absatz genannten Ausgleich zu gewähren sind.",
+            "(3) Ein ausführendes Luftfahrtunternehmen ist nicht verpflichtet, Ausgleichszahlungen gemäß Artikel 7 zu leisten, wenn es nachweisen kann, dass die Annullierung auf außergewöhnliche Umstände zurückgeht, die sich auch dann nicht hätten vermeiden lassen, wenn alle zumutbaren Maßnahmen ergriffen worden wären.",
+            "(2) Absatz 1 Buchstabe a) gilt auch für Fluggäste, deren Flüge Bestandteil einer Pauschalreise sind, mit Ausnahme des Anspruchs auf Erstattung, sofern dieser sich aus der Richtlinie 90/314/EWG ergibt.",
+            "In Fällen, in denen ein ausführendes Luftfahrtunternehmen eine Ausgleichszahlung leistet oder die sonstigen sich aus dieser Verordnung ergebenden Verpflichtungen erfuellt, kann keine Bestimmung dieser Verordnung in dem Sinne ausgelegt werden, dass sie das Recht des Luftfahrtunternehmens beschränkt, nach geltendem Recht bei anderen Personen, auch Dritten, Regress zu nehmen. Insbesondere beschränkt diese Verordnung in keiner Weise das Recht des ausführenden Luftfahrtunternehmens, Erstattung von einem Reiseunternehmen oder einer anderen Person zu verlangen, mit der es in einer Vertragsbeziehung steht. Gleichfalls kann keine Bestimmung dieser Verordnung in dem Sinne ausgelegt werden, dass sie das Recht eines Reiseunternehmens oder eines nicht zu den Fluggästen zählenden Dritten, mit dem das ausführende Luftfahrtunternehmen in einer Vertragsbeziehung steht, beschränkt, vom ausführenden Luftfahrtunternehmen gemäß den anwendbaren einschlägigen Rechtsvorschriften eine Erstattung oder Entschädigung zu verlangen."
+          ]
+        }
+      ]
+    }
+  }
+}
