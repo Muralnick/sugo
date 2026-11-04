@@ -43,6 +43,8 @@ Added on 2026-10-30, between steps 7 and 9: the remaining v0.1 pieces (text clea
 
 Added on 2026-11-01 (maintainer decision, ADR-055): a minimal local web UI, `sugo ui`, after step 8 and before step 9.
 
+Added on 2026-11-04 (maintainer decision, ADR-056): the conversion receipt and `sugo verify`, scoped to developer/RAG trust and debugging, as a v0.1 follow-up after the `v0.1.0a1` pre-release and before step 9.
+
 ## After v0.1
 
 - v0.2: shared engine, interactive shell, Japanese, Chinese, Korean, `normal` level with Docling (complex Office layouts, legacy formats).
