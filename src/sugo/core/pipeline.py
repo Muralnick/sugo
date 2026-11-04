@@ -45,6 +45,7 @@ from sugo.core.constants import (
 )
 from sugo.core.decisions import InvalidDecisionError, Proposal, apply_decisions
 from sugo.core.models import BlockFlag, Page
+from sugo.core.receipt import EditRecord, FlaggedBlock, Receipt, RemovalRecord
 from sugo.extractors.image.extract import extract_page
 from sugo.extractors.image.loader import UnsupportedImageError, detect_format
 from sugo.extractors.image.ocr_engine import OcrEngine
@@ -164,6 +165,9 @@ class Conversion:
     # Blocks flagged as holding credentials, removed or not: the MCP server
     # never sends such a document to an agent (ADR-053).
     secret_blocks: int = 0
+    # Per-block detail behind ``removed``/``edited``, plus confidence and
+    # warning flags; None unless asked for (``receipt``, ADR-056).
+    receipt: Receipt | None = None
 
 
 def convert_file(
@@ -176,6 +180,7 @@ def convert_file(
     count_raw_tokens: bool = False,
     languages: tuple[str, ...] = DEFAULT_LANGUAGES,
     strip_tracking_urls: bool = True,
+    receipt: bool = False,
 ) -> Conversion:
     """Read a file and convert it; ``source`` defaults to the path as given.
 
@@ -196,6 +201,7 @@ def convert_file(
         count_raw_tokens=count_raw_tokens,
         languages=languages,
         strip_tracking_urls=strip_tracking_urls,
+        receipt=receipt,
     )
 
 
@@ -220,6 +226,7 @@ def convert(
     count_raw_tokens: bool = False,
     languages: tuple[str, ...] = DEFAULT_LANGUAGES,
     strip_tracking_urls: bool = True,
+    receipt: bool = False,
 ) -> Conversion:
     """Convert a document's bytes into Markdown, and into chunks if asked.
 
@@ -234,6 +241,9 @@ def convert(
         languages: Languages whose text rules apply (ADR-025); others get
             only the universal rules.
         strip_tracking_urls: Delete tracking parameters from URLs.
+        receipt: Also build a self-contained receipt of every removal, edit
+            and flagged block, for ``sugo verify`` (ADR-056). Costs memory
+            and a second rendering pass, like ``count_raw_tokens``.
 
     Raises:
         ValueError: If a language has no pack, or ``max_chunk_tokens`` is too small.
@@ -252,6 +262,8 @@ def convert(
         count_raw_tokens=count_raw_tokens,
         text_cleaners=_text_cleaners(languages, strip_tracking_urls=strip_tracking_urls),
         languages=tuple(sorted(set(languages))),
+        strip_tracking_urls=strip_tracking_urls,
+        receipt=receipt,
     )
     if cache is not None:
         return _Job(data, kind, cache, ocr, options).run()
@@ -314,6 +326,9 @@ class _Options:
     count_raw_tokens: bool
     text_cleaners: tuple[Cleaner[Lexicon], ...]
     languages: tuple[str, ...]
+    strip_tracking_urls: bool
+    # Not part of the config hash: it measures the conversion, never changes it.
+    receipt: bool
 
     def cleaning(self) -> str:
         """The settings that change cleaned pages, part of their cache key."""
@@ -377,8 +392,13 @@ class _Job:
         edited: Counter[str] = Counter()
         secret_blocks = 0
         parts: list[str] = []
-        raw_parts: list[str] | None = [] if self._options.count_raw_tokens else None
+        # The receipt needs the raw token count too (ADR-056), like count_raw_tokens.
+        want_raw = self._options.count_raw_tokens or self._options.receipt
+        raw_parts: list[str] | None = [] if want_raw else None
         chunks: list[Chunk] = []
+        removal_records: list[RemovalRecord] = []
+        edit_records: list[EditRecord] = []
+        flagged_records: list[FlaggedBlock] = []
         for index in range(count):
             if raw_parts is not None:
                 raw_text = render(self._extracted(index).blocks)
@@ -388,6 +408,42 @@ class _Job:
             removed.update(block.removed_by for block in page.blocks if block.removed_by)
             edited.update(edit.edited_by for block in page.blocks for edit in block.edits)
             secret_blocks += sum(BlockFlag.SECRET in block.flags for block in page.blocks)
+            if self._options.receipt:
+                page_number = index + 1
+                for block in page.blocks:
+                    if block.removed_by is not None and block.reason is not None:
+                        removal_records.append(
+                            RemovalRecord(
+                                page=page_number,
+                                block_id=block.id,
+                                block_type=block.type,
+                                removed_by=block.removed_by,
+                                reason=block.reason,
+                                text=block.text,
+                            )
+                        )
+                    edit_records.extend(
+                        EditRecord(
+                            page=page_number,
+                            block_id=block.id,
+                            edited_by=edit.edited_by,
+                            kind=edit.kind,
+                            reason=edit.reason,
+                            original=edit.original,
+                            replacement=edit.replacement,
+                        )
+                        for edit in block.edits
+                    )
+                    if block.flags or (block.confidence is not None and block.confidence < 1.0):
+                        flagged_records.append(
+                            FlaggedBlock(
+                                page=page_number,
+                                block_id=block.id,
+                                block_type=block.type,
+                                flags=block.flags,
+                                confidence=block.confidence,
+                            )
+                        )
             text = render(page.blocks)
             if text:
                 parts.append(text)
@@ -396,22 +452,45 @@ class _Job:
                 chunks.extend(chunker.add(page))
         if chunker is not None:
             chunks.extend(chunker.finish())
+        markdown = "\n\n".join(parts)
+        raw_tokens = None if raw_parts is None else count_tokens("\n\n".join(raw_parts))
+        failed_pages = tuple(index + 1 for index in sorted(self._failed))
+        receipt = (
+            None
+            if not self._options.receipt
+            else Receipt(
+                source=self._options.source,
+                source_sha256=self._sha256,
+                sugo_version=sugo_version,
+                config_hash=config_hash,
+                languages=self._options.languages,
+                strip_tracking_urls=self._options.strip_tracking_urls,
+                pages=count,
+                failed_pages=failed_pages,
+                tokens_before=raw_tokens or 0,
+                tokens_after=count_tokens(markdown),
+                removed=tuple(removal_records),
+                edited=tuple(edit_records),
+                flagged=tuple(flagged_records),
+            )
+        )
         return Conversion(
             # Pages follow each other like paragraphs (ADR-046).
-            markdown="\n\n".join(parts),
+            markdown=markdown,
             kind=self._kind,
             source=self._options.source,
             source_sha256=self._sha256,
             pages=count,
-            failed_pages=tuple(index + 1 for index in sorted(self._failed)),
+            failed_pages=failed_pages,
             removed=MappingProxyType(dict(sorted(removed.items()))),
             chunks=tuple(chunks),
             sugo_version=sugo_version,
             config_hash=config_hash,
             # Joined like the Markdown, so both counts measure the same layout.
-            raw_tokens=None if raw_parts is None else count_tokens("\n\n".join(raw_parts)),
+            raw_tokens=raw_tokens if self._options.count_raw_tokens else None,
             edited=MappingProxyType(dict(sorted(edited.items()))),
             secret_blocks=secret_blocks,
+            receipt=receipt,
         )
 
     def _extract(self) -> int:

@@ -1,0 +1,305 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Muralnick/sugo/main/schemas/receipt-v1.schema.json",
+  "$defs": {
+    "BlockFlag": {
+      "description": "Warnings attached to a block for later stages and for the user (ADR-026).",
+      "enum": [
+        "illegible",
+        "suspicious_instruction",
+        "low_agreement",
+        "hidden",
+        "secret",
+        "decorative"
+      ],
+      "title": "BlockFlag",
+      "type": "string"
+    },
+    "BlockType": {
+      "description": "What a block is; drives cleaning rules and Markdown rendering.",
+      "enum": [
+        "heading",
+        "paragraph",
+        "list_item",
+        "table",
+        "code",
+        "chat_message",
+        "image",
+        "caption",
+        "footnote",
+        "formula",
+        "header",
+        "footer",
+        "page_number",
+        "ui_chrome"
+      ],
+      "title": "BlockType",
+      "type": "string"
+    },
+    "EditKind": {
+      "description": "The only kinds of text change the core applies (ADR-050).\n\nEach kind is checked mechanically by the core, so no cleaner can slip in\nnew words: a deletion only removes, a normalisation keeps every visible\ncharacter, and a hyphen join only removes a line-break hyphen.",
+      "enum": [
+        "delete",
+        "normalize",
+        "hyphen_join"
+      ],
+      "title": "EditKind",
+      "type": "string"
+    },
+    "EditRecord": {
+      "additionalProperties": false,
+      "description": "One text edit the core applied, mirroring ``TextEdit`` (ADR-050).",
+      "properties": {
+        "page": {
+          "minimum": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "block_id": {
+          "minLength": 1,
+          "title": "Block Id",
+          "type": "string"
+        },
+        "edited_by": {
+          "minLength": 1,
+          "title": "Edited By",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/EditKind"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "original": {
+          "minLength": 1,
+          "title": "Original",
+          "type": "string"
+        },
+        "replacement": {
+          "title": "Replacement",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page",
+        "block_id",
+        "edited_by",
+        "kind",
+        "reason",
+        "original",
+        "replacement"
+      ],
+      "title": "EditRecord",
+      "type": "object"
+    },
+    "FlaggedBlock": {
+      "additionalProperties": false,
+      "description": "A block that kept a warning flag or less than full confidence, removed or not.",
+      "properties": {
+        "page": {
+          "minimum": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "block_id": {
+          "minLength": 1,
+          "title": "Block Id",
+          "type": "string"
+        },
+        "block_type": {
+          "$ref": "#/$defs/BlockType"
+        },
+        "flags": {
+          "items": {
+            "$ref": "#/$defs/BlockFlag"
+          },
+          "title": "Flags",
+          "type": "array"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Confidence"
+        }
+      },
+      "required": [
+        "page",
+        "block_id",
+        "block_type",
+        "flags",
+        "confidence"
+      ],
+      "title": "FlaggedBlock",
+      "type": "object"
+    },
+    "RemovalRecord": {
+      "additionalProperties": false,
+      "description": "One block the core removed, with the text it removed (principle 3).",
+      "properties": {
+        "page": {
+          "minimum": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "block_id": {
+          "minLength": 1,
+          "title": "Block Id",
+          "type": "string"
+        },
+        "block_type": {
+          "$ref": "#/$defs/BlockType"
+        },
+        "removed_by": {
+          "minLength": 1,
+          "title": "Removed By",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page",
+        "block_id",
+        "block_type",
+        "removed_by",
+        "reason",
+        "text"
+      ],
+      "title": "RemovalRecord",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Self-contained record of one conversion's cleaning stage (ADR-056).",
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Source"
+    },
+    "source_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "pattern": "^[0-9a-f]+$",
+      "title": "Source Sha256",
+      "type": "string"
+    },
+    "sugo_version": {
+      "minLength": 1,
+      "title": "Sugo Version",
+      "type": "string"
+    },
+    "config_hash": {
+      "maxLength": 64,
+      "minLength": 64,
+      "pattern": "^[0-9a-f]+$",
+      "title": "Config Hash",
+      "type": "string"
+    },
+    "languages": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Languages",
+      "type": "array"
+    },
+    "strip_tracking_urls": {
+      "title": "Strip Tracking Urls",
+      "type": "boolean"
+    },
+    "pages": {
+      "minimum": 0,
+      "title": "Pages",
+      "type": "integer"
+    },
+    "failed_pages": {
+      "items": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "title": "Failed Pages",
+      "type": "array"
+    },
+    "tokens_before": {
+      "minimum": 0,
+      "title": "Tokens Before",
+      "type": "integer"
+    },
+    "tokens_after": {
+      "minimum": 0,
+      "title": "Tokens After",
+      "type": "integer"
+    },
+    "removed": {
+      "items": {
+        "$ref": "#/$defs/RemovalRecord"
+      },
+      "title": "Removed",
+      "type": "array"
+    },
+    "edited": {
+      "items": {
+        "$ref": "#/$defs/EditRecord"
+      },
+      "title": "Edited",
+      "type": "array"
+    },
+    "flagged": {
+      "items": {
+        "$ref": "#/$defs/FlaggedBlock"
+      },
+      "title": "Flagged",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "source",
+    "source_sha256",
+    "sugo_version",
+    "config_hash",
+    "languages",
+    "strip_tracking_urls",
+    "pages",
+    "failed_pages",
+    "tokens_before",
+    "tokens_after",
+    "removed",
+    "edited",
+    "flagged"
+  ],
+  "title": "Receipt",
+  "type": "object"
+}

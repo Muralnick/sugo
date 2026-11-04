@@ -23,14 +23,16 @@ msgid ""
 "Convert files into compact Markdown (sugo FILE is short for sugo convert FILE).\n"
 "\n"
 "Without -o the Markdown of one file goes to stdout; with --chunks, its chunks as "
-"JSON Lines. With -o each file becomes NAME.md, and NAME.jsonl with --chunks. A "
-"file that fails does not stop the others."
+"JSON Lines. With -o each file becomes NAME.md, and NAME.jsonl with --chunks. With "
+"--receipt, also NAME.receipt.json, checkable with sugo verify. A file that fails "
+"does not stop the others."
 msgstr ""
 "Converti i file in Markdown compatto (sugo FILE è l'abbreviazione di sugo convert FILE).\n"
 "\n"
 "Senza -o il Markdown di un file va sullo standard output; con --chunks, i suoi "
 "chunk in JSON Lines. Con -o ogni file diventa NOME.md, e NOME.jsonl con --chunks. "
-"Un file che non riesce non ferma gli altri."
+"Con --receipt, anche NOME.receipt.json, verificabile con sugo verify. Un file che "
+"non riesce non ferma gli altri."
 
 msgid "PDF, DOCX, XLSX, PPTX, PNG, JPEG, WEBP or XML files."
 msgstr "File PDF, DOCX, XLSX, PPTX, PNG, JPEG, WEBP o XML."
@@ -43,6 +45,9 @@ msgstr "Dividi anche in chunk (JSONL) per il RAG."
 
 msgid "Chunk size in tokens."
 msgstr "Dimensione dei chunk in token."
+
+msgid "Also write a receipt of removals and edits, for sugo verify."
+msgstr "Scrivi anche una ricevuta delle rimozioni e modifiche, per sugo verify."
 
 msgid "Start the Markdown with YAML metadata."
 msgstr "Inizia il Markdown con i metadati YAML."
@@ -76,6 +81,19 @@ msgstr "Offri Sugo agli agenti IA tramite MCP (stdio), leggendo solo nelle carte
 
 msgid "A folder agents may read; repeatable. Required."
 msgstr "Una cartella che gli agenti possono leggere; ripetibile. Obbligatoria."
+
+msgid ""
+"Check a conversion receipt against a fresh conversion of FILE (ADR-056). "
+"Self-contained: only FILE and RECEIPT are needed."
+msgstr ""
+"Controlla una ricevuta di conversione confrontandola con una nuova conversione di "
+"FILE (ADR-056). Autosufficiente: servono solo FILE e RECEIPT."
+
+msgid "The file the receipt is for."
+msgstr "Il file a cui si riferisce la ricevuta."
+
+msgid "The receipt written with --receipt."
+msgstr "La ricevuta scritta con --receipt."
 
 # --- Command line: what Typer's copy of Click writes in English ----------------
 
@@ -186,6 +204,9 @@ msgstr "scrivere {name}.md sovrascriverebbe un file di ingresso"
 msgid "unknown provider {names}; choose from {choices}"
 msgstr "fornitore sconosciuto {names}; scegli tra {choices}"
 
+msgid "--receipt needs -o or --json"
+msgstr "--receipt richiede -o oppure --json"
+
 # --- Command line: progress and results ---------------------------------------
 
 msgid "Converting"
@@ -193,6 +214,9 @@ msgstr "Conversione in corso"
 
 msgid "Converting {source}"
 msgstr "Conversione di {source}"
+
+msgid "Verifying {source}"
+msgstr "Verifica di {source}"
 
 msgid "clipboard"
 msgstr "appunti"
@@ -242,6 +266,25 @@ msgstr "rifiutata"
 
 msgid "warning: {message}"
 msgstr "avviso: {message}"
+
+msgid ""
+"warning: re-converted with a different version or configuration; an exact match "
+"is not guaranteed"
+msgstr ""
+"avviso: riconvertito con una versione o configurazione diversa; una corrispondenza "
+"esatta non è garantita"
+
+msgid "{source}: matches the receipt"
+msgstr "{source}: corrisponde alla ricevuta"
+
+msgid "{source}: does not match the receipt"
+msgstr "{source}: non corrisponde alla ricevuta"
+
+msgid "  {category}, page {page}, block {block_id}: {kind}"
+msgstr "  {category}, pagina {page}, blocco {block_id}: {kind}"
+
+msgid "  tokens after cleaning: {stored} in the receipt, {fresh} now"
+msgstr "  token dopo la pulizia: {stored} nella ricevuta, {fresh} ora"
 
 msgid "Interrupted."
 msgstr "Interrotto."
@@ -325,6 +368,12 @@ msgstr "il nome è troppo lungo"
 
 msgid "unknown error"
 msgstr "errore sconosciuto"
+
+msgid "The receipt is not valid; it may be from an incompatible Sugo version."
+msgstr "La ricevuta non è valida; potrebbe provenire da una versione incompatibile di Sugo."
+
+msgid "This file does not match the receipt: it is a different edition."
+msgstr "Questo file non corrisponde alla ricevuta: è un'edizione diversa."
 
 msgid "not a supported input: PDF, DOCX, XLSX, PPTX, PNG, JPEG, WEBP or XML expected"
 msgstr "formato non supportato: attesi PDF, DOCX, XLSX, PPTX, PNG, JPEG, WEBP o XML"

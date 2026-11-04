@@ -1,6 +1,6 @@
 # ADR-056: Conversion receipt and `sugo verify`
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-11-04
 **Deciders:** project author
 **Implements:** ADR-050 (text edits), ADR-041 (cleaner decisions), ADR-047 (chunks, schema versioning), ADR-003 (token metrics)
@@ -58,10 +58,11 @@ sugo verify FILE RECEIPT [--json]
 
 - `--receipt` needs `-o` or `--json` (maintainer decision, 2026-11-04: left to the author to resolve, settled the same way as `--max-tokens needs --chunks` — a receipt is structured data with no sensible inline textual form mixed with plain Markdown on stdout). With `-o`, writes `NAME.receipt.json` next to `NAME.md` (atomic, owner-only, like `NAME.jsonl`, ADR-047). With `--json` alone, adds a `receipt` object to the per-document JSON, next to `chunks` when `--chunks` is also given.
 - `sugo verify FILE RECEIPT`: re-reads `FILE`, re-converts it with the `languages` and `strip_tracking_urls` stored on the receipt itself (maintainer decision, 2026-11-04: the receipt is self-sufficient — it carries the actual settings, not just `config_hash`'s digest of them, so `verify` never needs the caller to remember or re-supply the original flags), and structurally compares the result:
-  - `source_sha256` differs → refuses immediately, exit 1, `FILE_CHANGED`: the receipt is for a different edition of the document.
+  - `source_sha256` differs → refuses immediately with the new error code `FILE_CHANGED`, exit 1: the receipt is for a different edition of the document.
+  - A receipt that is not valid JSON or not schema 1.0 → the new error code `RECEIPT_INVALID`, exit 1.
   - `sugo_version` or `config_hash` differs → warns (stderr) that an exact match cannot be guaranteed across versions/configs, then still compares and reports what it finds.
-  - Otherwise compares `removed`, `edited`, `flagged` and `tokens_after` entry-by-entry. A match exits 0. A mismatch exits 1 with a new error code `RECEIPT_MISMATCH`, reporting counts and block ids that differ — never the text itself (principle 11: logs and messages carry no document content; the receipt file the user already has on disk is where the content lives).
-  - `--json` prints `{"match": bool, "differences": [...]}`, listing block ids and the kind of difference (`missing`, `extra`, `changed`), again without text.
+  - Otherwise compares `removed`, `edited`, `flagged` and `tokens_after` entry-by-entry and prints the result itself — block ids and pages only, never text (principle 11). Like `sugo doctor`, the command reports everything itself and then sets the exit code directly (0 match, 1 mismatch), rather than wrapping a already-printed result in a second error object.
+  - `--json` prints `{"match": bool, "version_drifted": bool, "config_drifted": bool, "differences": [...]}`, each difference naming its `category` (`removed`/`edited`/`flagged`/`tokens_after`), `kind` (`missing`/`extra`/`changed`), `page` and `block_id` — again without text.
 
 ### Out of scope (deferred, maintainer decision 2026-11-04)
 
@@ -80,7 +81,7 @@ sugo verify FILE RECEIPT [--json]
 
 ## Consequences
 
-- New public contract: `Receipt` schema 1.0, the `--receipt` flag, the `sugo verify` command, its exit codes and the new `RECEIPT_MISMATCH` / `FILE_CHANGED` error codes (principle 12). Placed in `docs/ROADMAP.md` as a v0.1 follow-up, after the `v0.1.0a1` pre-release and before step 9 (maintainer decision, 2026-11-04) — it was not part of the original v0.1 scope table.
+- New public contract: `Receipt` schema 1.0, the `--receipt` flag, the `sugo verify` command, its exit codes and the new `FILE_CHANGED` / `RECEIPT_INVALID` error codes (principle 12). Placed in `docs/ROADMAP.md` as a v0.1 follow-up, after the `v0.1.0a1` pre-release and before step 9 (maintainer decision, 2026-11-04) — it was not part of the original v0.1 scope table.
 - `Conversion` gains one field (`receipt: Receipt | None`); existing callers are unaffected since it defaults to `None`.
 - Strengthens principle 3 ("no silent loss... can be inspected") with a self-contained, shareable artifact: `verify` needs only `FILE` and `RECEIPT`, never the machine, cache or original command line that produced it.
 - Residual: `verify` only promises a match under the `sugo_version` that produced the receipt; a version difference is reported as a warning, not a hard failure, because output can legitimately change between releases (this is the same boundary `Conversion.config_hash` already has).

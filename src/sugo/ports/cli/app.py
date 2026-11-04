@@ -1,4 +1,5 @@
-"""The ``sugo`` command: convert, stats, clip, doctor, mcp and ui (ADR-022, ADR-048, ADR-055).
+"""The ``sugo`` command: convert, stats, clip, doctor, mcp, ui and verify (ADR-022, ADR-048,
+ADR-055, ADR-056).
 
 ``sugo FILE`` is short for ``sugo convert FILE``. Results go to stdout,
 messages and progress to stderr; Rich turns colours off when stderr is not a
@@ -11,6 +12,7 @@ Messages and help follow ``ui.language`` (ADR-052); ``--json`` output and
 ``sugo mcp`` are always in English, for the programs and agents that read them.
 """
 
+import hashlib
 import io
 import json
 import logging
@@ -22,6 +24,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
+from pydantic import ValidationError
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
@@ -41,8 +44,10 @@ from sugo.ports.cli.translation import TranslatedCommand, TranslatedGroup, use_l
 from sugo.ports.errors import (
     ExitCode,
     PortError,
+    file_changed,
     from_exception,
     level_missing,
+    receipt_invalid,
     unreadable,
 )
 
@@ -50,6 +55,7 @@ if TYPE_CHECKING:
     from sugo.config.settings import Settings
     from sugo.core.estimate import SavingsEstimate
     from sugo.core.pipeline import Conversion
+    from sugo.core.receipt import Receipt
 
 _log = logging.getLogger(__name__)
 # Markup and highlighting off: file names and messages are shown as typed.
@@ -148,7 +154,8 @@ def _root(
         "Convert files into compact Markdown (sugo FILE is short for sugo convert FILE).\n\n"
         "Without -o the Markdown of one file goes to stdout; with --chunks, its "
         "chunks as JSON Lines. With -o each file becomes NAME.md, and NAME.jsonl "
-        "with --chunks. A file that fails does not stop the others."
+        "with --chunks. With --receipt, also NAME.receipt.json, checkable with "
+        "sugo verify. A file that fails does not stop the others."
     ),
 )
 def convert_command(
@@ -182,6 +189,12 @@ def convert_command(
             show_default=f"chunking.max_tokens, {CHUNK_MAX_TOKENS}",
         ),
     ] = None,
+    receipt: Annotated[
+        bool,
+        typer.Option(
+            "--receipt", help=N_("Also write a receipt of removals and edits, for sugo verify.")
+        ),
+    ] = False,
     front_matter: Annotated[
         bool, typer.Option("--front-matter", help=N_("Start the Markdown with YAML metadata."))
     ] = False,
@@ -201,7 +214,10 @@ def convert_command(
         raise typer.BadParameter(
             _("front matter goes only into Markdown output"), param_hint="'--front-matter'"
         )
-    targets = None if output is None else _targets(files, output, chunks=chunks)
+    if receipt and output is None and not json_output:
+        # A receipt has no sensible form mixed with plain Markdown on stdout (ADR-056).
+        raise typer.BadParameter(_("--receipt needs -o or --json"), param_hint="'--receipt'")
+    targets = None if output is None else _targets(files, output, chunks=chunks, receipt=receipt)
     with _failures(json_output):
         settings = _settings(quiet=json_output)
         chunk_tokens = (max_tokens or settings.chunking.max_tokens) if chunks else None
@@ -224,11 +240,18 @@ def convert_command(
                             max_chunk_tokens=chunk_tokens,
                             languages=settings.languages,
                             strip_tracking_urls=settings.cleaning.strip_tracking_urls,
+                            receipt=receipt,
                         )
                     written = (
                         None
                         if targets is None
-                        else _write_outputs(conversion, targets[path], front_matter=front_matter)
+                        else _write_outputs(
+                            conversion,
+                            targets[path],
+                            front_matter=front_matter,
+                            chunks=chunks,
+                            receipt=receipt,
+                        )
                     )
                 except Exception as error:
                     # Only reading raises OSError here: writing raises OUTPUT_UNWRITABLE.
@@ -244,7 +267,11 @@ def convert_command(
                     continue
                 partial = partial or bool(conversion.failed_pages)
                 if json_output:
-                    documents.append(_document_json(conversion, written, with_chunks=chunks))
+                    documents.append(
+                        _document_json(
+                            conversion, written, with_chunks=chunks, with_receipt=receipt
+                        )
+                    )
                 else:
                     _say_converted(source, conversion, written)
                     if written is None:
@@ -254,7 +281,9 @@ def convert_command(
         _finish(len(files), errors, partial=partial)
 
 
-def _targets(files: list[Path], output: Path, *, chunks: bool) -> dict[Path, list[Path]]:
+def _targets(
+    files: list[Path], output: Path, *, chunks: bool, receipt: bool
+) -> dict[Path, list[Path]]:
     """Output paths per input; refuses names that collide or overwrite an input."""
     targets: dict[Path, list[Path]] = {}
     seen: dict[str, Path] = {}
@@ -272,7 +301,11 @@ def _targets(files: list[Path], output: Path, *, chunks: bool) -> dict[Path, lis
                 param_hint="FILES",
             )
         seen[key] = path
-        names = [output / f"{path.stem}.md"] + ([output / f"{path.stem}.jsonl"] if chunks else [])
+        names = (
+            [output / f"{path.stem}.md"]
+            + ([output / f"{path.stem}.jsonl"] if chunks else [])
+            + ([output / f"{path.stem}.receipt.json"] if receipt else [])
+        )
         if any(name.resolve() in inputs for name in names):
             raise typer.BadParameter(
                 _("writing {name}.md would overwrite an input file").format(name=_shown(path.stem)),
@@ -283,10 +316,16 @@ def _targets(files: list[Path], output: Path, *, chunks: bool) -> dict[Path, lis
 
 
 def _write_outputs(
-    conversion: "Conversion", targets: list[Path], *, front_matter: bool
+    conversion: "Conversion",
+    targets: list[Path],
+    *,
+    front_matter: bool,
+    chunks: bool = False,
+    receipt: bool = False,
 ) -> list[str]:
     from sugo.exporters.jsonl import write_jsonl
     from sugo.exporters.markdown import write_markdown
+    from sugo.exporters.receipt import write_receipt
 
     markdown_path, *rest = targets
     try:
@@ -295,8 +334,10 @@ def _write_outputs(
             conversion.markdown,
             metadata=_metadata(conversion) if front_matter else None,
         )
-        if rest:
-            write_jsonl(rest[0], conversion.chunks)
+        if chunks:
+            write_jsonl(rest.pop(0), conversion.chunks)
+        if receipt and conversion.receipt is not None:
+            write_receipt(rest.pop(0), conversion.receipt)
     except OSError as error:
         raise PortError(
             code="OUTPUT_UNWRITABLE",
@@ -479,7 +520,8 @@ def clip_command(
             name = f"clip-{conversion.source_sha256[:12]}"
             written = _write_outputs(conversion, [output / f"{name}.md"], front_matter=False)
         if json_output:
-            _write_json({"documents": [_document_json(conversion, written, with_chunks=False)]})
+            documents = [_document_json(conversion, written, with_chunks=False, with_receipt=False)]
+            _write_json({"documents": documents})
         else:
             _say_converted(_("clipboard"), conversion, written)
             if written is None:
@@ -601,6 +643,133 @@ def ui_command(
             _stderr.print(_("Stopped."))
 
 
+# --- verify -------------------------------------------------------------------
+
+
+@app.command(
+    "verify",
+    cls=TranslatedCommand,
+    help=N_(
+        "Check a conversion receipt against a fresh conversion of FILE (ADR-056). "
+        "Self-contained: only FILE and RECEIPT are needed."
+    ),
+)
+def verify_command(
+    file: Annotated[
+        Path,
+        typer.Argument(
+            exists=True, dir_okay=False, readable=True, help=N_("The file the receipt is for.")
+        ),
+    ],
+    receipt_path: Annotated[
+        Path,
+        typer.Argument(
+            metavar="RECEIPT",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+            help=N_("The receipt written with --receipt."),
+        ),
+    ],
+    json_output: Annotated[bool, typer.Option("--json", help=N_("Print one JSON object."))] = False,
+) -> None:
+    """Verify a receipt; the help text is in the decorator, for translation."""
+    _english_for_json(json_output)
+    with _failures(json_output):
+        stored = _load_receipt(receipt_path)
+        settings = _settings(quiet=json_output)
+        _require_lite()
+        from sugo.core import pipeline
+        from sugo.core.receipt import diff_receipts
+
+        source = file.as_posix()
+        try:
+            data = pipeline.read_input(file)
+        except OSError as error:
+            raise unreadable(error) from error
+        if hashlib.sha256(data).hexdigest() != stored.source_sha256:
+            raise file_changed()
+        with (
+            _page_cache(enabled=settings.storage.cache == "persistent") as cache,
+            _progress(_("Verifying {source}").format(source=_shown(source)), quiet=json_output),
+        ):
+            fresh = pipeline.convert(
+                data,
+                cache=cache,
+                source=source,
+                languages=stored.languages,
+                strip_tracking_urls=stored.strip_tracking_urls,
+                receipt=True,
+            )
+        if fresh.receipt is None:
+            raise RuntimeError("internal error: receipt=True did not produce a receipt")
+        version_drifted = fresh.sugo_version != stored.sugo_version
+        config_drifted = fresh.config_hash != stored.config_hash
+        if not json_output and (version_drifted or config_drifted):
+            _stderr.print(
+                Text(
+                    _(
+                        "warning: re-converted with a different version or configuration; "
+                        "an exact match is not guaranteed"
+                    ),
+                    style="yellow",
+                )
+            )
+        differences = diff_receipts(stored, fresh.receipt)
+        if json_output:
+            _write_json(
+                {
+                    "match": not differences,
+                    "version_drifted": version_drifted,
+                    "config_drifted": config_drifted,
+                    "differences": differences,
+                }
+            )
+        else:
+            _print_verify_result(source, differences)
+        if differences:
+            # Already reported above, like sugo doctor: just the exit code.
+            raise typer.Exit(ExitCode.ERROR)
+
+
+def _load_receipt(path: Path) -> "Receipt":
+    from sugo.core.receipt import Receipt
+
+    try:
+        data = path.read_text(encoding="utf-8")
+    except OSError as error:
+        raise unreadable(error) from error
+    try:
+        return Receipt.model_validate_json(data)
+    except (ValidationError, ValueError) as error:
+        raise receipt_invalid() from error
+
+
+def _print_verify_result(source: str, differences: list[dict[str, Any]]) -> None:
+    if not differences:
+        _stdout.print(Text(_("{source}: matches the receipt").format(source=_shown(source))))
+        return
+    _stdout.print(
+        Text(
+            _("{source}: does not match the receipt").format(source=_shown(source)),
+            style="bold red",
+        )
+    )
+    for difference in differences:
+        if difference["category"] == "tokens_after":
+            line = _("  tokens after cleaning: {stored} in the receipt, {fresh} now").format(
+                stored=difference["stored"], fresh=difference["fresh"]
+            )
+        else:
+            line = _("  {category}, page {page}, block {block_id}: {kind}").format(
+                category=difference["category"],
+                page=difference["page"],
+                block_id=difference["block_id"],
+                kind=difference["kind"],
+            )
+        _stdout.print(Text(line))
+
+
 # --- shared -------------------------------------------------------------------
 
 
@@ -708,7 +877,7 @@ def _finish(total: int, errors: list[PortError], *, partial: bool) -> None:
 
 
 def _document_json(
-    conversion: "Conversion", written: list[str] | None, *, with_chunks: bool
+    conversion: "Conversion", written: list[str] | None, *, with_chunks: bool, with_receipt: bool
 ) -> dict[str, Any]:
     from sugo.metrics.tokenizer import count_tokens
 
@@ -728,6 +897,8 @@ def _document_json(
         document["markdown"] = conversion.markdown
         if with_chunks:
             document["chunks"] = [chunk.model_dump(mode="json") for chunk in conversion.chunks]
+        if with_receipt and conversion.receipt is not None:
+            document["receipt"] = conversion.receipt.model_dump(mode="json")
     return document
 
 

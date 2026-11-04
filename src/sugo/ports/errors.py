@@ -148,3 +148,21 @@ def unreadable(error: OSError) -> PortError:
         message=i18n.os_reason(error),
         exit_code=ExitCode.ERROR,
     )
+
+
+def receipt_invalid() -> PortError:
+    """The error for a receipt file that is not valid JSON or not schema 1.0 (ADR-056)."""
+    return PortError(
+        code="RECEIPT_INVALID",
+        message=_("The receipt is not valid; it may be from an incompatible Sugo version."),
+        exit_code=ExitCode.ERROR,
+    )
+
+
+def file_changed() -> PortError:
+    """``sugo verify``: the file's hash no longer matches the receipt's (ADR-056)."""
+    return PortError(
+        code="FILE_CHANGED",
+        message=_("This file does not match the receipt: it is a different edition."),
+        exit_code=ExitCode.ERROR,
+    )

@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from sugo.core import pipeline
 from sugo.core.decisions import EditDecision
-from sugo.core.models import EditKind, Page
+from sugo.core.models import BlockFlag, EditKind, Page
 from sugo.core.pipeline import (
     InputKind,
     InputUnsupportedError,
@@ -412,3 +412,58 @@ def test_text_settings_change_the_config_hash() -> None:
 def test_unknown_language_is_refused() -> None:
     with pytest.raises(ValueError, match="no language pack"):
         convert(text_report(), languages=("xx",))
+
+
+def test_no_receipt_unless_asked() -> None:
+    assert convert(report(4)).receipt is None
+
+
+def test_receipt_records_removals_with_their_text_and_reason() -> None:
+    result = convert(report(4), receipt=True)
+    assert result.receipt is not None
+    # One header/footer block removed per page but the first, plus a page number each.
+    by_cleaner = {r.removed_by for r in result.receipt.removed}
+    assert by_cleaner == {"headers_footers", "page_numbers"}
+    page_numbers = [r for r in result.receipt.removed if r.removed_by == "page_numbers"]
+    assert sorted(r.page for r in page_numbers) == [1, 2, 3, 4]
+    assert all(r.reason for r in page_numbers)
+    assert {r.text for r in page_numbers} == {"1", "2", "3", "4"}
+
+
+def test_receipt_records_edits() -> None:
+    result = convert(text_report(), receipt=True)
+    assert result.receipt is not None
+    kinds = {e.kind for e in result.receipt.edited}
+    assert kinds == {EditKind.HYPHEN_JOIN, EditKind.DELETE}
+    hyphen = next(e for e in result.receipt.edited if e.kind == EditKind.HYPHEN_JOIN)
+    assert hyphen.original == "-\n"
+    assert hyphen.replacement == ""
+    tracker = next(e for e in result.receipt.edited if e.kind == EditKind.DELETE)
+    assert "utm_source" in tracker.original
+    assert tracker.replacement == ""
+
+
+def test_receipt_is_self_sufficient() -> None:
+    result = convert(text_report(), languages=("en", "it"), strip_tracking_urls=False, receipt=True)
+    assert result.receipt is not None
+    assert result.receipt.languages == ("en", "it")
+    assert result.receipt.strip_tracking_urls is False
+    assert result.receipt.source_sha256 == result.source_sha256
+    assert result.receipt.sugo_version == result.sugo_version
+    assert result.receipt.config_hash == result.config_hash
+
+
+def test_receipt_counts_tokens_before_and_after_cleaning() -> None:
+    result = convert(report(4), receipt=True)
+    assert result.receipt is not None
+    assert result.receipt.tokens_before > result.receipt.tokens_after
+    assert result.receipt.tokens_after == count_tokens(result.markdown)
+    # Asking for a receipt never changes the output or its raw_tokens contract.
+    assert convert(report(4), receipt=True).raw_tokens is None
+
+
+def test_receipt_flags_low_confidence_and_secret_blocks(cache: PageCache) -> None:
+    secret = b"<config><user>u</user><password>p</password></config>"
+    result = convert(secret, cache=cache, receipt=True)
+    assert result.receipt is not None
+    assert any(BlockFlag.SECRET in f.flags for f in result.receipt.flagged)
