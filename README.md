@@ -79,8 +79,8 @@ Measured against two well-known alternatives, on the same 31-document benchmark 
 
 | | Sugo | Docling | MarkItDown |
 |---|:---:|:---:|:---:|
-| Documents converted with nothing lost or garbled | **28 / 31** | 18 / 31 | 14 / 31 |
-| OCR on chat/code screenshots | ✅ accurate | ⚠️ garbled | ❌ empty output |
+| Documents converted with nothing lost or garbled | **28 / 31** | 25 / 31 | 14 / 31 |
+| OCR on chat/code screenshots | ✅ accurate | ⚠️ right words, wrong order on some chats | ❌ empty output |
 | Reads PDFs out of the box | ✅ | ✅ | ❌ needs an extra |
 | Real EU regulation PDF, every clause kept | ✅ | ⚠️ 2 of 5 drop a clause | ❌ every one drops 2–7 |
 
