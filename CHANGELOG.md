@@ -5,6 +5,18 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning
 follows SemVer, with the 0.x caveat from `docs/ARCHITECTURE.md` (contracts may
 still change, with notice, before 1.0).
 
+## [Unreleased]
+
+### Added
+
+- Conversion receipt (`--receipt`) and `sugo verify` (ADR-056): an opt-in,
+  self-contained record of every removal and edit the core made, plus the
+  confidence and warning flags extractors already attach to blocks, for
+  debugging and trust in RAG pipelines. `sugo verify FILE RECEIPT`
+  re-converts the file with the receipt's own stored settings and reports
+  what differs, by block id only, never the text. Published schema:
+  `schemas/receipt-v1.schema.json`.
+
 ## [0.1.0a1] - 2026-11-03
 
 First public pre-release.
