@@ -73,6 +73,19 @@ The same holds across a benchmark corpus in five languages, with no content lost
 
 And it stays fast on an ordinary computer, not just a new one: on a 2010 desktop with 2 cores and no GPU, a 100-page PDF converts in 3.6 s and a phone screenshot in 13.7 s (full numbers in [TESTING](docs/TESTING.md)).
 
+## How it compares
+
+Measured against two well-known alternatives, on the same 31-document benchmark corpus, with the same tokenizer and the same ground truth — full method, raw numbers and limits in [docs/comparisons](docs/comparisons/sugo-vs-docling-markitdown.md):
+
+| | Sugo | Docling | MarkItDown |
+|---|:---:|:---:|:---:|
+| Documents converted with nothing lost or garbled | **28 / 31** | 18 / 31 | 14 / 31 |
+| OCR on chat/code screenshots | ✅ accurate | ⚠️ garbled | ❌ empty output |
+| Reads PDFs out of the box | ✅ | ✅ | ❌ needs an extra |
+| Real EU regulation PDF, every clause kept | ✅ | ⚠️ 2 of 5 drop a clause | ❌ every one drops 2–7 |
+
+A tool that drops content also "saves" tokens on paper — that's data loss, not compression. Every number above is paired with what actually survived the conversion.
+
 ## Status
 
 **Alpha.** The first release, v0.1, is being finished: everything below works today from a source install, or from an early manual alpha already on PyPI. The signed, stable v0.1 release (full supply-chain pipeline: SBOM, Sigstore attestations, PyPI Trusted Publishing) is still being prepared.
