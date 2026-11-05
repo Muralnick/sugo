@@ -76,11 +76,15 @@ to match the importable package and the `sugo` command, in
 the release workflow.
 
 This does not retroactively rename the already-published `sugo-cli
-0.1.0a1`; that pre-release stays as it is. Before the real `v0.1.0` tag can
-go through the pipeline above, the maintainer must, by hand, once more:
-claim `sugo` on PyPI the same way `sugo-cli` was claimed (a throwaway
-upload, so no one else grabs the name first), and register that project as
-the Trusted Publisher for this repository's `release.yml` / `release`
-environment (the Trusted Publisher setup described above is per
-project-name, so the one on `sugo-cli`, if ever configured, would not
+0.1.0a1`; that pre-release stays as it is. The version is bumped to
+`0.1.0a2` for the `sugo` claim upload, since `main` by then already carries
+changes (the conversion receipt, this release pipeline) that `sugo-cli
+0.1.0a1` does not — reusing the same version string for different code
+under a different distribution name would be misleading. Before the real
+`v0.1.0` tag can go through the pipeline above, the maintainer must, by
+hand, once more: claim `sugo` on PyPI the same way `sugo-cli` was claimed
+(a throwaway upload, so no one else grabs the name first), and register
+that project as the Trusted Publisher for this repository's `release.yml`
+/ `release` environment (the Trusted Publisher setup described above is
+per project-name, so the one on `sugo-cli`, if ever configured, would not
 carry over).
