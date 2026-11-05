@@ -65,22 +65,3 @@ proven, rather than building all of them at once.
 - All third-party GitHub Actions are pinned by commit SHA, not by tag
   (ADR-033's "hardened workflows" decision), with the human-readable
   version in a trailing comment.
-
-## Amendment (2026-11-05): distribution renamed back to `sugo`
-
-The name `sugo` on PyPI, squatted by an unrelated, empty project when
-`v0.1.0a1` was published by hand under `sugo-cli` (2026-11-03 amendment),
-has since freed up. The distribution is renamed from `sugo-cli` to `sugo`
-to match the importable package and the `sugo` command, in
-`pyproject.toml`, `src/sugo/core/constants.py` (`DISTRIBUTION_NAME`), and
-the release workflow.
-
-This does not retroactively rename the already-published `sugo-cli
-0.1.0a1`; that pre-release stays as it is. Before the real `v0.1.0` tag can
-go through the pipeline above, the maintainer must, by hand, once more:
-claim `sugo` on PyPI the same way `sugo-cli` was claimed (a throwaway
-upload, so no one else grabs the name first), and register that project as
-the Trusted Publisher for this repository's `release.yml` / `release`
-environment (the Trusted Publisher setup described above is per
-project-name, so the one on `sugo-cli`, if ever configured, would not
-carry over).
