@@ -1136,7 +1136,7 @@ wheels = [
 ]
 
 [[package]]
-name = "sugo-cli"
+name = "sugo"
 version = "0.1.0a1"
 source = { editable = "." }
 dependencies = [
@@ -1165,7 +1165,7 @@ dev = [
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
-    { name = "sugo-cli", extra = ["lite"] },
+    { name = "sugo", extra = ["lite"] },
 ]
 
 [package.metadata]
@@ -1192,7 +1192,7 @@ dev = [
     { name = "mypy", specifier = ">=2.4.0" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "ruff", specifier = ">=0.17.0" },
-    { name = "sugo-cli", extras = ["lite"] },
+    { name = "sugo", extras = ["lite"] },
 ]
 
 [[package]]

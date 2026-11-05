@@ -23,6 +23,13 @@ still change, with notice, before 1.0).
   Sigstore, and publishes to PyPI over OIDC Trusted Publishing after a
   manual approval gate.
 
+### Changed
+
+- Distribution renamed from `sugo-cli` back to `sugo` (ADR-033 amendment,
+  2026-11-05): the name freed up on PyPI. The `0.1.0a1` pre-release stays
+  published as `sugo-cli`; the real `v0.1.0` will ship as `sugo` once it is
+  claimed there by hand.
+
 ## [0.1.0a1] - 2026-11-03
 
 First public pre-release.

@@ -4,10 +4,10 @@ from types import MappingProxyType
 from typing import Final
 
 # The PyPI distribution name, for `importlib.metadata.version()` and install
-# hints: "sugo" itself is squatted on PyPI (ADR-033 amendment, 2026-11-03),
-# so the published distribution is "sugo-cli" while the package stays `sugo`
-# and the command stays `sugo`. The one place to change if that ever flips.
-DISTRIBUTION_NAME: Final = "sugo-cli"
+# hints. "sugo" was squatted on PyPI when v0.1.0a1 shipped as "sugo-cli"
+# (ADR-033 amendment, 2026-11-03); the name freed up and the distribution
+# reclaimed it (2026-11-05). The one place to change if that ever flips.
+DISTRIBUTION_NAME: Final = "sugo"
 
 # Markdown has six heading levels (`#` to `######`); deeper levels cannot be rendered.
 MAX_HEADING_LEVEL: Final = 6

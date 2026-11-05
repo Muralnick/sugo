@@ -110,7 +110,7 @@ Sugo richiede Python 3.12 e [uv](https://docs.astral.sh/uv/).
 uv tool install git+https://github.com/Muralnick/sugo
 ```
 
-C'è anche un'alpha su PyPI, pubblicata a mano in anticipo sulla release v0.1 firmata, con il nome `sugo-cli` (il nome "sugo" è già registrato su PyPI da un progetto estraneo e vuoto — è aperta una richiesta di trasferimento del nome):
+C'è anche un'alpha su PyPI, pubblicata a mano in anticipo sulla release v0.1 firmata, con il nome `sugo-cli` (il nome "sugo" era registrato da un progetto estraneo e vuoto al momento della pubblicazione; si è liberato nel frattempo, e il progetto è stato rinominato in `sugo` per la vera release `v0.1.0`):
 
 ```bash
 uv tool install --prerelease allow "sugo-cli[lite]"

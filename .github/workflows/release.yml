@@ -111,7 +111,7 @@ jobs:
         run: |
           uv venv .venv-release
           whl=$(ls dist/*.whl)
-          uv pip install --python .venv-release "sugo-cli[lite] @ ${whl}"
+          uv pip install --python .venv-release "sugo[lite] @ ${whl}"
 
       - name: Generate the CycloneDX SBOM
         run: |
@@ -155,7 +155,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     # Requires a one-time, by-hand step on pypi.org: add this repository and
-    # workflow as a Trusted Publisher for the sugo-cli project (ADR-033).
+    # workflow as a Trusted Publisher for the sugo project (ADR-033).
     environment: release
     permissions:
       id-token: write
