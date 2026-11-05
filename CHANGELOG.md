@@ -7,6 +7,11 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-05
+
+First signed release, published through the pipeline below (roadmap
+step 9). Still 0.x: contracts may change, with notice, before 1.0.
+
 ### Added
 
 - Conversion receipt (`--receipt`) and `sugo verify` (ADR-056): an opt-in,
@@ -22,6 +27,12 @@ still change, with notice, before 1.0).
   models and the tokenizer vocabulary), attests build provenance via
   Sigstore, and publishes to PyPI over OIDC Trusted Publishing after a
   manual approval gate.
+
+### Packaging
+
+- Published as `sugo-cli`: the name `sugo` is still held by an unrelated,
+  empty PyPI project; the open PEP 541 transfer request is unresolved. The
+  installed command is unaffected — it is still `sugo`.
 
 ## [0.1.0a1] - 2026-11-03
 
