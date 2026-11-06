@@ -17,7 +17,9 @@ reserves for later versions (ARCHITECTURE §14) give a warning instead.
 Errors name the file or variable and the key, never the value.
 """
 
+import errno
 import os
+import stat
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -163,7 +165,7 @@ def _load(cwd: Path | None, *, project: bool, environment: bool) -> Loaded:
     sources: list[Path] = []
     warnings: list[str] = []
     user = user_config_path()
-    if user.is_file():
+    if _is_file(user):
         layers.append((printable(str(user)), _read_toml(user)))
         sources.append(user)
     if project:
@@ -251,12 +253,35 @@ def _read_toml(path: Path) -> dict[str, Any]:
         ) from None
 
 
+# Errors that only mean "there is no such file"; anything else (a folder that cannot
+# be searched, for one) is a real problem the caller reports. The Windows codes are
+# "not ready", "invalid name" and "cannot resolve file name".
+_ABSENT_ERRNOS = frozenset({errno.ENOENT, errno.ENOTDIR, errno.EBADF, errno.ELOOP})
+_ABSENT_WINERRORS = frozenset({21, 123, 1921})
+
+
+def _is_file(path: Path) -> bool:
+    """Whether ``path`` is a regular file, raising ``OSError`` if it cannot be told.
+
+    ``Path.is_file`` raised for an unsearchable folder up to Python 3.13, but from 3.14
+    it answers False, which would silently skip a configuration file the user wrote.
+    """
+    try:
+        return stat.S_ISREG(path.stat().st_mode)
+    except OSError as error:
+        if error.errno in _ABSENT_ERRNOS or getattr(error, "winerror", None) in _ABSENT_WINERRORS:
+            return False
+        raise
+    except ValueError:  # an embedded null character in the path
+        return False
+
+
 def _project_layer(folder: Path, warnings: list[str]) -> tuple[Path, dict[str, Any]] | None:
     own = folder / "sugo.toml"
-    if own.is_file():
+    if _is_file(own):
         return own, _read_toml(own)
     pyproject = folder / "pyproject.toml"
-    if not pyproject.is_file():
+    if not _is_file(pyproject):
         return None
     try:
         table = _read_toml(pyproject)
