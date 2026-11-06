@@ -74,3 +74,32 @@ jobs:
 
       - name: Tests
         run: uv run pytest
+
+  python-versions:
+    # The package supports Python 3.12 to 3.14 (ADR-057). `checks` and `windows`
+    # above run the default 3.12 and keep their names (`checks` is required by
+    # the ruleset); these jobs run the tests on the newer versions, on Linux and
+    # on Windows. Lint, types and import boundaries need only one version.
+    name: tests (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+        python: ["3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.13.0"
+          enable-cache: true
+
+      - name: Install locked environment
+        run: uv sync --locked --python ${{ matrix.python }}
+
+      - name: Tests
+        run: uv run --python ${{ matrix.python }} pytest
