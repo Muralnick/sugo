@@ -12,6 +12,7 @@
 </p>
 
 <p align="center">
+  <a href="https://pypi.org/project/sugo-cli/"><img src="https://img.shields.io/pypi/v/sugo-cli?color=b23a22&label=PyPI" alt="PyPI version"></a>
   <a href="https://github.com/Muralnick/sugo/actions/workflows/ci.yml"><img src="https://github.com/Muralnick/sugo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/python-3.12-3776ab" alt="Python 3.12">
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-b23a22" alt="AGPL-3.0-or-later">
@@ -19,10 +20,24 @@
 </p>
 
 <p align="center">
-  🇮🇹 <a href="README.it.md">Leggi in italiano</a>
+  <a href="#quick-start"><b>Quick start</b></a> ·
+  <a href="#what-it-does">What it does</a> ·
+  <a href="#how-it-compares">Comparison</a> ·
+  <a href="#use-it-from-an-ai-agent-mcp">MCP</a> ·
+  <a href="docs/ROADMAP.md">Roadmap</a> ·
+  🇮🇹 <a href="README.it.md">Italiano</a>
 </p>
 
 ---
+
+<table align="center">
+  <tr>
+    <td align="center"><b>🔒 100% local</b><br>no cloud, no telemetry</td>
+    <td align="center"><b>✂️ Fewer tokens</b><br>33–38% with repeated headers, ~3% on real legal text</td>
+    <td align="center"><b>🧾 Nothing lost silently</b><br>every removal is recorded</td>
+    <td align="center"><b>🪶 Light</b><br>runs on 8 GB RAM, no GPU</td>
+  </tr>
+</table>
 
 Sugo turns PDFs, Office files, screenshots and images into clean, compact Markdown for RAG systems, AI agents and LLM chats. It removes what only costs tokens (repeated headers and footers, page numbers, hidden text, tracking parameters, app chrome around a screenshot) and keeps the content, the tables and the structure. Everything runs on your computer: no cloud API, no telemetry, nothing sent anywhere.
 
@@ -30,7 +45,7 @@ Sugo turns PDFs, Office files, screenshots and images into clean, compact Markdo
 
 ## What it does
 
-A three-page PDF, as a plain text extractor gives it to your model (pages 1 and 3 look the same):
+A small generated three-page PDF, as a plain text extractor gives it to your model (pages 1 and 3 look the same):
 
 ```text
 ACME S.p.A. - Annual Report 2025                Confidential
@@ -61,9 +76,9 @@ The board expects stable growth next year.
 Details: https://acme.example/report
 ```
 
-The header is kept once instead of on every page; the page numbers, the repeated "Confidential" and the tracking parameters are gone; the text is the same. `sugo stats` measures the difference: **180 → 97 tokens, 46% saved** on this small example. Every removal is recorded with the cleaner that made it and the reason, so you can always check what was dropped. Text that cannot be read is marked as illegible, never guessed.
+The header is kept once instead of on every page; the page numbers, the repeated "Confidential" and the tracking parameters are gone; the text is the same. `sugo stats` measures the difference: **180 → 97 tokens, 46% saved** on this small generated example; real documents with less page furniture save much less (see below). Every removal is recorded with the cleaner that made it and the reason, so you can always check what was dropped. Text that cannot be read is marked as illegible, never guessed.
 
-The same holds across a benchmark corpus in five languages, with no content lost on any document:
+Across a benchmark corpus in five languages, no text went missing in any document (on 3 screenshots the OCR misread a few characters, 1–7%). Savings depend heavily on the document:
 
 | Document | Tokens saved |
 |---|---|
@@ -75,20 +90,23 @@ And it stays fast on an ordinary computer, not just a new one: on a 2010 desktop
 
 ## How it compares
 
-Measured against two well-known alternatives, on the same 31-document benchmark corpus, with the same tokenizer and the same ground truth — full method, raw numbers and limits in [docs/comparisons](docs/comparisons/sugo-vs-docling-markitdown.md):
+Measured against two well-known alternatives, on the same 31-document benchmark corpus (26 synthetic documents made by the Sugo project plus 5 real EU-regulation PDFs), with the same tokenizer and the same ground truth — full method, raw numbers and limits in [docs/comparisons](docs/comparisons/sugo-vs-docling-markitdown.md):
 
 | | Sugo | Docling | MarkItDown |
 |---|:---:|:---:|:---:|
 | Documents converted with nothing lost or garbled | **28 / 31** | 25 / 31 | 14 / 31 |
-| OCR on chat/code screenshots | ✅ accurate | ⚠️ right words, wrong order on some chats | ❌ empty output |
+| OCR on chat/code screenshots | ✅ no text missing; 1–7% character errors on 3 accented screenshots | ⚠️ right words, wrong order on some chats | ❌ empty output |
 | Reads PDFs out of the box | ✅ | ✅ | ❌ needs an extra |
 | Real EU regulation PDF, every clause kept | ✅ | ⚠️ 2 of 5 drop a clause | ❌ every one drops 2–7 |
 
 A tool that drops content also "saves" tokens on paper — that's data loss, not compression. Every number above is paired with what actually survived the conversion.
 
+Fair caveats: the corpus is small and mostly synthetic, and it was built by the Sugo authors, so treat it as a sanity check, not a verdict. On the report PDFs Docling saves slightly *more* tokens than Sugo (about 38–48% vs 33–38%) without losing content; it is also several times slower on this corpus. Raw data and the full per-document table are in the linked comparison.
+
 ## Status
 
-**Alpha.** The first release, v0.1, is being finished: everything below works today from a source install, or from an early manual alpha already on PyPI. The signed, stable v0.1 release (full supply-chain pipeline: SBOM, Sigstore attestations, PyPI Trusted Publishing) is still being prepared.
+> [!NOTE]
+> **v0.1.0 is out** — the first signed release, on [PyPI](https://pypi.org/project/sugo-cli/) as `sugo-cli`. It is still 0.x: contracts may change, with notice, before 1.0. Releases are built reproducibly, with an SBOM, Sigstore attestations and PyPI Trusted Publishing.
 
 | Works today | Coming next |
 |---|---|
@@ -104,19 +122,26 @@ See the [roadmap](docs/ROADMAP.md) for the full plan.
 
 ## Quick start
 
-Sugo needs Python 3.12 and [uv](https://docs.astral.sh/uv/).
+Sugo needs Python 3.12. The install is about 400 MB on disk, because the PDF library, the OCR engine and its models come with it. The easiest way to install it is with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv tool install "sugo-cli[lite]"
+```
+
+Or with pip:
+
+```bash
+pip install "sugo-cli[lite]"
+```
+
+> [!TIP]
+> The package is called `sugo-cli` because the name `sugo` on PyPI is held by an unrelated, empty project (a name transfer request is open). The installed command is still `sugo`.
+
+To run the latest development version from source instead:
 
 ```bash
 uv tool install git+https://github.com/Muralnick/sugo
 ```
-
-An early alpha is also on PyPI, published by hand ahead of the signed v0.1 release, under the name `sugo-cli` (`sugo` itself is already registered on PyPI by an unrelated, empty project — a name transfer request is open):
-
-```bash
-uv tool install --prerelease allow "sugo-cli[lite]"
-```
-
-The installed command is `sugo` either way.
 
 Convert a file and print its Markdown:
 
