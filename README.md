@@ -33,7 +33,7 @@
 <table align="center">
   <tr>
     <td align="center"><b>🔒 100% local</b><br>no cloud, no telemetry</td>
-    <td align="center"><b>✂️ Fewer tokens</b><br>33–38% on a typical report</td>
+    <td align="center"><b>✂️ Fewer tokens</b><br>33–38% with repeated headers, ~3% on real legal text</td>
     <td align="center"><b>🧾 Nothing lost silently</b><br>every removal is recorded</td>
     <td align="center"><b>🪶 Light</b><br>runs on 8 GB RAM, no GPU</td>
   </tr>
@@ -45,7 +45,7 @@ Sugo turns PDFs, Office files, screenshots and images into clean, compact Markdo
 
 ## What it does
 
-A three-page PDF, as a plain text extractor gives it to your model (pages 1 and 3 look the same):
+A small generated three-page PDF, as a plain text extractor gives it to your model (pages 1 and 3 look the same):
 
 ```text
 ACME S.p.A. - Annual Report 2025                Confidential
@@ -76,9 +76,9 @@ The board expects stable growth next year.
 Details: https://acme.example/report
 ```
 
-The header is kept once instead of on every page; the page numbers, the repeated "Confidential" and the tracking parameters are gone; the text is the same. `sugo stats` measures the difference: **180 → 97 tokens, 46% saved** on this small example. Every removal is recorded with the cleaner that made it and the reason, so you can always check what was dropped. Text that cannot be read is marked as illegible, never guessed.
+The header is kept once instead of on every page; the page numbers, the repeated "Confidential" and the tracking parameters are gone; the text is the same. `sugo stats` measures the difference: **180 → 97 tokens, 46% saved** on this small generated example; real documents with less page furniture save much less (see below). Every removal is recorded with the cleaner that made it and the reason, so you can always check what was dropped. Text that cannot be read is marked as illegible, never guessed.
 
-The same holds across a benchmark corpus in five languages, with no content lost on any document:
+Across a benchmark corpus in five languages, no text went missing in any document (on 3 screenshots the OCR misread a few characters, 1–7%). Savings depend heavily on the document:
 
 | Document | Tokens saved |
 |---|---|
@@ -90,16 +90,18 @@ And it stays fast on an ordinary computer, not just a new one: on a 2010 desktop
 
 ## How it compares
 
-Measured against two well-known alternatives, on the same 31-document benchmark corpus, with the same tokenizer and the same ground truth — full method, raw numbers and limits in [docs/comparisons](docs/comparisons/sugo-vs-docling-markitdown.md):
+Measured against two well-known alternatives, on the same 31-document benchmark corpus (26 synthetic documents made by the Sugo project plus 5 real EU-regulation PDFs), with the same tokenizer and the same ground truth — full method, raw numbers and limits in [docs/comparisons](docs/comparisons/sugo-vs-docling-markitdown.md):
 
 | | Sugo | Docling | MarkItDown |
 |---|:---:|:---:|:---:|
 | Documents converted with nothing lost or garbled | **28 / 31** | 25 / 31 | 14 / 31 |
-| OCR on chat/code screenshots | ✅ accurate | ⚠️ right words, wrong order on some chats | ❌ empty output |
+| OCR on chat/code screenshots | ✅ no text missing; 1–7% character errors on 3 accented screenshots | ⚠️ right words, wrong order on some chats | ❌ empty output |
 | Reads PDFs out of the box | ✅ | ✅ | ❌ needs an extra |
 | Real EU regulation PDF, every clause kept | ✅ | ⚠️ 2 of 5 drop a clause | ❌ every one drops 2–7 |
 
 A tool that drops content also "saves" tokens on paper — that's data loss, not compression. Every number above is paired with what actually survived the conversion.
+
+Fair caveats: the corpus is small and mostly synthetic, and it was built by the Sugo authors, so treat it as a sanity check, not a verdict. On the report PDFs Docling saves slightly *more* tokens than Sugo (about 38–48% vs 33–38%) without losing content; it is also several times slower on this corpus. Raw data and the full per-document table are in the linked comparison.
 
 ## Status
 
@@ -120,7 +122,7 @@ See the [roadmap](docs/ROADMAP.md) for the full plan.
 
 ## Quick start
 
-Sugo needs Python 3.12. The easiest way to install it is with [uv](https://docs.astral.sh/uv/):
+Sugo needs Python 3.12. The install is about 400 MB on disk, because the PDF library, the OCR engine and its models come with it. The easiest way to install it is with [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv tool install "sugo-cli[lite]"
