@@ -12,6 +12,7 @@
 </p>
 
 <p align="center">
+  <a href="https://pypi.org/project/sugo-cli/"><img src="https://img.shields.io/pypi/v/sugo-cli?color=b23a22&label=PyPI" alt="PyPI version"></a>
   <a href="https://github.com/Muralnick/sugo/actions/workflows/ci.yml"><img src="https://github.com/Muralnick/sugo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/python-3.12-3776ab" alt="Python 3.12">
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-b23a22" alt="AGPL-3.0-or-later">
@@ -19,10 +20,24 @@
 </p>
 
 <p align="center">
-  🇮🇹 <a href="README.it.md">Leggi in italiano</a>
+  <a href="#quick-start"><b>Quick start</b></a> ·
+  <a href="#what-it-does">What it does</a> ·
+  <a href="#how-it-compares">Comparison</a> ·
+  <a href="#use-it-from-an-ai-agent-mcp">MCP</a> ·
+  <a href="docs/ROADMAP.md">Roadmap</a> ·
+  🇮🇹 <a href="README.it.md">Italiano</a>
 </p>
 
 ---
+
+<table align="center">
+  <tr>
+    <td align="center"><b>🔒 100% local</b><br>no cloud, no telemetry</td>
+    <td align="center"><b>✂️ Fewer tokens</b><br>33–38% on a typical report</td>
+    <td align="center"><b>🧾 Nothing lost silently</b><br>every removal is recorded</td>
+    <td align="center"><b>🪶 Light</b><br>runs on 8 GB RAM, no GPU</td>
+  </tr>
+</table>
 
 Sugo turns PDFs, Office files, screenshots and images into clean, compact Markdown for RAG systems, AI agents and LLM chats. It removes what only costs tokens (repeated headers and footers, page numbers, hidden text, tracking parameters, app chrome around a screenshot) and keeps the content, the tables and the structure. Everything runs on your computer: no cloud API, no telemetry, nothing sent anywhere.
 
@@ -88,7 +103,8 @@ A tool that drops content also "saves" tokens on paper — that's data loss, not
 
 ## Status
 
-**Alpha.** The first release, v0.1, is being finished: everything below works today from a source install, or from an early manual alpha already on PyPI. The signed, stable v0.1 release (full supply-chain pipeline: SBOM, Sigstore attestations, PyPI Trusted Publishing) is still being prepared.
+> [!NOTE]
+> **v0.1.0 is out** — the first signed release, on [PyPI](https://pypi.org/project/sugo-cli/) as `sugo-cli`. It is still 0.x: contracts may change, with notice, before 1.0. Releases are built reproducibly, with an SBOM, Sigstore attestations and PyPI Trusted Publishing.
 
 | Works today | Coming next |
 |---|---|
@@ -104,19 +120,26 @@ See the [roadmap](docs/ROADMAP.md) for the full plan.
 
 ## Quick start
 
-Sugo needs Python 3.12 and [uv](https://docs.astral.sh/uv/).
+Sugo needs Python 3.12. The easiest way to install it is with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv tool install "sugo-cli[lite]"
+```
+
+Or with pip:
+
+```bash
+pip install "sugo-cli[lite]"
+```
+
+> [!TIP]
+> The package is called `sugo-cli` because the name `sugo` on PyPI is held by an unrelated, empty project (a name transfer request is open). The installed command is still `sugo`.
+
+To run the latest development version from source instead:
 
 ```bash
 uv tool install git+https://github.com/Muralnick/sugo
 ```
-
-An early alpha is also on PyPI, published by hand ahead of the signed v0.1 release, under the name `sugo-cli` (`sugo` itself is already registered on PyPI by an unrelated, empty project — a name transfer request is open):
-
-```bash
-uv tool install --prerelease allow "sugo-cli[lite]"
-```
-
-The installed command is `sugo` either way.
 
 Convert a file and print its Markdown:
 
