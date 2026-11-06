@@ -397,7 +397,17 @@ def test_a_malformed_request_is_answered_with_its_status_only(server: WebServer)
     # http.server would echo the request line into an HTML error page.
     with socket.create_connection(("127.0.0.1", server.port), timeout=10) as connection:
         connection.sendall(b"GET /<script>alert(1)</script> HTTP/1.x\r\n\r\n")
-        assert b"script" not in connection.recv(65536)
+        # The server closes after a malformed request, so read the whole answer. The
+        # security headers legitimately contain "script-src": look for what was sent.
+        answer = b""
+        while chunk := connection.recv(65536):
+            answer += chunk
+    assert b"<script>" not in answer
+    assert b"alert(1)" not in answer
+    # Python 3.12 closes without a word on an invalid HTTP version (it treats the
+    # request as HTTP/0.9); 3.13 and later answer 400. Either is fine, nothing is echoed.
+    if answer:
+        assert b" 400 " in answer.split(b"\r\n", 1)[0]
     raw = f"GET / HTTP/1.1\r\nHost: 127.0.0.1:{server.port}\r\nX-Long: {'a' * 70_000}\r\n\r\n"
     response = exchange(server, raw.encode())
     assert response.status == 431

@@ -184,6 +184,26 @@ def test_unsearchable_configuration_folder_is_a_config_error(
         folder.chmod(0o700)
 
 
+def test_a_file_check_answers_only_what_it_can_tell(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Path.is_file() answers False for an unsearchable folder from Python 3.14, which
+    # would skip the user's file silently; the helper must raise instead, on every
+    # platform and Python version, so this does not depend on POSIX permissions.
+    file = write(tmp_path / "there.toml", "")
+    assert settings_module._is_file(file)
+    assert not settings_module._is_file(tmp_path)
+    assert not settings_module._is_file(tmp_path / "missing.toml")
+    assert not settings_module._is_file(file / "below-a-file.toml")
+
+    def refuse(self: Path, **_: object) -> os.stat_result:
+        raise PermissionError(13, "Permission denied", str(self))
+
+    monkeypatch.setattr(Path, "stat", refuse)
+    with pytest.raises(PermissionError):
+        settings_module._is_file(file)
+
+
 def test_non_utf8_file_does_not_quote_the_byte(isolated: Path) -> None:
     isolated.parent.mkdir(parents=True)
     isolated.write_bytes(b"[general]\nx = '\xff'\n")

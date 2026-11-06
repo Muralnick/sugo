@@ -5,7 +5,7 @@ description = "Documents, reduced: local conversion of documents and screenshots
 readme = "README.md"
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12,<3.15"
 dependencies = [
     "defusedxml>=0.7.1,<0.8",
     "platformdirs>=4.13.0,<5",
@@ -17,6 +17,8 @@ dependencies = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Typing :: Typed",
 ]
 

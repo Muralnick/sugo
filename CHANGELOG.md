@@ -7,6 +7,12 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+### Changed
+
+- Python 3.13 and 3.14 are supported in addition to 3.12 (ADR-057): the
+  installer no longer refuses them (`requires-python = ">=3.12,<3.15"`), and
+  CI runs the test suite on both, on Linux and Windows.
+
 ## [0.1.0] - 2026-11-05
 
 First signed release, published through the pipeline below (roadmap

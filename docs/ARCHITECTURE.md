@@ -24,7 +24,7 @@ Sugo converts documents and images into clean Markdown for RAG systems, agents a
 - **Recommended for `quality`**: NVIDIA GPU with 4–6 GB VRAM.
 - **Reference machine for benchmarks**: 8 GB RAM, Intel Core i5 10th gen (H series), GTX 1660 Ti 6 GB.
 - **Languages**: Italian, Spanish, English, French, German, Japanese, Mandarin Chinese, Korean.
-- **Platforms, by priority**: Linux, Windows, macOS. Python 3.12.
+- **Platforms, by priority**: Linux, Windows, macOS. Python 3.12 to 3.14 (ADR-057).
 
 ### Terminology
 
