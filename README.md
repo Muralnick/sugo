@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/sugo-logo-dark.svg">
-    <img src="docs/brand/sugo-logo.svg" alt="Sugo logo" width="120" height="120">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Muralnick/sugo/main/docs/brand/sugo-logo-dark.svg">
+    <img src="https://raw.githubusercontent.com/Muralnick/sugo/main/docs/brand/sugo-logo.svg" alt="Sugo logo" width="120" height="120">
   </picture>
 </p>
 
@@ -24,8 +24,8 @@
   <a href="#what-it-does">What it does</a> ·
   <a href="#how-it-compares">Comparison</a> ·
   <a href="#use-it-from-an-ai-agent-mcp">MCP</a> ·
-  <a href="docs/ROADMAP.md">Roadmap</a> ·
-  🇮🇹 <a href="README.it.md">Italiano</a>
+  <a href="https://github.com/Muralnick/sugo/blob/main/docs/ROADMAP.md">Roadmap</a> ·
+  🇮🇹 <a href="https://github.com/Muralnick/sugo/blob/main/README.it.md">Italiano</a>
 </p>
 
 ---
@@ -86,11 +86,11 @@ Across a benchmark corpus in five languages, no text went missing in any documen
 | Chat or code screenshot, Markdown vs. sending the image itself | 94–98% cheaper (Claude, Gemini, OpenAI) |
 | A real EU regulation from EUR-Lex, mostly substantive legal text | 2.9–3.5% |
 
-And it stays fast on an ordinary computer, not just a new one: on a 2010 desktop with 2 cores and no GPU, a 100-page PDF converts in 3.6 s and a phone screenshot in 13.7 s (full numbers in [TESTING](docs/TESTING.md)).
+And it stays fast on an ordinary computer, not just a new one: on a 2010 desktop with 2 cores and no GPU, a 100-page PDF converts in 3.6 s and a phone screenshot in 13.7 s (full numbers in [TESTING](https://github.com/Muralnick/sugo/blob/main/docs/TESTING.md)).
 
 ## How it compares
 
-Measured against two well-known alternatives, on the same 31-document benchmark corpus (26 synthetic documents made by the Sugo project plus 5 real EU-regulation PDFs), with the same tokenizer and the same ground truth — full method, raw numbers and limits in [docs/comparisons](docs/comparisons/sugo-vs-docling-markitdown.md):
+Measured against two well-known alternatives, on the same 31-document benchmark corpus (26 synthetic documents made by the Sugo project plus 5 real EU-regulation PDFs), with the same tokenizer and the same ground truth — full method, raw numbers and limits in [docs/comparisons](https://github.com/Muralnick/sugo/blob/main/docs/comparisons/sugo-vs-docling-markitdown.md):
 
 | | Sugo | Docling | MarkItDown |
 |---|:---:|:---:|:---:|
@@ -118,7 +118,7 @@ Fair caveats: the corpus is small and mostly synthetic, and it was built by the 
 | Command line, MCP server for agents, local web page | Work profiles and recipes |
 | Interface and text rules in English, Italian, Spanish, French, German | |
 
-See the [roadmap](docs/ROADMAP.md) for the full plan.
+See the [roadmap](https://github.com/Muralnick/sugo/blob/main/docs/ROADMAP.md) for the full plan.
 
 ## Quick start
 
@@ -183,7 +183,7 @@ Measured on 2026-11-03 on a 2010 desktop: Intel Core i5-650 (2 cores, 4 threads,
 | Dense phone screenshot (30 lines) → text, OCR | 30 of 30 lines, 0% character errors, 411 MB | < 1 GB |
 | Same screenshot, time | 13.7 s | < 2 s |
 
-Native documents run well within the targets even on this machine. OCR is accurate but slow on a CPU without AVX; making it faster is on the roadmap. Details and scripts are in [TESTING](docs/TESTING.md).
+Native documents run well within the targets even on this machine. OCR is accurate but slow on a CPU without AVX; making it faster is on the roadmap. Details and scripts are in [TESTING](https://github.com/Muralnick/sugo/blob/main/docs/TESTING.md).
 
 ## Supported files
 
@@ -208,35 +208,35 @@ flowchart LR
     K --> S[Token metrics]
 ```
 
-Each reader turns a file into the same structure of pages and blocks. Cleaners only *propose* changes; the core applies them and marks each removed block with who removed it and why, instead of deleting it. That is what makes the output checkable and reproducible. The full design is in [ARCHITECTURE](docs/ARCHITECTURE.md).
+Each reader turns a file into the same structure of pages and blocks. Cleaners only *propose* changes; the core applies them and marks each removed block with who removed it and why, instead of deleting it. That is what makes the output checkable and reproducible. The full design is in [ARCHITECTURE](https://github.com/Muralnick/sugo/blob/main/docs/ARCHITECTURE.md).
 
 ## Promises
 
-These are written down in [PRINCIPLES](PRINCIPLES.md) and checked by tests:
+These are written down in [PRINCIPLES](https://github.com/Muralnick/sugo/blob/main/PRINCIPLES.md) and checked by tests:
 
 - **Local by principle.** Conversion never needs the internet. No cloud API, no telemetry.
 - **No guessing.** Unreadable text is marked as illegible, never filled in.
 - **Nothing silently lost.** Every removal is recorded, with its reason.
 - **Honest metrics.** Savings are measured, and Sugo also tells you when sending the original image would be cheaper.
-- **Safe with untrusted files.** Size and time limits, XML parsed safely, models verified by checksum. See the [threat model](docs/THREAT_MODEL.md).
+- **Safe with untrusted files.** Size and time limits, XML parsed safely, models verified by checksum. See the [threat model](https://github.com/Muralnick/sugo/blob/main/docs/THREAT_MODEL.md).
 
 ## Documentation
 
 | Document | Content |
 |---|---|
-| [ARCHITECTURE](docs/ARCHITECTURE.md) | Complete system design |
-| [FEATURES](docs/FEATURES.md) | Features by engine level, work profiles, supported formats |
-| [THREAT_MODEL](docs/THREAT_MODEL.md) | Security analysis |
-| [TESTING](docs/TESTING.md) | Testing, benchmarks, performance targets |
-| [ROADMAP](docs/ROADMAP.md) | Development plan and first release scope |
-| [ADRs](docs/adr/) | Architecture decision records |
-| [PRINCIPLES](PRINCIPLES.md) | The promises Sugo never breaks |
-| [AI_WORKFLOW](AI_WORKFLOW.md) | How this project is built with AI assistance |
+| [ARCHITECTURE](https://github.com/Muralnick/sugo/blob/main/docs/ARCHITECTURE.md) | Complete system design |
+| [FEATURES](https://github.com/Muralnick/sugo/blob/main/docs/FEATURES.md) | Features by engine level, work profiles, supported formats |
+| [THREAT_MODEL](https://github.com/Muralnick/sugo/blob/main/docs/THREAT_MODEL.md) | Security analysis |
+| [TESTING](https://github.com/Muralnick/sugo/blob/main/docs/TESTING.md) | Testing, benchmarks, performance targets |
+| [ROADMAP](https://github.com/Muralnick/sugo/blob/main/docs/ROADMAP.md) | Development plan and first release scope |
+| [ADRs](https://github.com/Muralnick/sugo/tree/main/docs/adr/) | Architecture decision records |
+| [PRINCIPLES](https://github.com/Muralnick/sugo/blob/main/PRINCIPLES.md) | The promises Sugo never breaks |
+| [AI_WORKFLOW](https://github.com/Muralnick/sugo/blob/main/AI_WORKFLOW.md) | How this project is built with AI assistance |
 
 ## Contributing and security
 
-See [CONTRIBUTING](CONTRIBUTING.md). Please report vulnerabilities privately, as described in [SECURITY](SECURITY.md), not in public issues.
+See [CONTRIBUTING](https://github.com/Muralnick/sugo/blob/main/CONTRIBUTING.md). Please report vulnerabilities privately, as described in [SECURITY](https://github.com/Muralnick/sugo/blob/main/SECURITY.md), not in public issues.
 
 ## License
 
-AGPL-3.0-or-later (see [ADR-010](docs/adr/ADR-010-license.md)).
+AGPL-3.0-or-later (see [ADR-010](https://github.com/Muralnick/sugo/blob/main/docs/adr/ADR-010-license.md)).

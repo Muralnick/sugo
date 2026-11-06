@@ -7,6 +7,12 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+### Fixed
+
+- README: the logo and the links to files in the repository use absolute URLs,
+  because PyPI shows the README without the repository around it (the logo did
+  not load and the links led nowhere on the PyPI page).
+
 ## [0.1.1] - 2026-11-06
 
 ### Changed
