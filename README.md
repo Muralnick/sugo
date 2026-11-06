@@ -14,7 +14,7 @@
 <p align="center">
   <a href="https://pypi.org/project/sugo-cli/"><img src="https://img.shields.io/pypi/v/sugo-cli?color=b23a22&label=PyPI" alt="PyPI version"></a>
   <a href="https://github.com/Muralnick/sugo/actions/workflows/ci.yml"><img src="https://github.com/Muralnick/sugo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/python-3.12-3776ab" alt="Python 3.12">
+  <img src="https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-3776ab" alt="Python 3.12, 3.13 and 3.14">
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-b23a22" alt="AGPL-3.0-or-later">
   <img src="https://img.shields.io/badge/runs-100%25%20offline-2f7d4f" alt="Runs 100% offline">
 </p>
@@ -106,7 +106,7 @@ Fair caveats: the corpus is small and mostly synthetic, and it was built by the 
 ## Status
 
 > [!NOTE]
-> **v0.1.0 is out** — the first signed release, on [PyPI](https://pypi.org/project/sugo-cli/) as `sugo-cli`. It is still 0.x: contracts may change, with notice, before 1.0. Releases are built reproducibly, with an SBOM, Sigstore attestations and PyPI Trusted Publishing.
+> **v0.1.1 is out**, on [PyPI](https://pypi.org/project/sugo-cli/) as `sugo-cli` (v0.1.0 was the first signed release). It is still 0.x: contracts may change, with notice, before 1.0. Releases are built reproducibly, with an SBOM, Sigstore attestations and PyPI Trusted Publishing.
 
 | Works today | Coming next |
 |---|---|
@@ -122,7 +122,7 @@ See the [roadmap](docs/ROADMAP.md) for the full plan.
 
 ## Quick start
 
-Sugo needs Python 3.12. The install is about 400 MB on disk, because the PDF library, the OCR engine and its models come with it. The easiest way to install it is with [uv](https://docs.astral.sh/uv/):
+Sugo needs Python 3.12, 3.13 or 3.14. The install is about 400 MB on disk, because the PDF library, the OCR engine and its models come with it. The easiest way to install it is with [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv tool install "sugo-cli[lite]"

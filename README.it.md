@@ -14,7 +14,7 @@
 <p align="center">
   <a href="https://pypi.org/project/sugo-cli/"><img src="https://img.shields.io/pypi/v/sugo-cli?color=b23a22&label=PyPI" alt="Versione su PyPI"></a>
   <a href="https://github.com/Muralnick/sugo/actions/workflows/ci.yml"><img src="https://github.com/Muralnick/sugo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/python-3.12-3776ab" alt="Python 3.12">
+  <img src="https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-3776ab" alt="Python 3.12, 3.13 and 3.14">
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-b23a22" alt="AGPL-3.0-or-later">
   <img src="https://img.shields.io/badge/runs-100%25%20offline-2f7d4f" alt="Funziona 100% offline">
 </p>
@@ -105,7 +105,7 @@ Limiti da tenere presenti: il corpus è piccolo e per lo più sintetico, ed è s
 ## Stato
 
 > [!NOTE]
-> **La v0.1.0 è uscita**: la prima release firmata, su [PyPI](https://pypi.org/project/sugo-cli/) con il nome `sugo-cli`. È ancora 0.x: i contratti possono cambiare, con preavviso, prima della 1.0. Le release sono costruite in modo riproducibile, con SBOM, attestazioni Sigstore e PyPI Trusted Publishing.
+> **La v0.1.1 è uscita**, su [PyPI](https://pypi.org/project/sugo-cli/) con il nome `sugo-cli` (la v0.1.0 è stata la prima release firmata). È ancora 0.x: i contratti possono cambiare, con preavviso, prima della 1.0. Le release sono costruite in modo riproducibile, con SBOM, attestazioni Sigstore e PyPI Trusted Publishing.
 
 | Funziona oggi | In arrivo |
 |---|---|
@@ -121,7 +121,7 @@ Il piano completo è nella [roadmap](docs/ROADMAP.md) (in inglese).
 
 ## Avvio rapido
 
-Sugo richiede Python 3.12. L'installazione occupa circa 400 MB su disco, perché porta con sé la libreria PDF, il motore OCR e i suoi modelli. Il modo più semplice per installarlo è [uv](https://docs.astral.sh/uv/):
+Sugo richiede Python 3.12, 3.13 o 3.14. L'installazione occupa circa 400 MB su disco, perché porta con sé la libreria PDF, il motore OCR e i suoi modelli. Il modo più semplice per installarlo è [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv tool install "sugo-cli[lite]"
