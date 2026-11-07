@@ -1,6 +1,6 @@
 # ADR-062: Interactive shell, first version
 
-**Status:** Proposed
+**Status:** Accepted (maintainer decisions 1-4, 2026-11-07)
 **Date:** 2026-11-07
 **Deciders:** project author
 **Implements:** ARCHITECTURE §12 "Interactive shell", ROADMAP v0.2 (brought forward, maintainer decision 2026-11-07)
@@ -26,7 +26,7 @@ wcwidth changed on 2026-09-23: from **0.9.0** every release also ships **compile
 
 ## Decision
 
-### 1. Dependencies (to be confirmed by the maintainer)
+### 1. Dependencies (maintainer decision, 2026-11-07)
 
 - `prompt_toolkit>=3.0.53,<3.1`, base dependency, so the shell is always there.
 - `wcwidth>=0.8.5,<0.9`: pinned below the first release with native wheels. Raising it needs a new ADR, after checking what the compiled part does.
