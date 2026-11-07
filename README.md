@@ -172,6 +172,31 @@ claude mcp add sugo -- sugo mcp --root ~/Documents
 
 The agent gets two tools: `convert_document` and `estimate_savings`.
 
+### Uninstall
+
+Remove the program the same way you installed it:
+
+```bash
+uv tool uninstall sugo-cli
+```
+
+Or, if you used pip:
+
+```bash
+pip uninstall sugo-cli
+```
+
+If you added Sugo to an agent, remove it there too, for example `claude mcp remove sugo`.
+
+Uninstalling the program does not delete the files Sugo created. They are only on your computer, and you can delete them by hand:
+
+| What | Windows | macOS | Linux |
+|---|---|---|---|
+| Settings (`config.toml`) | `%LOCALAPPDATA%\sugo` | `~/Library/Application Support/sugo` | `~/.config/sugo` |
+| Cache (text of converted documents) | `%LOCALAPPDATA%\sugo\Cache` | `~/Library/Caches/sugo` | `~/.cache/sugo` |
+
+If you set `SUGO_CACHE_DIR`, the cache is in that folder instead. The cache holds text from the documents you converted, so delete it if those documents were private. Apart from these two folders and the files you asked it to write (such as `-o` output or receipts), Sugo keeps nothing else on disk.
+
 ## On an old computer
 
 Measured on 2026-11-03 on a 2010 desktop: Intel Core i5-650 (2 cores, 4 threads, no AVX), 8 GB RAM, SSD, no usable GPU. Weaker than the 8 GB, 4-core machine Sugo targets.
