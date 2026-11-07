@@ -77,7 +77,7 @@ def run_checks() -> list[Check]:
             Check(
                 N_("level lite"),
                 Status.ERROR,
-                _('missing {packages}: pip install "{distribution}[lite]"').format(
+                _("missing {packages}: pip install --force-reinstall {distribution}").format(
                     packages=", ".join(missing), distribution=DISTRIBUTION_NAME
                 ),
             )

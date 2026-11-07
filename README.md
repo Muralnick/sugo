@@ -7,6 +7,8 @@
 
 <h1 align="center">Sugo</h1>
 
+<!-- mcp-name: io.github.Muralnick/sugo -->
+
 <p align="center">
   <strong>Documents, reduced.</strong> Feed your LLM the sauce, not the water.
 </p>
@@ -125,17 +127,17 @@ See the [roadmap](https://github.com/Muralnick/sugo/blob/main/docs/ROADMAP.md) f
 Sugo needs Python 3.12, 3.13 or 3.14. The install is about 400 MB on disk, because the PDF library, the OCR engine and its models come with it. The easiest way to install it is with [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install "sugo-cli[lite]"
+uv tool install sugo-cli
 ```
 
 Or with pip:
 
 ```bash
-pip install "sugo-cli[lite]"
+pip install sugo-cli
 ```
 
 > [!TIP]
-> The package is called `sugo-cli` because the name `sugo` on PyPI is held by an unrelated, empty project (a name transfer request is open). The installed command is still `sugo`.
+> The package is called `sugo-cli` because the name `sugo` on PyPI is held by an unrelated, empty project (a name transfer request is open). The installed command is still `sugo`; `sugo-cli` works too. Older instructions with `sugo-cli[lite]` still work: everything is now included by default.
 
 To run the latest development version from source instead:
 

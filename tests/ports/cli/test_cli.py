@@ -267,7 +267,7 @@ def test_missing_lite_level_exits_with_5(monkeypatch: pytest.MonkeyPatch) -> Non
     result = run("report.pdf")
     assert result.exit_code == ExitCode.MISSING
     assert "LEVEL_MISSING" in result.stderr
-    assert f'pip install "{DISTRIBUTION_NAME}[lite]"' in result.stderr
+    assert f"pip install --force-reinstall {DISTRIBUTION_NAME}" in result.stderr
     as_json = run("report.pdf", "--json")
     assert json.loads(as_json.stderr)["error"]["details"] == {"missing": ["rapidocr"]}
     assert as_json.stdout == ""

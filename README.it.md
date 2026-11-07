@@ -124,17 +124,17 @@ Il piano completo è nella [roadmap](docs/ROADMAP.md) (in inglese).
 Sugo richiede Python 3.12, 3.13 o 3.14. L'installazione occupa circa 400 MB su disco, perché porta con sé la libreria PDF, il motore OCR e i suoi modelli. Il modo più semplice per installarlo è [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install "sugo-cli[lite]"
+uv tool install sugo-cli
 ```
 
 Oppure con pip:
 
 ```bash
-pip install "sugo-cli[lite]"
+pip install sugo-cli
 ```
 
 > [!TIP]
-> Il pacchetto si chiama `sugo-cli` perché il nome `sugo` su PyPI è tenuto da un progetto estraneo e vuoto (è aperta una richiesta di trasferimento). Il comando installato resta `sugo`.
+> Il pacchetto si chiama `sugo-cli` perché il nome `sugo` su PyPI è tenuto da un progetto estraneo e vuoto (è aperta una richiesta di trasferimento). Il comando installato resta `sugo`; funziona anche `sugo-cli`. Le vecchie istruzioni con `sugo-cli[lite]` funzionano ancora: ora tutto è incluso di serie.
 
 Per usare invece l'ultima versione di sviluppo dal codice sorgente:
 

@@ -61,3 +61,4 @@
 | [057](ADR-057-python-3.13-3.14.md) | Support Python 3.12 to 3.14 | Proposed |
 | [058](ADR-058-readable-receipt-file.md) | Write the receipt file indented | Accepted |
 | [059](ADR-059-web-ui-cli-parity.md) | Bring the web UI level with the command line | Accepted |
+| [060](ADR-060-mcp-registry-ready-package.md) | A package the official MCP Registry can run | Accepted |

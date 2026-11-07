@@ -94,7 +94,8 @@ def level_missing(packages: list[str]) -> PortError:
         code="LEVEL_MISSING",
         message=_("The lite level is not installed."),
         exit_code=ExitCode.MISSING,
-        hint=f'pip install "{DISTRIBUTION_NAME}[lite]"',
+        # The lite level is a base dependency (ADR-060): only a damaged install lacks it.
+        hint=f"pip install --force-reinstall {DISTRIBUTION_NAME}",
         details={"missing": packages},
     )
 
