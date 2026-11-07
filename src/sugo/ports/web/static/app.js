@@ -476,6 +476,51 @@
 
   input.addEventListener("change", () => convert(input.files[0]));
 
+  // --- Pasting a screenshot (ADR-059), as sugo clip: only an image counts. ---
+
+  const PASTED_NAME = "clipboard.png";
+
+  function pastedFile(blob) {
+    return new File([blob], PASTED_NAME, { type: blob.type });
+  }
+
+  // Ctrl+V needs no permission: the browser hands the page what was pasted.
+  document.addEventListener("paste", (event) => {
+    const target = event.target;
+    // Pasting into a settings field stays an ordinary paste.
+    if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement) return;
+    const items = event.clipboardData ? Array.from(event.clipboardData.items) : [];
+    const image = items.find((item) => item.kind === "file" && item.type.startsWith("image/"));
+    if (!image) return;  // Text is ignored, as sugo clip ignores it.
+    const blob = image.getAsFile();
+    if (!blob) return;
+    event.preventDefault();
+    selectView("convert");
+    convert(pastedFile(blob));
+  });
+
+  // The button asks the browser, which may ask the user first.
+  $("paste").addEventListener("click", async () => {
+    if (busy || !token) return;
+    if (!navigator.clipboard || typeof navigator.clipboard.read !== "function") {
+      setStatus(texts.paste_denied, false);
+      return;
+    }
+    let items;
+    try { items = await navigator.clipboard.read(); } catch (e) {
+      setStatus(texts.paste_denied, false);
+      return;
+    }
+    for (const item of items) {
+      const type = item.types.find((name) => name.startsWith("image/"));
+      if (type) {
+        convert(pastedFile(await item.getType(type)));
+        return;
+      }
+    }
+    setStatus(texts.paste_none, false);
+  });
+
   // Stop the browser from opening a file dropped outside the drop area.
   for (const name of ["dragover", "drop"]) {
     window.addEventListener(name, (event) => event.preventDefault());
@@ -558,5 +603,6 @@
     showError({ message: texts.no_token });
     drop.classList.add("busy");
     input.disabled = true;
+    $("paste").disabled = true;
   }
 })();
