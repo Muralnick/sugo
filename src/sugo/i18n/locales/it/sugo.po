@@ -1203,3 +1203,30 @@ msgstr "{before} -> {after} token"
 
 msgid "{saved:.0f}% saved"
 msgstr "{saved:.0f}% risparmiato"
+
+msgid "Drag a file here (PDF, Word, Excel, PowerPoint, image) or type its name · /help"
+msgstr "Trascina qui un file (PDF, Word, Excel, PowerPoint, immagine) o scrivi il suo nome · /help"
+
+msgid "/save writes the Markdown to a folder"
+msgstr "/save salva il Markdown in una cartella"
+
+msgid "/explain shows what was removed and why"
+msgstr "/explain mostra cosa è stato tolto e perché"
+
+msgid "/stats compares the tokens per AI provider"
+msgstr "/stats confronta i token per fornitore di IA"
+
+msgid "Copy a screenshot, then type /clip to convert it"
+msgstr "Copia uno screenshot, poi scrivi /clip per convertirlo"
+
+msgid "Tab completes file names and commands"
+msgstr "Tab completa i nomi dei file e i comandi"
+
+msgid "Several files at once: *.pdf, or names separated by spaces"
+msgstr "Più file insieme: *.pdf, oppure nomi separati da spazi"
+
+msgid "/receipt keeps a record of every change, checkable with /verify"
+msgstr "/receipt registra ogni modifica, da controllare poi con /verify"
+
+msgid "/chunks splits the next files into pieces for RAG"
+msgstr "/chunks divide i prossimi file in pezzi per RAG"
