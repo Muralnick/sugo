@@ -375,11 +375,15 @@
   // --- Save all: one uncompressed ZIP built here, no library (ADR-059). ---
 
   // A name safe in any folder: no path, no control or reserved characters.
+  // Format characters (\p{Cf}) include the ones that reverse text (U+202E).
+  // Names Windows reserves for devices get an underscore.
   function safeStem(fileName) {
-    const stem = fileName.replace(/\.[^.]*$/, "")
-      .replace(/[\u0000-\u001f\u007f-\u009f\/\\:*?"<>|]/g, "_")
+    let stem = fileName.replace(/\.[^.]*$/, "")
+      .replace(/[\u0000-\u001f\u007f-\u009f\/\\:*?"<>|]|\p{Cf}/gu, "_")
       .replace(/^[.\s]+|[.\s]+$/g, "");
-    return [...stem].slice(0, 200).join("") || "document";
+    stem = [...stem].slice(0, 120).join("");
+    if (/^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/i.test(stem)) stem += "_";
+    return stem || "document";
   }
 
   // report.pdf and report.png become report and report (2), never one file.
