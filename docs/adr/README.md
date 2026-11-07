@@ -65,3 +65,4 @@
 | [061](ADR-061-worker-start-user-site.md) | Start workers so a user install can find Sugo | Accepted |
 | [062](ADR-062-interactive-shell.md) | Interactive shell, first version | Accepted |
 | [063](ADR-063-handwriting-in-scans.md) | Handwriting in scanned pages (signatures) | Accepted |
+| [064](ADR-064-scanned-letterheads.md) | Repeated letterheads in scanned documents | Accepted |
