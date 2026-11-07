@@ -112,6 +112,18 @@ def test_a_dropped_file_is_converted_and_saved(
     assert "Section 2 says something new." in saved.read_text(encoding="utf-8")
 
 
+def test_a_clean_file_says_there_was_nothing_to_remove(
+    workdir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    document = pymupdf.open()
+    page = document.new_page()
+    page.insert_text((72, 120), "One plain sentence with nothing to clean.", fontsize=10)
+    (workdir / "clean.pdf").write_bytes(document.tobytes())
+    output = run(capsys, "clean.pdf")
+    assert "already clean: nothing to remove" in output
+    assert "% saved" not in output
+
+
 @pytest.mark.usefixtures("workdir")
 def test_several_files_are_saved_together(
     workdir: Path, capsys: pytest.CaptureFixture[str]

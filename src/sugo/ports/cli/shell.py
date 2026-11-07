@@ -306,11 +306,15 @@ def _show(result: Result) -> None:
     line.append(f"  {pages}  ", style="dim")
     line.append(_("{before} -> {after} tokens").format(before=before, after=after))
     line.append("  ")
-    filled = round(saved / 100 * _BAR_CELLS)
-    line.append("█" * filled, style="green")
-    line.append("░" * (_BAR_CELLS - filled), style="dim")
-    line.append("  ")
-    line.append(_("{saved:.0f}% saved").format(saved=saved), style="bold green")
+    if after >= before:
+        # An empty bar at 0% looks like a failure; it means the text was already clean.
+        line.append(_("already clean: nothing to remove"), style="dim")
+    else:
+        filled = round(saved / 100 * _BAR_CELLS)
+        line.append("█" * filled, style="green")
+        line.append("░" * (_BAR_CELLS - filled), style="dim")
+        line.append("  ")
+        line.append(_("{saved:.0f}% saved").format(saved=saved), style="bold green")
     console.print(line)
     cli._say_converted(result.source, conversion, None)
 

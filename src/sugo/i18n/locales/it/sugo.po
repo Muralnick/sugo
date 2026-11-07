@@ -1251,3 +1251,6 @@ msgstr "/verify FILE RICEVUTA"
 
 msgid "Converting {source}, page {page}"
 msgstr "Conversione di {source}, pagina {page}"
+
+msgid "already clean: nothing to remove"
+msgstr "testo già pulito: niente da togliere"

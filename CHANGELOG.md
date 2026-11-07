@@ -14,6 +14,11 @@ still change, with notice, before 1.0).
   `/explain`, `/clip` and `/help`.
 - The shell shows the page being read while a document converts.
 
+### Changed
+
+- When cleaning removes nothing, the shell says the text was already clean
+  instead of showing an empty "0% saved" bar.
+
 ### Fixed
 
 - The shell's `/help` translates argument names (`CARTELLA`, `DIMENSIONE`,
