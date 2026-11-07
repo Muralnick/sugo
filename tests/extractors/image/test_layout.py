@@ -195,3 +195,40 @@ def test_blank_image_skips_ocr(encode: Encode) -> None:
 
     page = extract_page(encode(Image.new("RGB", (300, 200), "white"), "PNG"), NoOcr())  # type: ignore[arg-type]
     assert page.blocks == ()
+
+
+# --- Text of very different sizes (ADR-064) -----------------------------------------
+
+
+def sized(text: str, y: float, height: float) -> OcrLine:
+    return OcrLine(
+        text=text, confidence=0.99, bbox=BBox(x0=0.1, y0=y, x1=0.8, y1=y + height), illegible=False
+    )
+
+
+SMALL, BODY_SIZE = 0.012, 0.022
+CAPTIONS = [
+    sized("Regional Training Consortium of Schools", 0.050, SMALL),
+    sized("Technical Institute of Industry, Bergamo", 0.062, SMALL),
+]
+# Touching the captions above: no whitespace band for the XY-cut.
+BODY_ROWS = [
+    sized("The meeting took place on 31 March 2026 at 15:00.", 0.073, BODY_SIZE),
+    sized("The committee examined every application received.", 0.094, BODY_SIZE),
+]
+
+
+def test_small_captions_are_not_merged_into_the_body_below() -> None:
+    assert len(texts([*CAPTIONS, *BODY_ROWS])) == 2
+
+
+def test_screenshots_keep_rows_of_different_sizes_together() -> None:
+    blocks = build_blocks([*CAPTIONS, *BODY_ROWS], origin_engine="test", screenshot=True)
+    assert len(blocks) == 1
+
+
+def test_a_short_row_does_not_split_a_paragraph() -> None:
+    # "nei termini" has no descender: a lower box, the same type size.
+    short = sized("received in time;", 0.115, SMALL)
+    after = sized("The final ranking will be published on the website.", 0.128, BODY_SIZE)
+    assert len(texts([*BODY_ROWS, short, after])) == 1

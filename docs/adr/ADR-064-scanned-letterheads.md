@@ -68,3 +68,13 @@ For OCR pages, the edge analyzer also records, for each text block in the edge b
 1. Order: the layout fix (part 1) comes first, in its own pull request; the letterhead matching (part 2) follows.
 2. `[illegible]` blocks inside a matched letterhead area stay on every page, as ADR-044 does for all flagged blocks.
 3. Release: 0.2.0, with ADR-063.
+
+## Implementation notes
+
+### Part 1, layout (2026-11-07)
+
+- Rows are compared one after the other inside an XY-cut leaf: a row whose median line height is at least 1.5 times the previous row's (or two thirds of it) starts a new paragraph (`LAYOUT_SIZE_SPLIT_RATIO`).
+- **Rows with fewer than 25 readable characters are not measured** (`LAYOUT_SIZE_MIN_CHARS`). With every row measured, a short body line without descenders ("…stabiliti;") has a lower box, and it split a body paragraph in mid-sentence on the real scan.
+- Screenshots are exempt: a chat message and its small timestamp stay one bubble.
+- On the real scan, the only changes are the two intended ones: the letterhead now ends before the first body paragraph on pages 2 and 3; every other block is unchanged. The synthetic corpus (native PDFs, XLSX, screenshots) does not reach this code; the extractor tests and `benchmarks/handwriting.py` give the same results as before.
+- The ADR's "or the gap between them is more than a share of the line height" was not needed on the real scan and is not implemented.

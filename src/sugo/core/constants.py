@@ -113,6 +113,17 @@ LAYOUT_COLUMN_GAP: Final = 1.5
 # share of the shorter box's height.
 LAYOUT_SAME_ROW_OVERLAP: Final = 0.5
 
+# Two text rows whose heights differ by at least this factor are never one
+# paragraph on a document page (ADR-064): a letterhead's small captions
+# touching the body below them. Measured on a real scanned record
+# (2026-11-07): letterhead to body 1.6 to 1.9; adjacent body rows mostly
+# below 1.25. Screenshots are exempt: a chat message and its small timestamp
+# are one bubble.
+LAYOUT_SIZE_SPLIT_RATIO: Final = 1.5
+# Rows with fewer readable characters are not measured: a short row's box
+# depends on its letters (ascenders, descenders), not on its type size.
+LAYOUT_SIZE_MIN_CHARS: Final = 25
+
 # --- Screenshot detectors (roadmap step 3a) ----------------------------------
 # Conservative on purpose: leaving noise costs a few tokens, removing content
 # breaks principle 3. Initial values, to be calibrated (step 8).

@@ -21,6 +21,9 @@ still change, with notice, before 1.0).
 
 ### Changed
 
+- Scanned pages: text of very different sizes, such as a letterhead's small
+  captions touching the body below them, is no longer merged into one
+  paragraph (ADR-064, part 1).
 - When cleaning removes nothing, the shell says the text was already clean
   instead of showing an empty "0% saved" bar.
 
