@@ -256,16 +256,10 @@
     try { return encodeURIComponent(name); } catch (e) { return null; }  // a lone surrogate
   }
 
-  async function convert(file) {
-    if (busy || !token || !file) return;
-    clearAll();
-    $("file-name").textContent = file.name;
-    if (file.size === 0) { showError({ message: texts.empty }); return; }
-    if (file.size > data.max_bytes) { showError({ message: texts.too_large }); return; }
-    busy = true;
-    drop.classList.add("busy");
-    setStatus(texts.converting, true);
-    baseName = file.name.replace(/\.[^.]*$/, "") || "document";
+  // One file, one request: {result} or {error}, never an exception.
+  async function requestConversion(file) {
+    if (file.size === 0) return { error: { message: texts.empty } };
+    if (file.size > data.max_bytes) return { error: { message: texts.too_large } };
     try {
       const response = await fetch("/api/convert", {
         method: "POST",
@@ -277,24 +271,208 @@
       });
       let body = null;
       try { body = await response.json(); } catch (e) { body = null; }
-      setStatus("", false);
-      if (response.ok && body) {
-        lastResult = body;
-        showResult(body);
-      } else if (body && body.error) {
-        showError(body.error);
-      } else {
-        showError({ message: texts.unexpected });
+      if (response.ok && body) return { result: body };
+      if (body && body.error) return { error: body.error };
+    } catch (e) { /* reported below */ }
+    return { error: { message: texts.unexpected } };
+  }
+
+  function convert(file) {
+    if (file) convertFiles([file]);
+  }
+
+  // Several files (ADR-059): converted one after the other, each with its own
+  // request, so the server's limits apply to each; a refused file does not
+  // stop the others. Results live only in this page.
+  let batch = [];
+  let selected = -1;
+
+  async function convertFiles(list) {
+    const files = Array.from(list || []);
+    if (busy || !token || files.length === 0) return;
+    clearAll();
+    batch = [];
+    selected = -1;
+    show($("batch"), false);
+    if (files.length > data.max_batch_files) {
+      showError({ message: texts.batch_too_many });
+      input.value = "";
+      return;
+    }
+    busy = true;
+    drop.classList.add("busy");
+    const several = files.length > 1;
+    batch = files.map((file) => ({ file: file, state: "waiting", result: null, error: null }));
+    if (several) { renderBatch(); show($("batch"), true); }
+    try {
+      for (let index = 0; index < batch.length; index += 1) {
+        const entry = batch[index];
+        entry.state = "converting";
+        if (several) renderBatch();
+        setStatus(several ? fill(texts.batch_title, batchCounts()) : texts.converting, true);
+        const answer = await requestConversion(entry.file);
+        entry.state = answer.result ? "done" : "refused";
+        entry.result = answer.result || null;
+        entry.error = answer.error || null;
+        if (!several || selected === -1) {
+          if (answer.result || !several) showEntry(index);
+        }
+        if (several) renderBatch();
       }
-    } catch (e) {
-      setStatus("", false);
-      showError({ message: texts.unexpected });
     } finally {
       busy = false;
       drop.classList.remove("busy");
+      setStatus("", false);
       input.value = "";
+      $("save-all").disabled = !batch.some((entry) => entry.result);
     }
   }
+
+  function batchCounts() {
+    return {
+      done: number(batch.filter((entry) => entry.state === "done").length),
+      count: number(batch.length),
+    };
+  }
+
+  function renderBatch() {
+    $("batch-title").textContent = fill(texts.batch_title, batchCounts());
+    const list = $("batch-list");
+    list.replaceChildren();
+    batch.forEach((entry, index) => {
+      const item = document.createElement("li");
+      if (index === selected) item.className = "selected";
+      const name = document.createElement("button");
+      name.type = "button";
+      name.textContent = entry.file.name;
+      name.disabled = entry.state === "waiting" || entry.state === "converting";
+      name.addEventListener("click", () => { showEntry(index); renderBatch(); });
+      const state = document.createElement("span");
+      state.className = "batch-state " + entry.state;
+      state.textContent = texts["state_" + entry.state];
+      if (entry.error && entry.error.code) state.textContent += " · " + entry.error.code;
+      item.append(name, state);
+      list.append(item);
+    });
+  }
+
+  function showEntry(index) {
+    const entry = batch[index];
+    selected = index;
+    show($("error"), false);
+    show($("result"), false);
+    lastResult = null;
+    $("file-name").textContent = entry.file.name;
+    baseName = entry.file.name.replace(/\.[^.]*$/, "") || "document";
+    if (entry.result) {
+      lastResult = entry.result;
+      showResult(entry.result);
+    } else if (entry.error) {
+      showError(entry.error);
+    }
+  }
+
+  // --- Save all: one uncompressed ZIP built here, no library (ADR-059). ---
+
+  // A name safe in any folder: no path, no control or reserved characters.
+  function safeStem(fileName) {
+    const stem = fileName.replace(/\.[^.]*$/, "")
+      .replace(/[\u0000-\u001f\u007f-\u009f\/\\:*?"<>|]/g, "_")
+      .replace(/^[.\s]+|[.\s]+$/g, "");
+    return [...stem].slice(0, 200).join("") || "document";
+  }
+
+  // report.pdf and report.png become report and report (2), never one file.
+  function zipEntries() {
+    const taken = new Set();
+    const entries = [];
+    for (const entry of batch) {
+      if (!entry.result) continue;
+      const stem = safeStem(entry.file.name);
+      let name = stem;
+      for (let n = 2; taken.has(name.toLowerCase()); n += 1) name = stem + " (" + n + ")";
+      taken.add(name.toLowerCase());
+      entries.push({ name: name + ".md", text: entry.result.markdown });
+      if (typeof entry.result.jsonl === "string") entries.push({ name: name + ".jsonl", text: entry.result.jsonl });
+      if (typeof entry.result.receipt_file === "string") {
+        entries.push({ name: name + ".receipt.json", text: entry.result.receipt_file });
+      }
+    }
+    return entries;
+  }
+
+  const CRC_TABLE = (() => {
+    const table = new Uint32Array(256);
+    for (let n = 0; n < 256; n += 1) {
+      let c = n;
+      for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      table[n] = c >>> 0;
+    }
+    return table;
+  })();
+
+  function crc32(bytes) {
+    let crc = 0xffffffff;
+    for (let i = 0; i < bytes.length; i += 1) crc = CRC_TABLE[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+
+  // The "stored" method: no compression, local headers, central directory, end record.
+  function makeZip(entries) {
+    const encoder = new TextEncoder();
+    const now = new Date();
+    const time = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+    const date = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+    const parts = [];
+    const central = [];
+    let offset = 0;
+    for (const entry of entries) {
+      const name = encoder.encode(entry.name);
+      const content = encoder.encode(entry.text);
+      const crc = crc32(content);
+      const local = new DataView(new ArrayBuffer(30));
+      local.setUint32(0, 0x04034b50, true);
+      local.setUint16(4, 20, true);
+      local.setUint16(6, 0x0800, true);  // names are UTF-8
+      local.setUint16(8, 0, true);  // stored
+      local.setUint16(10, time, true);
+      local.setUint16(12, date, true);
+      local.setUint32(14, crc, true);
+      local.setUint32(18, content.length, true);
+      local.setUint32(22, content.length, true);
+      local.setUint16(26, name.length, true);
+      local.setUint16(28, 0, true);
+      parts.push(local, name, content);
+      const record = new DataView(new ArrayBuffer(46));
+      record.setUint32(0, 0x02014b50, true);
+      record.setUint16(4, 20, true);
+      record.setUint16(6, 20, true);
+      record.setUint16(8, 0x0800, true);
+      record.setUint16(10, 0, true);
+      record.setUint16(12, time, true);
+      record.setUint16(14, date, true);
+      record.setUint32(16, crc, true);
+      record.setUint32(20, content.length, true);
+      record.setUint32(24, content.length, true);
+      record.setUint16(28, name.length, true);
+      record.setUint32(42, offset, true);
+      central.push(record, name);
+      offset += 30 + name.length + content.length;
+    }
+    const size = central.reduce((total, part) => total + part.byteLength, 0);
+    const end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true);
+    end.setUint16(8, entries.length, true);
+    end.setUint16(10, entries.length, true);
+    end.setUint32(12, size, true);
+    end.setUint32(16, offset, true);
+    return new Blob([...parts, ...central, end], { type: "application/zip" });
+  }
+
+  $("save-all").addEventListener("click", () => {
+    const entries = zipEntries();
+    if (entries.length > 0) download(makeZip(entries), "sugo.zip", "application/zip");
+  });
 
   function showResult(result) {
     const text = result.text;
@@ -474,7 +652,7 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  input.addEventListener("change", () => convert(input.files[0]));
+  input.addEventListener("change", () => convertFiles(input.files));
 
   // --- Pasting a screenshot (ADR-059), as sugo clip: only an image counts. ---
 
@@ -530,7 +708,7 @@
   drop.addEventListener("drop", (event) => {
     drop.classList.remove("over");
     const files = event.dataTransfer && event.dataTransfer.files;
-    if (files && files.length > 0) convert(files[0]);
+    if (files && files.length > 0) convertFiles(files);
   });
 
   $("copy").addEventListener("click", async () => {

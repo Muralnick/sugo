@@ -42,7 +42,7 @@
       <div class="drop-actions">
         <label class="button primary">
           <span data-text="choose"></span>
-          <input id="file" type="file" accept=".pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,.webp,.xml">
+          <input id="file" type="file" multiple accept=".pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,.webp,.xml">
         </label>
         <button id="paste" type="button" data-text="paste"></button>
       </div>
@@ -55,6 +55,14 @@
       <span class="spinner" aria-hidden="true"></span>
       <span id="status-text"></span>
     </div>
+
+    <section id="batch" class="panel" hidden>
+      <div class="panel-head">
+        <h2 id="batch-title"></h2>
+        <button id="save-all" type="button" data-text="save_all" disabled></button>
+      </div>
+      <ol id="batch-list" class="batch-list"></ol>
+    </section>
 
     <section id="error" class="error" role="alert" hidden>
       <p><strong id="error-code"></strong> <span id="error-message"></span></p>

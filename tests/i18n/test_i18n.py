@@ -173,11 +173,11 @@ def test_os_errors_are_explained_without_the_path() -> None:
 
 
 def test_translate_picks_a_language_without_switching() -> None:
-    assert i18n.translate("it", "Choose a file") == "Scegli un file"
-    assert i18n.translate("en", "Choose a file") == "Choose a file"
+    assert i18n.translate("it", "Choose files") == "Scegli i file"
+    assert i18n.translate("en", "Choose files") == "Choose files"
     assert i18n.active_language() == "en"
     with pytest.raises(ValueError, match="no interface language"):
-        i18n.translate("fr", "Choose a file")
+        i18n.translate("fr", "Choose files")
 
 
 @pytest.mark.parametrize(

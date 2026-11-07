@@ -338,3 +338,14 @@ footer { margin-top: 40px; }
 .verdict { font-weight: 700; margin: 0; }
 .verdict.match { color: var(--accent); }
 .verdict.mismatch { color: var(--error); }
+
+/* Several files (ADR-059) */
+.batch-list { list-style: none; margin: 0; padding: 0; }
+.batch-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.batch-list li:last-child { border-bottom: 0; }
+.batch-list button { border: 0; background: none; padding: 4px 0; text-align: left; overflow-wrap: anywhere; color: inherit; }
+.batch-list button:hover { background: none; text-decoration: underline; }
+.batch-list li.selected button { font-weight: 700; }
+.batch-state { white-space: nowrap; font-size: 0.85rem; color: var(--muted); }
+.batch-state.done { color: var(--accent); }
+.batch-state.refused { color: var(--error); }
