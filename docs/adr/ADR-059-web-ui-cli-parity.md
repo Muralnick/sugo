@@ -1,6 +1,6 @@
 # ADR-059: Bring the web UI level with the command line
 
-**Status:** Proposed
+**Status:** Accepted (maintainer decision, 2026-11-07)
 **Date:** 2026-11-07
 **Deciders:** project author
 **Amends:** ADR-055 (web UI scope: several items move out of "Left for later")
