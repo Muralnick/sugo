@@ -64,3 +64,4 @@
 | [060](ADR-060-mcp-registry-ready-package.md) | A package the official MCP Registry can run | Accepted |
 | [061](ADR-061-worker-start-user-site.md) | Start workers so a user install can find Sugo | Accepted |
 | [062](ADR-062-interactive-shell.md) | Interactive shell, first version | Accepted |
+| [063](ADR-063-handwriting-in-scans.md) | Handwriting in scanned pages (signatures) | Proposed |
