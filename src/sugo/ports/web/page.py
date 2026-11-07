@@ -50,6 +50,10 @@ _TEXTS = {
     "tab_questions": N_("Questions"),
     "drop": N_("Drop a file here"),
     "choose": N_("Choose a file"),
+    "paste": N_("Paste a screenshot"),
+    "paste_hint": N_("Or press Ctrl+V on this page to convert the image in the clipboard."),
+    "paste_none": N_("The clipboard holds no image."),
+    "paste_denied": N_("The browser did not allow reading the clipboard; press Ctrl+V instead."),
     "formats": N_(
         "PDF, DOCX, XLSX or PPTX up to {large} MB; PNG, JPEG, WEBP or XML up to {small} MB."
     ),

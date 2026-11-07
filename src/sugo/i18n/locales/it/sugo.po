@@ -696,6 +696,18 @@ msgstr "Nessun testo modificato."
 msgid "Receipt"
 msgstr "Ricevuta"
 
+msgid "Paste a screenshot"
+msgstr "Incolla uno screenshot"
+
+msgid "Or press Ctrl+V on this page to convert the image in the clipboard."
+msgstr "Oppure premi Ctrl+V su questa pagina per convertire l'immagine negli appunti."
+
+msgid "The clipboard holds no image."
+msgstr "Negli appunti non c'è un'immagine."
+
+msgid "The browser did not allow reading the clipboard; press Ctrl+V instead."
+msgstr "Il browser non ha permesso di leggere gli appunti; premi invece Ctrl+V."
+
 msgid "Keep a cache on disk: faster next time, but it holds the text of converted documents"
 msgstr "Tieni una cache sul disco: la volta dopo è più veloce, ma contiene il testo dei documenti convertiti"
 

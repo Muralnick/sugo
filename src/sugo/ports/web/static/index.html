@@ -38,10 +38,14 @@
     <div id="drop" class="drop">
       <div class="drop-icon" aria-hidden="true"></div>
       <p class="drop-title" data-text="drop"></p>
-      <label class="button primary">
-        <span data-text="choose"></span>
-        <input id="file" type="file" accept=".pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,.webp,.xml">
-      </label>
+      <div class="drop-actions">
+        <label class="button primary">
+          <span data-text="choose"></span>
+          <input id="file" type="file" accept=".pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,.webp,.xml">
+        </label>
+        <button id="paste" type="button" data-text="paste"></button>
+      </div>
+      <p class="muted small" data-text="paste_hint"></p>
       <p class="muted small" data-text="formats"></p>
       <p id="file-name" class="file-name"></p>
     </div>

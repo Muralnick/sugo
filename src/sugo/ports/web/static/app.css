@@ -330,3 +330,6 @@ footer { margin-top: 40px; }
 #doctor-checks td.number { text-align: left; }
 .check-warning { color: var(--warn); }
 .check-error { color: var(--error); }
+
+/* Paste (ADR-059) */
+.drop-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
