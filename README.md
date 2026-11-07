@@ -136,6 +136,8 @@ Or with pip:
 pip install sugo-cli
 ```
 
+If `sugo` is "not recognized" or "not found" after installing with pip, pip put it in a folder your system does not search. This happens on Windows when pip installs for your user only ("Defaulting to user installation"). Either install with `uv tool install sugo-cli` and run `uv tool update-shell` once, or add the folder pip names in its warning (on Windows, `%APPDATA%\Python\Python3XX\Scripts`) to your `Path`, then open a new terminal.
+
 > [!TIP]
 > The package is called `sugo-cli` because the name `sugo` on PyPI is held by an unrelated, empty project (a name transfer request is open). The installed command is still `sugo`; `sugo-cli` works too. Older instructions with `sugo-cli[lite]` still work: everything is now included by default.
 
