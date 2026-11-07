@@ -105,7 +105,8 @@ def test_a_dropped_file_is_converted_and_saved(
     output = run(capsys, "my report [draft].pdf", "/save out")
     assert "Section 1 says something new." in output
     assert "ACME Corporation" not in output.split("✓")[0]  # The header was removed.
-    assert "my report [draft].pdf: 3 pages" in output
+    assert "✓ my report [draft].pdf  3 pages" in output
+    assert "% saved" in output
     saved = workdir / "out" / "my report [draft].md"
     assert "Section 2 says something new." in saved.read_text(encoding="utf-8")
 
@@ -125,7 +126,7 @@ def test_a_missing_file_is_reported_and_the_shell_goes_on(
 ) -> None:
     output = run(capsys, "missing.pdf", "second.pdf")
     assert "FILE_UNREADABLE" in output
-    assert "second.pdf: 3 pages" in output
+    assert "✓ second.pdf  3 pages" in output
 
 
 @pytest.mark.usefixtures("workdir")

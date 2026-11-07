@@ -1156,9 +1156,6 @@ msgstr "Alcune voci non sono mostrate; /receipt e /save le scrivono tutte."
 msgid "Tokens saved per LLM provider for the last result"
 msgstr "Token risparmiati per fornitore di LLM per l'ultimo risultato"
 
-msgid "Type /help for the commands, /exit or Ctrl+D to leave."
-msgstr "Scrivi /help per i comandi, /exit o Ctrl+D per uscire."
-
 msgid "Type /save to write the Markdown to a folder, /stats or /explain for more."
 msgstr "Scrivi /save per salvare il Markdown in una cartella, /stats o /explain per saperne di più."
 
@@ -1175,13 +1172,34 @@ msgid "Write the last result as NAME.md (default: here)"
 msgstr "Scrivi l'ultimo risultato come NOME.md (di base: qui)"
 
 msgid "off"
-msgstr "disattivata"
+msgstr "no"
 
 msgid "on"
-msgstr "attiva"
+msgstr "sì"
 
-msgid "page {page}, {cleaner}: {reason}"
-msgstr "pagina {page}, {cleaner}: {reason}"
+msgid "/help for the commands · /clip for a screenshot · /exit to leave"
+msgstr "/help per i comandi · /clip per uno screenshot · /exit per uscire"
 
-msgid "{source}: {pages}, {before} -> {after} tokens ({saved:.1f}% saved)"
-msgstr "{source}: {pages}, {before} -> {after} token (risparmiato il {saved:.1f}%)"
+msgid "Commands"
+msgstr "Comandi"
+
+msgid "Documents, reduced."
+msgstr "Documenti, ridotti."
+
+msgid "Folder: {folder}"
+msgstr "Cartella: {folder}"
+
+msgid "Tab completes · Esc clears · /help"
+msgstr "Tab completa · Esc cancella · /help"
+
+msgid "chunks"
+msgstr "chunk"
+
+msgid "receipt"
+msgstr "ricevuta"
+
+msgid "{before} -> {after} tokens"
+msgstr "{before} -> {after} token"
+
+msgid "{saved:.0f}% saved"
+msgstr "{saved:.0f}% risparmiato"
