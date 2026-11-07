@@ -31,6 +31,8 @@ from sugo.languages.packs import PACKS
 _MB = 1024 * 1024
 _LARGE_MB = max(MAX_PDF_FILE_BYTES, MAX_OFFICE_FILE_BYTES) // _MB
 _SMALL_MB = max(MAX_IMAGE_FILE_BYTES, MAX_XML_FILE_BYTES) // _MB
+# A receipt holds at most the text of a document, as large as an XML file may be (ADR-059).
+MAX_RECEIPT_BYTES = MAX_XML_FILE_BYTES
 
 # Files served as they are, by URL path: (file name, media type).
 STATIC = {
@@ -46,6 +48,7 @@ STATIC = {
 _TEXTS = {
     "tagline": N_("Documents, reduced: drop a file to get its compact Markdown."),
     "tab_convert": N_("Convert"),
+    "tab_verify": N_("Verify"),
     "tab_settings": N_("Settings"),
     "tab_questions": N_("Questions"),
     "drop": N_("Drop a file here"),
@@ -99,6 +102,28 @@ _TEXTS = {
     "receipt_page": N_("page {page}"),
     "receipt_confidence": N_("confidence {confidence}"),
     "receipt_no_text": N_("(no text)"),
+    "verify_intro": N_(
+        "Check that converting a file still gives what its receipt recorded, as sugo verify "
+        "does. Nothing is saved."
+    ),
+    "verify_document": N_("Document"),
+    "verify_receipt": N_("Its receipt (.receipt.json)"),
+    "verify_run": N_("Verify"),
+    "verifying": N_("Verifying…"),
+    "verify_missing_files": N_("Choose both the document and its receipt."),
+    "receipt_too_large": N_("This receipt is larger than {receipt_size} MB."),
+    "verify_match": N_("The conversion is unchanged: it matches the receipt."),
+    "verify_mismatch": N_("The conversion does not match the receipt. Differences: {count}"),
+    "verify_drifted": N_(
+        "The receipt was made with another Sugo version, so an exact match is not guaranteed."
+    ),
+    "diff_removed": N_("removed block"),
+    "diff_edited": N_("edited text"),
+    "diff_flagged": N_("uncertain block"),
+    "diff_missing": N_("in the receipt, not now"),
+    "diff_extra": N_("now, not in the receipt"),
+    "diff_block": N_("page {page}, block {block}"),
+    "diff_tokens": N_("Tokens after cleaning: {stored} in the receipt, {fresh} now"),
     "edit_before": N_("Before"),
     "edit_after": N_("After"),
     "chunks_title": N_("Chunks"),
@@ -240,6 +265,7 @@ def render_page(settings: Settings, language: str) -> bytes:
         "defaults": defaults(settings, language),
         "packs": sorted(PACKS),
         "max_bytes": MAX_INPUT_BYTES,
+        "max_receipt_bytes": MAX_RECEIPT_BYTES,
         "chunk_min": CHUNK_MIN_TOKENS,
         "chunk_max": CHUNK_MAX_TOKENS_LIMIT,
     }
@@ -278,6 +304,7 @@ def _texts(language: str) -> dict[str, Any]:
         "large": _LARGE_MB,
         "small": _SMALL_MB,
         "size": MAX_INPUT_BYTES // _MB,
+        "receipt_size": MAX_RECEIPT_BYTES // _MB,
         "min": CHUNK_MIN_TOKENS,
         "max": CHUNK_MAX_TOKENS_LIMIT,
     }

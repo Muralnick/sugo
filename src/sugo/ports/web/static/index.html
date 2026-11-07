@@ -25,6 +25,7 @@
     </div>
     <nav class="tabs" role="tablist">
       <button type="button" role="tab" id="tab-convert" aria-controls="view-convert" data-view="convert" data-text="tab_convert"></button>
+      <button type="button" role="tab" id="tab-verify" aria-controls="view-verify" data-view="verify" data-text="tab_verify"></button>
       <button type="button" role="tab" id="tab-settings" aria-controls="view-settings" data-view="settings" data-text="tab_settings"></button>
       <button type="button" role="tab" id="tab-questions" aria-controls="view-questions" data-view="questions" data-text="tab_questions"></button>
     </nav>
@@ -139,6 +140,33 @@
         </details>
       </div>
     </section>
+  </section>
+
+  <section id="view-verify" class="view" role="tabpanel" aria-labelledby="tab-verify" hidden>
+    <p class="muted" data-text="verify_intro"></p>
+    <div class="panel settings">
+      <label class="field">
+        <span class="field-label" data-text="verify_document"></span>
+        <input id="verify-document" type="file" accept=".pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,.webp,.xml">
+      </label>
+      <label class="field">
+        <span class="field-label" data-text="verify_receipt"></span>
+        <input id="verify-receipt" type="file" accept=".json,application/json">
+      </label>
+      <button id="verify-run" type="button" data-text="verify_run"></button>
+      <p id="verify-status" class="muted small" role="status" aria-live="polite"></p>
+    </div>
+
+    <section id="verify-error" class="error" role="alert" hidden>
+      <p><strong id="verify-error-code"></strong> <span id="verify-error-message"></span></p>
+      <p id="verify-error-hint" class="muted"></p>
+    </section>
+
+    <div id="verify-result" class="panel" hidden>
+      <p id="verify-verdict" class="verdict"></p>
+      <p id="verify-drifted" class="warning" data-text="verify_drifted" hidden></p>
+      <ol id="verify-differences" class="receipt-list"></ol>
+    </div>
   </section>
 
   <section id="view-settings" class="view" role="tabpanel" aria-labelledby="tab-settings" hidden>

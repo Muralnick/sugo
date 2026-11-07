@@ -693,6 +693,57 @@ msgstr "Nessun testo modificato."
 msgid "Receipt"
 msgstr "Ricevuta"
 
+msgid "Verify"
+msgstr "Verifica"
+
+msgid "Check that converting a file still gives what its receipt recorded, as sugo verify does. Nothing is saved."
+msgstr "Controlla che convertire un file dia ancora quello che la sua ricevuta ha registrato, come fa sugo verify. Non viene salvato niente."
+
+msgid "Document"
+msgstr "Documento"
+
+msgid "Its receipt (.receipt.json)"
+msgstr "La sua ricevuta (.receipt.json)"
+
+msgid "Verifying…"
+msgstr "Verifica in corso…"
+
+msgid "Choose both the document and its receipt."
+msgstr "Scegli sia il documento sia la sua ricevuta."
+
+msgid "This receipt is larger than {receipt_size} MB."
+msgstr "Questa ricevuta è più grande di {receipt_size} MB."
+
+msgid "The conversion is unchanged: it matches the receipt."
+msgstr "La conversione non è cambiata: corrisponde alla ricevuta."
+
+msgid "The conversion does not match the receipt. Differences: {count}"
+msgstr "La conversione non corrisponde alla ricevuta. Differenze: {count}"
+
+msgid "The receipt was made with another Sugo version, so an exact match is not guaranteed."
+msgstr "La ricevuta è stata creata con un'altra versione di Sugo, quindi una corrispondenza esatta non è garantita."
+
+msgid "removed block"
+msgstr "blocco rimosso"
+
+msgid "edited text"
+msgstr "testo modificato"
+
+msgid "uncertain block"
+msgstr "blocco incerto"
+
+msgid "in the receipt, not now"
+msgstr "nella ricevuta, non ora"
+
+msgid "now, not in the receipt"
+msgstr "ora, non nella ricevuta"
+
+msgid "page {page}, block {block}"
+msgstr "pagina {page}, blocco {block}"
+
+msgid "Tokens after cleaning: {stored} in the receipt, {fresh} now"
+msgstr "Token dopo la pulizia: {stored} nella ricevuta, {fresh} ora"
+
 msgid "Paste a screenshot"
 msgstr "Incolla uno screenshot"
 

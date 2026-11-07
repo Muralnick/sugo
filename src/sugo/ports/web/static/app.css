@@ -333,3 +333,8 @@ footer { margin-top: 40px; }
 
 /* Paste (ADR-059) */
 .drop-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+
+/* Verify (ADR-059) */
+.verdict { font-weight: 700; margin: 0; }
+.verdict.match { color: var(--accent); }
+.verdict.mismatch { color: var(--error); }
