@@ -45,7 +45,7 @@ from sugo.core.constants import (
     CACHE_WAL_LIMIT_BYTES,
 )
 from sugo.core.models import Page
-from sugo.storage.paths import cache_dir, ensure_private_dir
+from sugo.storage.paths import cache_dir, check_private_file, ensure_private_dir
 
 _log = logging.getLogger(__name__)
 
@@ -146,7 +146,8 @@ class PageCache:
 
         Raises:
             StorageDirError: If the directory holding ``path`` is not private
-                to the user and cannot be made so.
+                to the user and cannot be made so, or the database or its
+                journal files are links or belong to another user.
             CacheUnavailableError: If the database is locked for too long or
                 cannot be written.
         """
@@ -338,6 +339,9 @@ class PageCache:
         self.close()
 
     def _open(self) -> sqlite3.Connection:
+        # The database and its journal files, before SQLite follows any link.
+        for suffix in ("", "-wal", "-shm"):
+            check_private_file(self._path.with_name(self._path.name + suffix))
         try:
             return self._connect()
         except sqlite3.OperationalError:

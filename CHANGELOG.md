@@ -38,6 +38,13 @@ still change, with notice, before 1.0).
   marked hidden and never reaches the LLM as visible text. Each page is
   rendered a second time without its text (ADR-043 amendment); reading a PDF
   takes about 16 ms more per page.
+- Security (review findings of 2026-11-02): `sugo ui` no longer puts the
+  page's access token on the browser's command line, where other local users
+  could read it (F7); XML files with passwords in common formats (KeePass,
+  Wi-Fi profiles, FileZilla, .NET and Java settings, `AdministratorPassword`)
+  are now flagged secret and never sent to MCP agents (F8); the page cache
+  refuses a `cache.db` that is a link or belongs to another user (F9);
+  `sugo verify` refuses a receipt larger than the web UI accepts.
 - The shell's `/help` translates argument names (`CARTELLA`, `DIMENSIONE`,
   `RICEVUTA` in Italian).
 

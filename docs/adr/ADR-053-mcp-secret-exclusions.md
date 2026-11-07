@@ -66,3 +66,15 @@ The PEM marker is checked now, case-insensitively, on the whole text `convert_do
 - Some legitimate files are refused to agents: a document named `credentials.docx` or `secrets.pdf`, a project's `web.config`, anything inside a `.git` folder, an XML schema that defines a `password` element. The person can still convert them with the CLI.
 - Agents usually have their own file access; these exclusions protect what goes through Sugo and keep Sugo from being the easy path. They do not replace the agent's own permissions.
 - Residual: a secret in a file with an unlisted name and in a format other than XML (a DOCX with a password typed in a table) still reaches the agent. Detecting that needs content classification, considered with the `legal` features (ADR-014).
+
+## Amendment, 2026-11-07: wider XML credential names (security review F8)
+
+The security review of 2026-11-02 (finding F8, LOW) showed common XML formats whose secrets the exact-name list missed: KeePass 2.x exports (`<Key>Password</Key><Value>…`), Wi-Fi profiles exported with `netsh … key=clear` (`<keyMaterial>`), FileZilla site lists (`<Pass>`), .NET and Java settings (`<add key="DbPassword" value=…>`, `<entry key="db.password">`), Windows unattend files (`<AdministratorPassword>`) and camel-case names such as `userPWD`.
+
+Decision:
+
+- A name is still matched whole, without separators, against the list (now with `keymaterial`, `sharedkey`, `presharedkey`).
+- Each word of a name, split at case changes and separators, is also matched against credential words: `password`, `passwd`, `pwd`, `pass`, `passphrase`, `secret`, `psk`. Single words that only contain them (`secretary`, `passport`, `PassengerName`, `compass`) do not match.
+- In key/value formats, an element or attribute named `key` or `name` whose value is a credential name flags its block.
+
+Consequence: more documents are refused to agents, for example a sports XML with `<Pass>` elements; the person can still convert them with the CLI. Residual: names in other languages (`<Passwort>`, `<contrasena>`) and values that only look like secrets are not recognised.

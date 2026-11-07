@@ -624,11 +624,11 @@ msgstr ""
 msgid "Print the page's address instead of opening it."
 msgstr "Stampa l'indirizzo della pagina invece di aprirla."
 
-msgid "Opening {url}"
-msgstr "Apro {url}"
+msgid "Opening Sugo in the browser"
+msgstr "Apro Sugo nel browser"
 
-msgid "No browser found: open the address above."
-msgstr "Nessun browser trovato: apri l'indirizzo qui sopra."
+msgid "No browser found: open this address: {url}"
+msgstr "Nessun browser trovato: apri questo indirizzo: {url}"
 
 msgid "Press Ctrl+C to stop."
 msgstr "Premi Ctrl+C per fermare."

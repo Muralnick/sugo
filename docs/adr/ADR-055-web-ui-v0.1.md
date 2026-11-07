@@ -98,3 +98,9 @@ After ROADMAP step 8 (benchmarks) and before step 9 (PyPI): about two or three w
 - Residual risks:
   - another program run by the same user can reach the server, as it can read the user's files anyway;
   - a malicious browser extension can read the page, and the token with it.
+
+## Amendment, 2026-11-07: the token never on a command line (security review F7)
+
+The security review of 2026-11-02 (finding F7, LOW) noted that `webbrowser.open` starts the browser, or `xdg-open`, with the page's address as a process argument, so on Linux any local user could read the session token from the process list; the address was also printed in the terminal.
+
+Decision: `sugo ui` writes a small page into a private temporary folder (`0700`, file `0600`, created with `O_EXCL`) that forwards the browser to the address with the token, and gives the browser only that file. The page is deleted when the server stops. The terminal no longer shows the token, unless no browser is found or `--no-browser` is used: both print the address for the person to open, and `--no-browser` remains the person's choice on a shared machine.

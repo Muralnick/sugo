@@ -350,6 +350,17 @@ def test_verify_refuses_an_invalid_receipt(workdir: Path) -> None:
 
 
 @pytest.mark.usefixtures("workdir")
+def test_verify_refuses_a_receipt_too_large_without_reading_it_all(
+    workdir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run("report.pdf", "-o", "out", "--receipt")
+    monkeypatch.setattr(cli, "MAX_RECEIPT_BYTES", 16)
+    result = run("verify", "report.pdf", "out/report.receipt.json")
+    assert result.exit_code == ExitCode.ERROR
+    assert "RECEIPT_INVALID" in result.stderr
+
+
+@pytest.mark.usefixtures("workdir")
 def test_verify_refuses_a_receipt_with_an_unknown_language(workdir: Path) -> None:
     # Well formed, but from a Sugo with a language pack this one lacks.
     run("report.pdf", "-o", "out", "--receipt")

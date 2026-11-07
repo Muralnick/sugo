@@ -23,6 +23,7 @@ replaced), so the Office readers can choose as Office does (ADR-054).
 """
 
 import io
+import re
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -33,6 +34,8 @@ from sugo.core.constants import (
     MAX_XML_FILE_BYTES,
     OFFICE_TABLE_MAX_ROWS,
     XML_CREDENTIAL_NAMES,
+    XML_CREDENTIAL_WORDS,
+    XML_KEY_NAMES,
     XML_MAX_DEPTH,
     XML_MAX_ELEMENTS,
     XML_MIN_TABLE_RECORDS,
@@ -142,10 +145,33 @@ def local_name(name: str) -> str:
     return name.rsplit("}", 1)[-1].rsplit(":", 1)[-1]
 
 
+# Words of a name: runs of capitals before a capitalised word ("PWDHash" ->
+# "PWD"), capitalised or lower-case words, capital runs, digits. Separators
+# such as "-", "_", "." and ":" are simply skipped.
+_NAME_WORDS = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+")
+# Longer values are text, not a name; the cap also bounds the regex's work.
+_MAX_NAME_CHARS = 128
+
+
 def is_credential_name(name: str) -> bool:
-    """Whether an element or attribute name says it holds credentials (ADR-053)."""
-    key = local_name(name).casefold()
-    return key.replace("-", "").replace("_", "").replace(".", "") in XML_CREDENTIAL_NAMES
+    """Whether an element or attribute name says it holds credentials (ADR-053).
+
+    The whole name, without separators, is matched against known names
+    ("apikey", "keymaterial"), and each word of it, split at case changes and
+    separators, against credential words ("AdministratorPassword", "userPWD").
+    """
+    local = local_name(name)
+    if len(local) > _MAX_NAME_CHARS:
+        return False
+    words = [word.casefold() for word in _NAME_WORDS.findall(local)]
+    return "".join(words) in XML_CREDENTIAL_NAMES or any(
+        word in XML_CREDENTIAL_WORDS for word in words
+    )
+
+
+def _names_credential(key: str, value: str) -> bool:
+    """Whether a key/value pair names a credential: <Key>Password</Key>, key="db.password"."""
+    return local_name(key).casefold() in XML_KEY_NAMES and is_credential_name(value)
 
 
 @dataclass
@@ -170,8 +196,11 @@ class _Layout:
         name = local_name(element.tag)
         self._secret |= is_credential_name(name)
         attributes = _attributes(element)
-        self._secret |= any(is_credential_name(key) for key, _ in attributes)
+        self._secret |= any(
+            is_credential_name(key) or _names_credential(key, value) for key, value in attributes
+        )
         text = _clean(element.text)
+        self._secret |= _names_credential(name, text)
         children = list(element)
         if not children and not attributes:
             if text:
@@ -215,8 +244,9 @@ class _Layout:
             self._secret |= is_credential_name(local_name(record.tag))
             row = {f"@{key}": value for key, value in _attributes(record)}
             row |= {local_name(child.tag): _clean(child.text) for child in record}
-            for column in row:
+            for column, value in row.items():
                 self._secret |= is_credential_name(column.lstrip("@"))
+                self._secret |= _names_credential(column.lstrip("@"), value)
                 if column not in columns:
                     columns.append(column)
             rows.append(row)
