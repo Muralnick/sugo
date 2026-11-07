@@ -10,7 +10,9 @@
         "low_agreement",
         "hidden",
         "secret",
-        "decorative"
+        "decorative",
+        "handwriting",
+        "ink_overlap"
       ],
       "title": "BlockFlag",
       "type": "string"

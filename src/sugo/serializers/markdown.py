@@ -14,6 +14,7 @@ rendered, whatever their type, so only cleaners decide what is dropped.
 - code: a fenced block, text unchanged but for a literal ``[illegible]``;
 - tables: the cheapest faithful format (``sugo.serializers.tables``);
 - illegible blocks: ``[illegible]``, never a guess (principle 4, ADR-026);
+- handwriting blocks: ``[handwriting]``, never the words the OCR made up (ADR-063);
 - anything else: the text, lines kept as they are.
 
 Blank lines around a block's text and the indentation of each line that
@@ -30,6 +31,7 @@ from collections.abc import Iterable
 from sugo.core.constants import MARKDOWN_CONTINUATION_INDENT, MARKDOWN_MIN_FENCE
 from sugo.core.models import Block, BlockFlag, BlockType
 from sugo.serializers.escape import (
+    HANDWRITING_MARKER,
     ILLEGIBLE_MARKER,
     drop_controls,
     escape_heading,
@@ -85,6 +87,9 @@ def _render_block(block: Block, level: int = 0) -> str | None:
     """One block as Markdown, or None if it has nothing to show; ``level`` nests a list item."""
     if BlockFlag.ILLEGIBLE in block.flags:
         return _prefixed(block, [ILLEGIBLE_MARKER], level)
+    if BlockFlag.HANDWRITING in block.flags:
+        # What the OCR read in pen strokes is made-up words: never shown (ADR-063).
+        return _prefixed(block, [HANDWRITING_MARKER], level)
     if block.type is BlockType.TABLE and block.table is not None:
         return render_table(block.table)
     # First of all: escaping must see the text as it will be printed.

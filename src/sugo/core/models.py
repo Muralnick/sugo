@@ -92,6 +92,12 @@ class BlockFlag(StrEnum):
     # A picture too small to hold content, such as a bullet or an icon in an
     # Office file: kept apart so a cleaner removes it with a reason (ADR-054).
     DECORATIVE = "decorative"
+    # Pen strokes in a scan, such as a signature: the OCR text is kept, but
+    # rendered as a marker, never as text, since it would be made-up words
+    # (principle 4, ADR-063).
+    HANDWRITING = "handwriting"
+    # Typed text crossed by handwriting: kept, but its letters may be damaged.
+    INK_OVERLAP = "ink_overlap"
 
 
 class EditKind(StrEnum):

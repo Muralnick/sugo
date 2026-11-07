@@ -9,10 +9,10 @@ Lines of a paragraph are joined with newlines, not spaces, so nothing is lost
 packs decide later how to recompose them. Boxes on the same text row are joined
 with a space.
 
-Illegible lines and, in screenshots, UI-chrome lines become blocks of their
-own, so unreadable areas and interface noise are never merged into readable
-text (principle 4). Readable paragraphs are then typed by the detectors
-(paragraph, chat message, code).
+Illegible lines, handwriting lines (ADR-063) and, in screenshots, UI-chrome
+lines become blocks of their own, so unreadable areas, pen strokes and
+interface noise are never merged into readable text (principle 4). Readable
+paragraphs are then typed by the detectors (paragraph, chat message, code).
 
 The result does not depend on the order of the input lines (principle 6).
 """
@@ -34,6 +34,7 @@ class _Kind(Enum):
     TEXT = auto()
     ILLEGIBLE = auto()
     CHROME = auto()
+    HANDWRITING = auto()
 
 
 @dataclass(frozen=True)
@@ -88,6 +89,8 @@ def build_blocks(
     for paragraph in paragraphs:
         if paragraph.kind is _Kind.ILLEGIBLE:
             detection = Detection(BlockType.PARAGRAPH, "")
+        elif paragraph.kind is _Kind.HANDWRITING:
+            detection = Detection(BlockType.PARAGRAPH, plain_text(paragraph.rows))
         elif paragraph.kind is _Kind.CHROME:
             detection = Detection(BlockType.UI_CHROME, plain_text(paragraph.rows))
         else:
@@ -114,9 +117,15 @@ def _paragraphs(group: Group, *, screenshot: bool) -> list[_Paragraph]:
 
     for row_index, row in enumerate(text_rows(group)):
         for line in row:
-            if line.illegible or (screenshot and is_ui_chrome(line)):
+            if line.illegible or line.handwriting or (screenshot and is_ui_chrome(line)):
                 flush()
-                kind = _Kind.ILLEGIBLE if line.illegible else _Kind.CHROME
+                kind = (
+                    _Kind.ILLEGIBLE
+                    if line.illegible
+                    else _Kind.HANDWRITING
+                    if line.handwriting
+                    else _Kind.CHROME
+                )
                 result.append(_Paragraph(kind, ((line,),)))
                 last_row = -1
                 continue
@@ -142,5 +151,15 @@ def _make_block(
         reading_order=order,
         speaker=detection.speaker,
         origin_engine=origin_engine,
-        flags=(BlockFlag.ILLEGIBLE,) if paragraph.kind is _Kind.ILLEGIBLE else (),
+        flags=_flags(paragraph),
     )
+
+
+def _flags(paragraph: _Paragraph) -> tuple[BlockFlag, ...]:
+    if paragraph.kind is _Kind.ILLEGIBLE:
+        return (BlockFlag.ILLEGIBLE,)
+    if paragraph.kind is _Kind.HANDWRITING:
+        return (BlockFlag.HANDWRITING,)
+    if any(line.ink_overlap for line in paragraph.members):
+        return (BlockFlag.INK_OVERLAP,)
+    return ()

@@ -67,8 +67,13 @@ class LexiconAnalyzer:
             raise ValueError(f"page {page.index} observed twice")
         self._seen.add(page.index)
         for block in page.blocks:
-            # Hidden text must not vouch for a word the reader never sees.
-            if block.removed or BlockFlag.HIDDEN in block.flags:
+            # Hidden text must not vouch for a word the reader never sees,
+            # nor handwriting for words the OCR made up (ADR-063).
+            if (
+                block.removed
+                or BlockFlag.HIDDEN in block.flags
+                or BlockFlag.HANDWRITING in block.flags
+            ):
                 continue
             # Composed first, so "e" + U+0301 stays inside its word.
             for match in _WORD.finditer(canonical(block.text)):

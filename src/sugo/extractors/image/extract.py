@@ -1,11 +1,13 @@
 """Turn an image into one IR page: decode, classify, preprocess, OCR, layout.
 
-Blank images skip OCR entirely and yield a page without blocks. Pages of
+Blank images skip OCR entirely and yield a page without blocks. Pages that
+are not screenshots are checked for handwriting, such as signatures (ADR-063). Pages of
 scanned PDFs enter after decoding, as pixels rendered by the PDF extractor.
 """
 
 from sugo.core.models import Page
 from sugo.extractors.image.classifier import ImageKind, classify
+from sugo.extractors.image.handwriting import mark_handwriting
 from sugo.extractors.image.layout import build_page
 from sugo.extractors.image.loader import LoadedImage, decode_image
 from sugo.extractors.image.ocr_engine import ENGINE_NAME, OcrEngine
@@ -36,11 +38,14 @@ def extract_image(
         if classification.kind is ImageKind.BLANK
         else engine.read(preprocess(image, classification))
     )
+    screenshot = classification.kind is ImageKind.SCREENSHOT and not document_page
+    if not screenshot:
+        lines = mark_handwriting(lines)
     return build_page(
         lines,
         width=image.width,
         height=image.height,
         origin_engine=ENGINE_NAME,
-        screenshot=classification.kind is ImageKind.SCREENSHOT and not document_page,
+        screenshot=screenshot,
         index=index,
     )
