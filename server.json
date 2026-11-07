@@ -1,0 +1,36 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Muralnick/sugo",
+  "description": "Local, offline conversion of PDFs, Office files and screenshots into compact Markdown.",
+  "repository": {
+    "url": "https://github.com/Muralnick/sugo",
+    "source": "github"
+  },
+  "version": "0.1.1",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "sugo-cli",
+      "version": "0.1.1",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp"
+        },
+        {
+          "type": "named",
+          "name": "--root",
+          "description": "A folder the agent may read; Sugo reads nothing outside it.",
+          "isRequired": true,
+          "isRepeated": true,
+          "format": "filepath",
+          "valueHint": "folder"
+        }
+      ]
+    }
+  ]
+}

@@ -13,6 +13,15 @@ dependencies = [
     "rich>=15.0.0,<16",
     "tiktoken>=0.14.0,<0.15",
     "typer>=0.27.3,<0.28",
+    # The lite level, always installed so the package converts (ADR-060).
+    # Image stack: ADR-039.
+    "numpy>=2.5.4,<3",
+    "onnxruntime>=1.31.0,<2",
+    "pillow>=12.3.0,<13",
+    # Native PDFs (ADR-043): 2.0 bundles MuPDF 1.28.5. The worker never loads
+    # its layout module or pymupdf4llm.
+    "pymupdf>=2.0,<2.1",
+    "rapidocr==3.10.0",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -24,18 +33,13 @@ classifiers = [
 
 [project.scripts]
 sugo = "sugo.ports.cli.app:main"
+# For runners that start a package by its name, such as uvx sugo-cli (ADR-060).
+sugo-cli = "sugo.ports.cli.app:main"
 
 [project.optional-dependencies]
-# Engine levels are installed as extras (ADR-007). Image stack: ADR-039.
-lite = [
-    "numpy>=2.5.4,<3",
-    "onnxruntime>=1.31.0,<2",
-    "pillow>=12.3.0,<13",
-    # Native PDFs (ADR-043): 2.0 bundles MuPDF 1.28.5. The worker never loads
-    # its layout module or pymupdf4llm.
-    "pymupdf>=2.0,<2.1",
-    "rapidocr==3.10.0",
-]
+# Kept empty so "sugo-cli[lite]" still installs: the lite level is now in the
+# base dependencies (ADR-060). Later levels come as extras (ADR-007).
+lite = []
 
 [dependency-groups]
 # Development tools only; see ADR-035. Exact versions and hashes live in uv.lock.

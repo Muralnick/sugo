@@ -523,8 +523,8 @@ msgstr "sconosciuto"
 msgid "level lite"
 msgstr "livello lite"
 
-msgid "missing {packages}: pip install \"{distribution}[lite]\""
-msgstr "mancano {packages}: pip install \"{distribution}[lite]\""
+msgid "missing {packages}: pip install --force-reinstall {distribution}"
+msgstr "mancano {packages}: pip install --force-reinstall {distribution}"
 
 msgid "not installed"
 msgstr "non installato"
