@@ -38,6 +38,7 @@ from sugo.core.constants import (
     CHUNK_MAX_TOKENS_LIMIT,
     CHUNK_MIN_TOKENS,
     DISTRIBUTION_NAME,
+    MAX_RECEIPT_BYTES,
 )
 from sugo.i18n import N_, ngettext
 from sugo.i18n import gettext as _
@@ -690,14 +691,27 @@ def ui_command(
             with WebServer(converter(settings), settings) as server:
                 if no_browser:
                     _write(server.url + "\n")
-                else:
-                    import webbrowser
+                    _stderr.print(_("Press Ctrl+C to stop."))
+                    server.serve_forever()
+                    return
+                import webbrowser
 
-                    _stderr.print(Text(_("Opening {url}").format(url=server.url)))
-                    if not webbrowser.open(server.url):
-                        _stderr.print(Text(_("No browser found: open the address above.")))
-                _stderr.print(_("Press Ctrl+C to stop."))
-                server.serve_forever()
+                from sugo.ports.web.launcher import launcher_page
+
+                # The browser gets a private page, never the address with its
+                # token, which other users could read on a command line (F7).
+                with launcher_page(server.url) as page:
+                    _stderr.print(_("Opening Sugo in the browser"))
+                    if not webbrowser.open(page.as_uri()):
+                        _stderr.print(
+                            Text(
+                                _("No browser found: open this address: {url}").format(
+                                    url=server.url
+                                )
+                            )
+                        )
+                    _stderr.print(_("Press Ctrl+C to stop."))
+                    server.serve_forever()
         except KeyboardInterrupt:
             _stderr.print(_("Stopped."))
 
@@ -817,9 +831,14 @@ def _load_receipt(path: Path) -> "Receipt":
     try:
         # Bytes, not text: pydantic-core validates the JSON itself and turns
         # invalid UTF-8 into a ValidationError below, never a UnicodeDecodeError.
-        data = path.read_bytes()
+        # One byte past the limit tells a file that is too large, without
+        # reading all of it (security review, 2026-11-07).
+        with path.open("rb") as file:
+            data = file.read(MAX_RECEIPT_BYTES + 1)
     except OSError as error:
         raise unreadable(error) from error
+    if len(data) > MAX_RECEIPT_BYTES:
+        raise receipt_invalid()
     try:
         receipt = Receipt.model_validate_json(data)
     except (ValidationError, ValueError) as error:

@@ -298,6 +298,38 @@ def test_cache_dir_symlink_is_refused(tmp_path: Path) -> None:
         PageCache(tmp_path / "link" / "cache.db")
 
 
+@pytest.mark.skipif(os.name != "posix", reason="POSIX symbolic links")
+@pytest.mark.parametrize("name", ["cache.db", "cache.db-wal", "cache.db-shm"])
+def test_planted_symlink_in_the_cache_dir_is_refused(tmp_path: Path, name: str) -> None:
+    # Security review F9: another user's file must never receive document text.
+    target = tmp_path / "theirs.db"
+    target.write_bytes(b"")
+    folder = tmp_path / "cache"
+    folder.mkdir()
+    (folder / name).symlink_to(target)
+    with pytest.raises(StorageDirError, match="not a plain file"):
+        PageCache(folder / "cache.db")
+    assert target.read_bytes() == b""
+
+
+def test_planted_hard_link_in_the_cache_dir_is_refused(tmp_path: Path) -> None:
+    target = tmp_path / "theirs.db"
+    target.write_bytes(b"")
+    folder = tmp_path / "cache"
+    folder.mkdir()
+    os.link(target, folder / "cache.db")
+    with pytest.raises(StorageDirError, match="hard links"):
+        PageCache(folder / "cache.db")
+    assert target.read_bytes() == b""
+
+
+def test_a_cache_reopens_its_own_files(tmp_path: Path) -> None:
+    with PageCache(tmp_path / "cache.db"):
+        pass
+    with PageCache(tmp_path / "cache.db"):
+        pass
+
+
 def test_code_fingerprint_covers_sugo_source() -> None:
     fingerprint = page_cache._code_fingerprint()
     assert len(fingerprint) == 64

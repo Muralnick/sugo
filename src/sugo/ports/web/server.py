@@ -48,6 +48,7 @@ from sugo.core.constants import (
     CHUNK_MAX_TOKENS_LIMIT,
     CHUNK_MIN_TOKENS,
     MAX_INPUT_BYTES,
+    MAX_RECEIPT_BYTES,
     WEB_SOCKET_TIMEOUT_S,
     WEB_TOKEN_BYTES,
     WEB_UPLOAD_TIMEOUT_S,
@@ -61,7 +62,7 @@ from sugo.ports.errors import (
     receipt_invalid,
     web_request_refused,
 )
-from sugo.ports.web.page import MAX_RECEIPT_BYTES, render_page, static_file
+from sugo.ports.web.page import render_page, static_file
 
 _log = logging.getLogger(__name__)
 

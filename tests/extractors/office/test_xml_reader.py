@@ -104,8 +104,52 @@ def test_credential_names_flag_their_block_secret(xml: str) -> None:
     assert any(BlockFlag.SECRET in block.flags for block in page(xml).blocks)
 
 
+@pytest.mark.parametrize(
+    "xml",
+    [
+        # KeePass 2.x XML export.
+        pytest.param(
+            "<KeePassFile><Root><Group><Entry>"
+            + "<String><Key>Title</Key><Value>Bank</Value></String>"
+            + "<String><Key>Password</Key><Value>hunter2</Value></String>"
+            + "</Entry></Group></Root></KeePassFile>",
+            id="keepass",
+        ),
+        pytest.param(
+            "<E>" + "<String><Key>Password</Key><Value>x</Value></String>" * 4 + "</E>",
+            id="keepass-table",
+        ),
+        # netsh wlan export profile key=clear.
+        pytest.param(
+            "<WLANProfile><MSM><security><sharedKey><keyType>passPhrase</keyType>"
+            "<keyMaterial>hunter2</keyMaterial></sharedKey></security></MSM></WLANProfile>",
+            id="wifi",
+        ),
+        # FileZilla site list.
+        pytest.param(
+            '<FileZilla3><Servers><Server><Host>h</Host><Pass encoding="base64">aA==</Pass>'
+            "</Server></Servers></FileZilla3>",
+            id="filezilla",
+        ),
+        pytest.param('<appSettings><add key="DbPassword" value="x"/></appSettings>', id="dotnet"),
+        pytest.param('<properties><entry key="db.password">x</entry></properties>', id="java"),
+        pytest.param(
+            "<unattend><AdministratorPassword>x</AdministratorPassword></unattend>", id="admin"
+        ),
+        pytest.param('<user userPWD="x"/>', id="camel"),
+    ],
+)
+def test_common_credential_formats_are_secret(xml: str) -> None:
+    # Security review F8: these reached MCP agents before.
+    assert any(BlockFlag.SECRET in block.flags for block in page(xml).blocks)
+
+
 def test_ordinary_names_are_not_secret() -> None:
-    xml = "<s><token>the</token><key>A</key><keyword>x</keyword><passport>y</passport></s>"
+    xml = (
+        "<s><token>the</token><key>A</key><keyword>x</keyword><passport>y</passport>"
+        '<secretary>z</secretary><PassengerName>w</PassengerName><add key="Title" value="v"/>'
+        "<String><Key>UserName</Key><Value>me</Value></String></s>"
+    )
     assert not any(BlockFlag.SECRET in block.flags for block in page(xml).blocks)
     assert is_credential_name("{urn:x}Client_Secret")
     assert not is_credential_name("secretary")

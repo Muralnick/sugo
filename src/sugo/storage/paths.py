@@ -47,3 +47,28 @@ def ensure_private_dir(path: Path) -> Path:
         if stat.S_IMODE(info.st_mode) & 0o077:
             path.chmod(0o700)
     return path
+
+
+def check_private_file(path: Path) -> None:
+    """Make sure an existing file in a private directory cannot leak to another user.
+
+    A directory that was not private when Sugo first used it may already hold
+    a link planted by another user: SQLite would follow it and write document
+    text into their file (security review F9, 2026-11-02). A missing file is
+    fine; SQLite then creates it inside the private directory.
+
+    Raises:
+        StorageDirError: If the path is a symbolic link, not a regular file,
+            has more than one hard link, or (on Linux and macOS) belongs to
+            another user.
+    """
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        return
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+        raise StorageDirError("storage file is not a plain file")
+    if info.st_nlink > 1:
+        raise StorageDirError("storage file has other hard links")
+    if os.name == "posix" and info.st_uid != os.getuid():
+        raise StorageDirError("storage file belongs to another user")

@@ -23,6 +23,7 @@ from sugo.core.constants import (
     MAX_INPUT_BYTES,
     MAX_OFFICE_FILE_BYTES,
     MAX_PDF_FILE_BYTES,
+    MAX_RECEIPT_BYTES,
     MAX_XML_FILE_BYTES,
 )
 from sugo.i18n import N_
@@ -33,8 +34,6 @@ _LARGE_MB = max(MAX_PDF_FILE_BYTES, MAX_OFFICE_FILE_BYTES) // _MB
 _SMALL_MB = max(MAX_IMAGE_FILE_BYTES, MAX_XML_FILE_BYTES) // _MB
 # Files the page converts in one batch, one request each (ADR-059).
 MAX_BATCH_FILES = 50
-# A receipt holds at most the text of a document, as large as an XML file may be (ADR-059).
-MAX_RECEIPT_BYTES = MAX_XML_FILE_BYTES
 
 # Files served as they are, by URL path: (file name, media type).
 STATIC = {

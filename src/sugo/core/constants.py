@@ -239,6 +239,10 @@ PDF_HEADING_MAX_LINES: Final = 3
 # ten times the file's size; a larger file is refused before parsing.
 MAX_XML_FILE_BYTES: Final = 50 * 1024 * 1024
 
+# Largest receipt read by sugo verify and the web UI: a receipt holds at most
+# the text of a document, as large as an XML file may be (ADR-056, ADR-059).
+MAX_RECEIPT_BYTES: Final = MAX_XML_FILE_BYTES
+
 # Deepest nesting and most elements in one XML file. Real data files nest a
 # dozen levels; deeper or larger files are attacks on time and memory.
 XML_MAX_DEPTH: Final = 256
@@ -282,8 +286,26 @@ XML_CREDENTIAL_NAMES: Final = frozenset(
         "apitoken",
         "bearertoken",
         "connectionstring",
+        # Wi-Fi profiles exported with netsh (key=clear).
+        "keymaterial",
+        "sharedkey",
+        "presharedkey",
     }
 )
+
+# Words that mark a credential anywhere in a name split at case changes and
+# separators: "AdministratorPassword", "userPWD", FileZilla's <Pass>,
+# "clientSecret" (security review F8, 2026-11-02). "secretary" or "passport"
+# are single words and do not match.
+XML_CREDENTIAL_WORDS: Final = frozenset(
+    {"password", "passwd", "pwd", "pass", "passphrase", "secret", "psk"}
+)
+
+# Names of the element or attribute that names a value in key/value formats:
+# KeePass <Key>Password</Key>, .NET <add key="DbPassword" value=…>, Java
+# <entry key="db.password">, <setting name="ApiKey">. A credential name as
+# their value flags the block (F8).
+XML_KEY_NAMES: Final = frozenset({"key", "name"})
 
 # Largest Office file read, as for PDF; Office files are ZIP archives of XML parts.
 MAX_OFFICE_FILE_BYTES: Final = 200 * 1024 * 1024
