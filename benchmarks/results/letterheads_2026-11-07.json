@@ -1,0 +1,74 @@
+[
+  {
+    "document": "letterhead_3_pages",
+    "pages": 3,
+    "removed_blocks": 11,
+    "removed_letterhead_tokens": 47,
+    "removed_body": [],
+    "body_lost": [],
+    "letterhead_tokens_after_page_1": 34,
+    "ok": true
+  },
+  {
+    "document": "letterhead_6_pages",
+    "pages": 6,
+    "removed_blocks": 24,
+    "removed_letterhead_tokens": 104,
+    "removed_body": [],
+    "body_lost": [],
+    "letterhead_tokens_after_page_1": 85,
+    "ok": true
+  },
+  {
+    "document": "control_3_pages",
+    "pages": 3,
+    "removed_blocks": 0,
+    "removed_letterhead_tokens": 0,
+    "removed_body": [],
+    "body_lost": [],
+    "ok": true
+  },
+  {
+    "document": "control_6_pages",
+    "pages": 6,
+    "removed_blocks": 0,
+    "removed_letterhead_tokens": 0,
+    "removed_body": [],
+    "body_lost": [],
+    "ok": true
+  },
+  {
+    "document": "control_footnotes_6_pages",
+    "pages": 6,
+    "removed_blocks": 0,
+    "removed_letterhead_tokens": 0,
+    "removed_body": [],
+    "body_lost": [],
+    "ok": true
+  },
+  {
+    "document": "letterhead_footnotes_6_pages",
+    "pages": 6,
+    "removed_blocks": 24,
+    "removed_letterhead_tokens": 102,
+    "removed_body": [],
+    "body_lost": [],
+    "letterhead_tokens_after_page_1": 85,
+    "ok": true
+  },
+  {
+    "document": "control_running_titles_6_pages",
+    "pages": 6,
+    "removed_blocks": 2,
+    "removed_letterhead_tokens": 0,
+    "removed_body": [
+      "Supply agreement, section 3: notices",
+      "Supply agreement, section 4: warranties"
+    ],
+    "body_lost": [
+      "Supply agreement, section 3: notices",
+      "Supply agreement, section 4: warranties"
+    ],
+    "ok": false
+  }
+]

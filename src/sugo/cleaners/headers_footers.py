@@ -9,6 +9,10 @@ page. Longer text may be a clause someone repeated on every page so that it
 would be dropped as a footer (THREAT_MODEL C): its first copy is kept, and
 only the later identical copies go, so no content leaves the output.
 
+Scanned letterheads are read with different OCR errors on each page, so
+they are matched by similar text instead (ADR-064): their first copy always
+stays, and only the later copies go.
+
 Headers and footers a document declares itself, such as Word's, have no
 place on the page and appear once per section: the first copy stays, even a
 short one, which may say what the document is ("DRAFT"), and the identical
@@ -48,6 +52,16 @@ class HeaderFooterCleaner:
                     continue
                 reason += f"; first copy kept on page {repeated.first_page + 1}"
             decisions.append(Decision(block_id=text.block_id, reason=reason))
+        decided = {decision.block_id for decision in decisions}
+        for block in page.blocks:
+            letterhead = stats.letterhead(page.index, block.id)
+            if letterhead is None or block.id in decided:
+                continue
+            reason = (
+                f"letterhead repeated on {letterhead.pages} nearby pages (similar text read"
+                f" with OCR); first copy kept on page {letterhead.first_page + 1}"
+            )
+            decisions.append(Decision(block_id=block.id, reason=reason))
         for declared in declared_texts(page):
             first = stats.first_declared(declared)
             if declared.type in _DECLARED and first is not None and first < page.index:

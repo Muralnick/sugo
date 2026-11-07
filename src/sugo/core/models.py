@@ -156,7 +156,12 @@ class BBox(_Model):
 
 
 class Style(_Model):
-    """Typographic hints, when the extractor can provide them."""
+    """Typographic hints, when the extractor can provide them.
+
+    ``font_size`` is in points for native pages; for pages read with OCR it is
+    the block's median text-line height in pixels of the page image, which is
+    only compared within the same page (ADR-064).
+    """
 
     font_size: Annotated[float, Field(gt=0)] | None = None
     bold: bool | None = None

@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 
 from sugo.core.constants import LAYOUT_SIZE_MIN_CHARS, LAYOUT_SIZE_SPLIT_RATIO
-from sugo.core.models import Block, BlockFlag, BlockType, Page, PageOrigin
+from sugo.core.models import Block, BlockFlag, BlockType, Page, PageOrigin, Style
 from sugo.extractors.image.detectors import Detection, detect, is_ui_chrome, plain_text
 from sugo.extractors.image.ocr_engine import OcrLine
 from sugo.extractors.reading_order import text_rows, union, xy_cut
@@ -63,14 +63,25 @@ def build_page(
         width=float(width),
         height=float(height),
         origin=PageOrigin.OCR,
-        blocks=build_blocks(lines, origin_engine=origin_engine, screenshot=screenshot),
+        blocks=build_blocks(
+            lines, origin_engine=origin_engine, screenshot=screenshot, page_height=float(height)
+        ),
     )
 
 
 def build_blocks(
-    lines: Sequence[OcrLine], *, origin_engine: str, screenshot: bool = False
+    lines: Sequence[OcrLine],
+    *,
+    origin_engine: str,
+    screenshot: bool = False,
+    page_height: float | None = None,
 ) -> tuple[Block, ...]:
-    """Group OCR lines into typed blocks in reading order."""
+    """Group OCR lines into typed blocks in reading order.
+
+    With ``page_height`` (pixels), each block's style records its median
+    text-line height in pixels as its font size: OCR knows no points, and the
+    size is compared only within a page (ADR-064).
+    """
     if not lines:
         return ()
     # A canonical starting order makes the result independent of the input order.
@@ -96,7 +107,7 @@ def build_blocks(
             detection = Detection(BlockType.UI_CHROME, plain_text(paragraph.rows))
         else:
             detection = next(detections)
-        blocks.append(_make_block(paragraph, detection, len(blocks), origin_engine))
+        blocks.append(_make_block(paragraph, detection, len(blocks), origin_engine, page_height))
     return tuple(blocks)
 
 
@@ -166,9 +177,14 @@ def _row_height(row: Sequence[OcrLine]) -> float | None:
 
 
 def _make_block(
-    paragraph: _Paragraph, detection: Detection, order: int, origin_engine: str
+    paragraph: _Paragraph,
+    detection: Detection,
+    order: int,
+    origin_engine: str,
+    page_height: float | None = None,
 ) -> Block:
     members = paragraph.members
+    size = statistics.median(line.bbox.y1 - line.bbox.y0 for line in members)
     return Block(
         id=f"b{order}",
         type=detection.type,
@@ -180,6 +196,7 @@ def _make_block(
         speaker=detection.speaker,
         origin_engine=origin_engine,
         flags=_flags(paragraph),
+        style=Style(font_size=size * page_height) if page_height and size > 0 else None,
     )
 
 

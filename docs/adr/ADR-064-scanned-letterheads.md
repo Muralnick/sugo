@@ -78,3 +78,24 @@ For OCR pages, the edge analyzer also records, for each text block in the edge b
 - Screenshots are exempt: a chat message and its small timestamp stay one bubble.
 - On the real scan, the only changes are the two intended ones: the letterhead now ends before the first body paragraph on pages 2 and 3; every other block is unchanged. The synthetic corpus (native PDFs, XLSX, screenshots) does not reach this code; the extractor tests and `benchmarks/handwriting.py` give the same results as before.
 - The ADR's "or the gap between them is more than a share of the line height" was not needed on the real scan and is not implemented.
+
+### Part 2, letterhead matching (2026-11-07)
+
+Measured with `benchmarks/letterheads.py` (synthetic noisy scans, results in `benchmarks/results/`) and the maintainer's real scanned record (not in the repository). Changes from section 2, each forced by a measurement:
+
+- **Containment against the whole band, not block against block.** A candidate block is a copy when at least half of its character trigrams are found anywhere in the top band of another page. The layout groups the captions differently on each page, so whole blocks rarely correspond; the band does.
+- **Keyed trigram bitsets (4,096 bits) instead of MinHash signatures.** Containment needs the band's whole set, and a fixed-size bitset bounds memory per page; the trigrams are hashed with a key derived from the document's SHA-256. Only the decisions (page and block ids) leave the analyzer. Each page is compared with at most 5 pages before and after it, so the work grows linearly with the document.
+- **Only text clearly smaller than the page's body text is a candidate** (at most 0.8 times the page's typical size). Without this rule, body-size articles that repeat in part from page to page were removed as whole blocks, losing the part that was new on each page. The OCR layout now records each block's median line height, in pixels, as `Style.font_size`; it is compared only within a page.
+- **Top band only.** Matching the bottom band too removed formulaic footnotes in small print (different by a word or two on each page) and, once, a body-size closing line. The bottom keeps ADR-044's exact matching.
+- **Tried and dropped:** keeping a block when one of its words is found on no other page. It cut the real record's saving from 14% to 4.4% (OCR-damaged words look new) and did not protect the case below.
+
+Results:
+
+| Document | Result |
+|---|---|
+| Real scanned record, 3 pages | 1,504 → 1,293 tokens (**14.0%** saved); 6 letterhead copies removed on pages 2 and 3; no body text removed |
+| Synthetic letterhead, 3 and 6 pages, with and without footnotes | Letterhead tokens after page 1 removed (above the two-thirds gate); no body text or footnote removed |
+| Synthetic controls without letterhead (repeating articles, footnotes) | Nothing removed |
+| Synthetic control: a small running title that changes on every page ("…, section 3: notices") | **Known limit:** removed on 2 of 6 pages; the section name is in the receipt, not in the Markdown |
+
+The known limit is for the maintainer to accept or not.

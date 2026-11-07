@@ -34,6 +34,7 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import ClassVar
 
+from sugo.analyzers.letterheads import Letterhead, LetterheadCollector
 from sugo.core.constants import (
     MAX_EDGE_BLOCKS_PER_BAND,
     MAX_EDGE_TEXT_CHARS,
@@ -155,6 +156,11 @@ class EdgeStats:
     declared: Mapping[tuple[BlockType, bytes], int] = field(
         default_factory=lambda: MappingProxyType({})
     )
+    # (page index, block id) of each later copy of a scanned letterhead,
+    # found by similar rather than identical text (ADR-064).
+    letterheads: Mapping[tuple[int, str], Letterhead] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
 
     def digest(self) -> str:
         """A digest of these statistics, the same whatever order pages were observed in.
@@ -168,6 +174,7 @@ class EdgeStats:
                 sorted(self.repeated.items()),
                 sorted(self.page_numbers),
                 sorted(self.declared.items()),
+                sorted(self.letterheads.items()),
             )
         )
         return hashlib.sha256(canonical.encode()).hexdigest()
@@ -178,6 +185,10 @@ class EdgeStats:
         if repeated is None or not repeated.matches(text, page_index):
             return None
         return repeated
+
+    def letterhead(self, page_index: int, block_id: str) -> Letterhead | None:
+        """The scanned letterhead this block is a later copy of, if any (ADR-064)."""
+        return self.letterheads.get((page_index, block_id))
 
     def first_declared(self, text: "DeclaredText") -> int | None:
         """The first page holding a declared header or footer with the same text, if seen."""
@@ -196,8 +207,10 @@ class EdgeAnalyzer:
 
     name: ClassVar[str] = "edges"
 
-    def __init__(self) -> None:
+    def __init__(self, key: bytes = b"") -> None:
+        """``key`` keys the letterhead sketches; the pipeline passes the document's digest."""
         self._seen: set[int] = set()
+        self._letterheads = LetterheadCollector(key)
         # (band, pattern) -> page index -> numbers of its first copy on that page.
         self._texts: defaultdict[tuple[Band, bytes], dict[int, tuple[int | bytes, ...]]] = (
             defaultdict(dict)
@@ -216,6 +229,7 @@ class EdgeAnalyzer:
         if page.index in self._seen:
             raise ValueError(f"page {page.index} observed twice")
         self._seen.add(page.index)
+        self._letterheads.observe(page)
         for declared in declared_texts(page):
             first = self._declared.get((declared.type, declared.digest), page.index)
             self._declared[(declared.type, declared.digest)] = min(first, page.index)
@@ -240,6 +254,7 @@ class EdgeAnalyzer:
             repeated=MappingProxyType(repeated),
             page_numbers=page_numbers,
             declared=MappingProxyType(dict(sorted(self._declared.items()))),
+            letterheads=MappingProxyType(dict(sorted(self._letterheads.finalize().items()))),
         )
 
 
