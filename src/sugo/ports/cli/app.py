@@ -775,9 +775,15 @@ def _load_receipt(path: Path) -> "Receipt":
     except OSError as error:
         raise unreadable(error) from error
     try:
-        return Receipt.model_validate_json(data)
+        receipt = Receipt.model_validate_json(data)
     except (ValidationError, ValueError) as error:
         raise receipt_invalid() from error
+    from sugo.languages.packs import PACKS
+
+    if any(code not in PACKS for code in receipt.languages):
+        # Well formed, but from a Sugo with a language pack this one lacks.
+        raise receipt_invalid()
+    return receipt
 
 
 def _print_verify_result(source: str, differences: list[dict[str, Any]]) -> None:
