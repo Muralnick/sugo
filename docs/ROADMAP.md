@@ -23,7 +23,7 @@ Scope updated on 2026-10-30 (maintainer decision): Office and XML documents move
 | CLI one-shot commands, `sugo clip`, `sugo doctor` | Interactive shell, guided setup |
 | MCP server: `convert_document`, `estimate_savings` with allowed roots and token budget | Other MCP tools |
 | Basic TOML configuration | Policies, profiles, recipes |
-| Local web UI, `sugo ui` (ADR-055): one file, Markdown, tokens, removals, chunks, settings, questions | Side-by-side preview, removal list, progress events, several files, work profiles |
+| Local web UI, `sugo ui` (ADR-055, ADR-059): Markdown, tokens, removals, chunks, settings, questions; receipt with the removal and edit list, verify, paste, several files, no-cache setting, installation check | Side-by-side preview, progress events, work profiles |
 | Linux CI on every push, Windows smoke tests | Full platform matrix, Docker images |
 
 ## Development steps
