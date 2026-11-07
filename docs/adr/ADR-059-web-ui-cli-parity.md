@@ -60,7 +60,7 @@ The Settings panel gets **Keep a cache on disk** (on by default when `storage.ca
 
 ### 6. Installation check
 
-A **Check installation** button in the Settings panel calls `GET /api/doctor` (token, host and origin checked like the conversion route) and shows the same checks as `sugo doctor --json`: name, status and message of each. The route runs the checks; it changes nothing.
+A **Check installation** button in the Settings panel calls `POST /api/doctor` with an empty body (token, host and origin checked like the conversion route; POST because browsers do not always send `Origin` with a same-origin GET, and the server requires it) and shows the same checks as `sugo doctor --json`: name, status and message of each. The route runs the checks; it changes nothing.
 
 ### 7. Still left for later
 
