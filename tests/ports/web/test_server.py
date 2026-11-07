@@ -865,7 +865,12 @@ def test_the_installation_check_is_protected_like_a_conversion(
     server: WebServer, change: Callable[[list[tuple[str, str]]], list[tuple[str, str]]]
 ) -> None:
     called: list[bool] = []
-    server.doctor = lambda: called.append(True) or {"checks": []}
+
+    def doctor() -> dict[str, Any]:
+        called.append(True)
+        return {"checks": []}
+
+    server.doctor = doctor
     headers = change(api_headers(server, b""))
     assert_refused(request(server, "POST", DOCTOR_PATH, headers=headers), 403)
     assert called == []
