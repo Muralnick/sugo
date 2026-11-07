@@ -589,6 +589,9 @@ def test_the_page_settings_reach_the_conversion(server: WebServer, recorder: Rec
         (NAME_HEADER, "bad%0Aname.pdf"),
         (NAME_HEADER, "bad%1B%5B31mname.pdf"),
         (NAME_HEADER, "half%E2%82.pdf"),
+        # Not printable for Python: the page leaves such names out (app.js encodedName).
+        (NAME_HEADER, "shot%E2%80%AFPM.png"),
+        (NAME_HEADER, "flip%E2%80%AEfdp.exe"),
         (NAME_HEADER, "a" * 256),
         (NAME_HEADER, "%61" * 1_100),
     ],

@@ -230,15 +230,20 @@
     };
     if (settings.chunks) headers["X-Sugo-Chunk-Tokens"] = String(settings.chunk_tokens);
     if (settings.receipt) headers["X-Sugo-Receipt"] = "true";
-    if (name && plainName(name)) headers["X-Sugo-Name"] = encodeURIComponent(name);
+    const encoded = settings.receipt && name ? encodedName(name) : null;
+    if (encoded) headers["X-Sugo-Name"] = encoded;
     return headers;
   }
 
-  // The file's name for the receipt, only if the server would accept it
-  // (ADR-059); otherwise the receipt simply has no name.
-  function plainName(name) {
-    return name.length <= 255 && name !== "." && name !== ".." &&
-      !/[/\\]/.test(name) && !/[\u0000-\u001f\u007f-\u009f]/.test(name);
+  // The file's name for the receipt, sent only if the server would accept it
+  // (ADR-059): otherwise the receipt simply has no name. The test mirrors
+  // Python's str.isprintable(): no control, format, private-use, unassigned
+  // or separator characters, except the plain space (U+202F, for example,
+  // is in macOS screenshot names).
+  function encodedName(name) {
+    if ([...name].length > 255 || name === "." || name === "..") return null;
+    if (/[/\\]/.test(name) || /(?! )[\p{C}\p{Z}]/u.test(name)) return null;
+    try { return encodeURIComponent(name); } catch (e) { return null; }  // a lone surrogate
   }
 
   async function convert(file) {
