@@ -693,6 +693,24 @@ msgstr "Nessun testo modificato."
 msgid "Receipt"
 msgstr "Ricevuta"
 
+msgid "Keep a cache on disk: faster next time, but it holds the text of converted documents"
+msgstr "Tieni una cache sul disco: la volta dopo è più veloce, ma contiene il testo dei documenti convertiti"
+
+msgid "The cache is off in your configuration file."
+msgstr "La cache è disattivata nel tuo file di configurazione."
+
+msgid "Installation"
+msgstr "Installazione"
+
+msgid "Check installation"
+msgstr "Controlla l'installazione"
+
+msgid "Checking…"
+msgstr "Controllo in corso…"
+
+msgid "The check could not run; the terminal running sugo ui may say more."
+msgstr "Il controllo non è riuscito; il terminale dove gira sugo ui può dire di più."
+
 msgid "What Sugo removed or changed, with the reason, and the blocks it was not sure it read correctly. Save it to check this conversion later with sugo verify."
 msgstr "Cosa Sugo ha rimosso o cambiato, con il motivo, e i blocchi che non è sicuro di aver letto bene. Salvala per controllare più avanti questa conversione con sugo verify."
 

@@ -45,6 +45,8 @@
       strip_tracking_urls: typeof s.strip_tracking_urls === "boolean" ? s.strip_tracking_urls : d.strip_tracking_urls,
       chunks: typeof s.chunks === "boolean" ? s.chunks : d.chunks,
       receipt: typeof s.receipt === "boolean" ? s.receipt : d.receipt,
+      // The page can turn the cache off, never on against the configuration.
+      cache: d.cache && (typeof s.cache === "boolean" ? s.cache : true),
       chunk_tokens: Math.min(data.chunk_max, Math.max(data.chunk_min, size)),
     };
   }
@@ -148,6 +150,9 @@
     size.value = String(settings.chunk_tokens);
     size.disabled = !settings.chunks;
     $("make-receipt").checked = settings.receipt;
+    $("keep-cache").checked = settings.cache;
+    $("keep-cache").disabled = !data.defaults.cache;
+    show($("cache-off-config"), !data.defaults.cache);
   }
 
   $("ui-language").addEventListener("change", (event) => {
@@ -162,6 +167,10 @@
   $("make-chunks").addEventListener("change", (event) => {
     settings.chunks = event.target.checked;
     $("chunk-tokens").disabled = !settings.chunks;
+    saveSettings();
+  });
+  $("keep-cache").addEventListener("change", (event) => {
+    settings.cache = event.target.checked && data.defaults.cache;
     saveSettings();
   });
   $("make-receipt").addEventListener("change", (event) => {
@@ -230,6 +239,7 @@
     };
     if (settings.chunks) headers["X-Sugo-Chunk-Tokens"] = String(settings.chunk_tokens);
     if (settings.receipt) headers["X-Sugo-Receipt"] = "true";
+    if (!settings.cache) headers["X-Sugo-Cache"] = "off";
     const encoded = settings.receipt && name ? encodedName(name) : null;
     if (encoded) headers["X-Sugo-Name"] = encoded;
     return headers;
@@ -499,6 +509,44 @@
       download(lastResult.jsonl, baseName + ".jsonl", "application/jsonl;charset=utf-8");
     }
   });
+
+  // --- Installation check (ADR-059): the checks of sugo doctor. ---
+
+  async function runDoctor() {
+    const rows = $("doctor-checks").querySelector("tbody");
+    rows.replaceChildren();
+    show($("doctor-checks"), false);
+    $("doctor").disabled = true;
+    $("doctor-status").textContent = texts.doctor_running;
+    try {
+      const response = await fetch("/api/doctor", {
+        method: "POST",
+        headers: { "X-Sugo-Token": token, "X-Sugo-Language": settings.ui_language },
+        cache: "no-store",
+        credentials: "omit",
+        referrerPolicy: "no-referrer",
+      });
+      let body = null;
+      try { body = await response.json(); } catch (e) { body = null; }
+      if (!response.ok || !body || !Array.isArray(body.checks)) {
+        $("doctor-status").textContent = body && body.error ? body.error.message : texts.doctor_failed;
+        return;
+      }
+      for (const check of body.checks) {
+        const tr = row([check.label, texts["status_" + check.status] || check.status, check.detail]);
+        tr.children[1].className = "check-" + check.status;
+        rows.append(tr);
+      }
+      $("doctor-status").textContent = "";
+      show($("doctor-checks"), true);
+    } catch (e) {
+      $("doctor-status").textContent = texts.doctor_failed;
+    } finally {
+      $("doctor").disabled = !token;
+    }
+  }
+
+  $("doctor").addEventListener("click", runDoctor);
 
   // --- Start ---
 

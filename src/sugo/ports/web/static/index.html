@@ -174,7 +174,24 @@
         <span data-text="make_receipt"></span>
       </label>
 
+      <label class="check">
+        <input id="keep-cache" type="checkbox">
+        <span data-text="keep_cache"></span>
+      </label>
+      <p id="cache-off-config" class="muted small" data-text="cache_off_config" hidden></p>
+
       <button id="reset" type="button" data-text="reset"></button>
+    </div>
+
+    <div class="panel settings">
+      <div class="panel-head">
+        <h2 data-text="doctor_title"></h2>
+        <button id="doctor" type="button" data-text="doctor_run"></button>
+      </div>
+      <p id="doctor-status" class="muted small" role="status" aria-live="polite"></p>
+      <table id="doctor-checks" hidden>
+        <tbody></tbody>
+      </table>
     </div>
   </section>
 

@@ -24,8 +24,10 @@ from sugo.core.pipeline import InputUnsupportedError
 from sugo.ports.web import server as web_server
 from sugo.ports.web.page import render_page
 from sugo.ports.web.server import (
+    CACHE_HEADER,
     CHUNKS_HEADER,
     CONVERT_PATH,
+    DOCTOR_PATH,
     LANGUAGE_HEADER,
     LANGUAGES_HEADER,
     NAME_HEADER,
@@ -75,9 +77,11 @@ class Recorder:
 
 
 def running(
-    convert: Callable[[bytes, Options], dict[str, Any]], settings: Settings | None = None
+    convert: Callable[[bytes, Options], dict[str, Any]],
+    settings: Settings | None = None,
+    doctor: Callable[[], dict[str, Any]] | None = None,
 ) -> Iterator[WebServer]:
-    server = WebServer(convert, settings or Settings())
+    server = WebServer(convert, settings or Settings(), doctor)
     thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05})
     thread.start()
     try:
@@ -264,6 +268,7 @@ def test_the_page_starts_from_the_users_configuration() -> None:
         "chunks": False,
         "chunk_tokens": 256,
         "receipt": False,
+        "cache": True,
     }
     assert data["packs"] == ["de", "en", "es", "fr", "it"]
 
@@ -594,6 +599,9 @@ def test_the_page_settings_reach_the_conversion(server: WebServer, recorder: Rec
         (NAME_HEADER, "flip%E2%80%AEfdp.exe"),
         (NAME_HEADER, "a" * 256),
         (NAME_HEADER, "%61" * 1_100),
+        (CACHE_HEADER, "on"),
+        (CACHE_HEADER, "OFF"),
+        (CACHE_HEADER, ""),
     ],
 )
 def test_an_unknown_setting_is_refused(
@@ -797,3 +805,74 @@ def test_a_refused_setting_still_gets_its_answer_with_a_large_body(
     headers = [*api_headers(server, body), (LANGUAGE_HEADER, "fr")]
     assert_refused(request(server, "POST", CONVERT_PATH, headers=headers, body=body), 400)
     assert recorder.calls == []
+
+
+# --- Cache and installation check (ADR-059) -------------------------------------------
+
+
+def test_the_page_can_turn_the_cache_off(server: WebServer, recorder: Recorder) -> None:
+    body = b"%PDF"
+    headers = [*api_headers(server, body), (CACHE_HEADER, "off")]
+    assert request(server, "POST", CONVERT_PATH, headers=headers, body=body).status == 200
+    assert upload(server).status == 200
+    assert [options.cache for options in recorder.options] == [False, True]
+
+
+def test_without_cache_nothing_is_written(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(CACHE_DIR_ENV, str(tmp_path / "cache"))
+    document = b"<note><title>Hello</title><body>Some text.</body></note>"
+    for server in running(converter(Settings())):
+        headers = [*api_headers(server, document), (CACHE_HEADER, "off")]
+        assert request(server, "POST", CONVERT_PATH, headers=headers, body=document).status == 200
+    assert not (tmp_path / "cache").exists()
+
+
+def doctor_request(server: WebServer, *extra: tuple[str, str], body: bytes = b"") -> Response:
+    headers = [*api_headers(server, body), *extra]
+    return request(server, "POST", DOCTOR_PATH, headers=headers, body=body)
+
+
+def test_the_installation_check_answers_like_sugo_doctor() -> None:
+    def doctor() -> dict[str, Any]:
+        return {"checks": [{"name": "cache", "label": i18n.gettext("cache"), "status": "ok"}]}
+
+    for server in running(Recorder(), doctor=doctor):
+        english = doctor_request(server)
+        italian = doctor_request(server, (LANGUAGE_HEADER, "it"))
+    assert english.status == 200
+    assert english.json()["checks"][0]["label"] == "cache"
+    assert italian.json()["checks"][0]["status"] == "ok"
+    assert i18n.active_language() == "en"
+
+
+def test_the_real_installation_checks_run() -> None:
+    report = web_server.installation_checks()
+    names = [check["name"] for check in report["checks"]]
+    assert names[0] == "sugo"
+    assert {"name", "label", "status", "detail"} <= set(report["checks"][0])
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda headers: without(headers, TOKEN_HEADER),
+        lambda headers: replaced(headers, TOKEN_HEADER, "wrong"),
+        lambda headers: replaced(headers, "Origin", "http://evil.example"),
+        lambda headers: without(headers, "Origin"),
+    ],
+)
+def test_the_installation_check_is_protected_like_a_conversion(
+    server: WebServer, change: Callable[[list[tuple[str, str]]], list[tuple[str, str]]]
+) -> None:
+    called: list[bool] = []
+    server.doctor = lambda: called.append(True) or {"checks": []}
+    headers = change(api_headers(server, b""))
+    assert_refused(request(server, "POST", DOCTOR_PATH, headers=headers), 403)
+    assert called == []
+
+
+def test_the_installation_check_takes_no_body(server: WebServer) -> None:
+    server.doctor = lambda: {"checks": []}
+    assert_refused(doctor_request(server, body=b"x"), 400)
+    assert_refused(doctor_request(server, (LANGUAGE_HEADER, "fr")), 400)
+    assert request(server, "GET", DOCTOR_PATH).status == 404

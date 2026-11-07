@@ -117,6 +117,17 @@ _TEXTS = {
     "text_languages_help": N_("Sugo applies their text rules when cleaning. Choose at least one."),
     "strip_tracking": N_("Remove tracking parameters from links (utm_source and similar)"),
     "make_chunks": N_("Also split into chunks for RAG"),
+    "keep_cache": N_(
+        "Keep a cache on disk: faster next time, but it holds the text of converted documents"
+    ),
+    "cache_off_config": N_("The cache is off in your configuration file."),
+    "doctor_title": N_("Installation"),
+    "doctor_run": N_("Check installation"),
+    "doctor_running": N_("Checking…"),
+    "doctor_failed": N_("The check could not run; the terminal running sugo ui may say more."),
+    "status_ok": N_("ok"),
+    "status_warning": N_("warning"),
+    "status_error": N_("error"),
     "make_receipt": N_("Also make a receipt: every block removed or edited, with its reason"),
     "chunk_size": N_("Chunk size in tokens ({min} to {max})"),
     "reset": N_("Back to my configuration"),
@@ -244,6 +255,7 @@ def defaults(settings: Settings, language: str) -> dict[str, Any]:
         "strip_tracking_urls": settings.cleaning.strip_tracking_urls,
         "chunks": False,
         "receipt": False,
+        "cache": settings.storage.cache == "persistent",
         "chunk_tokens": settings.chunking.max_tokens,
     }
 

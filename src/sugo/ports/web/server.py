@@ -12,6 +12,10 @@ settings come as one header each, checked against the known values; the
 server keeps nothing between conversions and writes nothing to disk. The
 file's name, never a path, may come percent-encoded in ``X-Sugo-Name``: it
 names the receipt's ``source`` and is never logged (ADR-059).
+``X-Sugo-Cache: off`` converts without the page cache. ``/api/doctor`` runs
+the read-only installation checks of ``sugo doctor``; it is a POST with an
+empty body, because browsers send ``Origin`` with POST but not always with a
+same-origin GET.
 
 Every refusal is ``WEB_REQUEST_REFUSED``, with one message whatever the
 check. The access log is off; failures are logged by exception type only,
@@ -55,6 +59,7 @@ _log = logging.getLogger(__name__)
 LOOPBACK = "127.0.0.1"
 TOKEN_HEADER = "X-Sugo-Token"  # noqa: S105 - a header name, not a secret
 CONVERT_PATH = "/api/convert"
+DOCTOR_PATH = "/api/doctor"
 # Bytes read from the socket at a time.
 _READ_BYTES = 1024 * 1024
 
@@ -82,6 +87,8 @@ CHUNKS_HEADER = "X-Sugo-Chunk-Tokens"
 # ADR-059.
 RECEIPT_HEADER = "X-Sugo-Receipt"
 NAME_HEADER = "X-Sugo-Name"
+# Only "off": the page can turn the cache off, never on against the configuration.
+CACHE_HEADER = "X-Sugo-Cache"
 _BOOLEANS = {"true": True, "false": False}
 # A file name, as most file systems allow it; percent-encoding takes at most
 # twelve characters per character (four UTF-8 bytes, three characters each).
@@ -104,10 +111,14 @@ class Options:
     receipt: bool = False
     # The file's name, for the receipt; None if the page sent none.
     source: str | None = None
+    # False keeps no page cache on disk for this conversion (as --no-cache).
+    cache: bool = True
 
 
 # Turns a file's bytes into the JSON the page shows.
 Converter = Callable[[bytes, Options], dict[str, Any]]
+# Runs the installation checks, in the active interface language.
+Doctor = Callable[[], dict[str, Any]]
 
 
 class _Refused(Exception):  # noqa: N818 - a signal, not an error the user sees
@@ -125,9 +136,12 @@ class WebServer(ThreadingHTTPServer):
     # On Windows, SO_REUSEADDR would let another program bind the same port.
     allow_reuse_address = False
 
-    def __init__(self, converter: Converter, settings: Settings) -> None:
+    def __init__(
+        self, converter: Converter, settings: Settings, doctor: "Doctor | None" = None
+    ) -> None:
         super().__init__((LOOPBACK, 0), _Handler)
         self.converter = converter
+        self.doctor = doctor or installation_checks
         self.settings = settings
         # Fixed at start: a conversion switches the process's language for
         # its own messages, which other threads must not pick up.
@@ -201,11 +215,14 @@ class _Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         try:
             self._check_host()
-            if self.path != CONVERT_PATH:
+            if self.path not in {CONVERT_PATH, DOCTOR_PATH}:
                 self._send(HTTPStatus.NOT_FOUND, b"")
                 return
             self._check_origin_and_token()
             length = self._content_length()
+            if self.path == DOCTOR_PATH:
+                self._doctor(length)
+                return
             try:
                 options = self._options()
             except _Refused:
@@ -222,6 +239,26 @@ class _Handler(BaseHTTPRequestHandler):
                     self._convert(data, options)
         except _Refused as refused:
             self._refuse(refused.status)
+
+    def _doctor(self, length: int) -> None:
+        """The installation checks; the request carries no body."""
+        try:
+            options = self._options()
+        except _Refused:
+            self._read_body(length)
+            raise
+        if length:
+            self._read_body(length)
+            raise _Refused(HTTPStatus.BAD_REQUEST)
+        # One at a time, like a conversion: the checks speak the page's language.
+        with self._one_at_a_time(0), _speaking(options.language):
+            try:
+                report = self.server.doctor()
+            except Exception as error:  # noqa: BLE001 - the server outlives a failing check
+                _log.error("installation checks failed: %s", type(error).__name__)
+                self._send(HTTPStatus.INTERNAL_SERVER_ERROR, b"")
+                return
+        self._send_json(HTTPStatus.OK, report)
 
     def do_OPTIONS(self) -> None:
         # A CORS preflight: never allowed, so no cross-site request follows it.
@@ -290,6 +327,9 @@ class _Handler(BaseHTTPRequestHandler):
         if receipt is not None and receipt not in _BOOLEANS:
             raise _Refused(HTTPStatus.BAD_REQUEST)
         name = self._single(NAME_HEADER)
+        cache = self._single(CACHE_HEADER)
+        if cache is not None and cache != "off":
+            raise _Refused(HTTPStatus.BAD_REQUEST)
         return Options(
             language=language,
             languages=languages,
@@ -299,6 +339,7 @@ class _Handler(BaseHTTPRequestHandler):
             chunk_tokens=chunk_tokens,
             receipt=receipt is not None and _BOOLEANS[receipt],
             source=None if name is None else _file_name(name),
+            cache=cache is None,
         )
 
     def _single(self, name: str) -> str | None:
@@ -401,7 +442,8 @@ def converter(settings: Settings) -> Converter:
         from sugo.exporters.receipt import receipt_text
         from sugo.metrics.providers import list_providers
 
-        with page_cache(enabled=settings.storage.cache == "persistent") as cache:
+        persistent = options.cache and settings.storage.cache == "persistent"
+        with page_cache(enabled=persistent) as cache:
             conversion = pipeline.convert(
                 data,
                 cache=cache,
@@ -433,6 +475,23 @@ def converter(settings: Settings) -> Converter:
         return result
 
     return convert
+
+
+def installation_checks() -> dict[str, Any]:
+    """The checks of ``sugo doctor --json``, with each name also in the active language."""
+    from sugo.ports.cli.doctor import run_checks
+
+    return {
+        "checks": [
+            {
+                "name": check.name,
+                "label": i18n.gettext(check.name),
+                "status": check.status.value,
+                "detail": check.detail,
+            }
+            for check in run_checks()
+        ]
+    }
 
 
 @contextmanager
