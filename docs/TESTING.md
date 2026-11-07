@@ -72,7 +72,7 @@ Measured so far (targets unchanged until a decision is recorded):
 
 | Operation | Measured | Script |
 |---|---|---|
-| Dense phone screenshot (30 lines) → text, warm, `lite` small models | 7.4 s, 411 MB peak, 0% character errors (October 2026) | `benchmarks/ocr_speed.py` |
+| Dense phone screenshot (30 lines) → text, warm, `lite` small models, on an older office PC, not the reference machine (hardware not recorded; first reported as the reference machine, corrected in ARCHITECTURE §25) | 7.4 s, 411 MB peak, 0% character errors (October 2026) | `benchmarks/ocr_speed.py` |
 | Same, on a 2010 desktop (i5-650: 2 cores, 4 threads, no AVX; 8 GB) | 13.7 s, 411 MB peak, 0% character errors (2026-11-03) | `benchmarks/ocr_speed.py` |
 | Same, on the reference machine (i5-10300H) | 1.5 s, 347 MB peak, 0% character errors (2026-11-03) | `benchmarks/ocr_speed.py` |
 | Native PDF, 100 generated pages with header, footer and page numbers, `--no-cache`, same 2010 desktop | 3.6 s including startup (about 28 pages/s), 98 MB peak (2026-11-03) | `/usr/bin/time -f "%e s %M KB" sugo convert --no-cache` |
