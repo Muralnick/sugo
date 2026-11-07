@@ -222,3 +222,27 @@ def test_sugo_shell_works_with_a_plain_input_line() -> None:
     result = CliRunner().invoke(cli.app, ["shell"], input="second.pdf\n/exit\n")
     assert result.exit_code == ExitCode.OK
     assert "Section 1 says something new." in plain(result.output)
+
+
+# --- Hints ---------------------------------------------------------------------------
+
+
+@pytest.mark.usefixtures("workdir")
+def test_the_first_hint_says_what_to_do_then_tips_take_turns() -> None:
+    state = shell.State(cli._settings(quiet=True))
+    assert "Drag a file here" in shell.hint(state)
+    shell.run_line(state, "second.pdf")
+    tips = set()
+    for read in range(len(shell.HINTS)):
+        state.lines_read = read
+        tips.add(shell.hint(state))
+    # Every tip comes up, and none of them is the first-time hint.
+    assert len(tips) == len(shell.HINTS)
+    assert not any("Drag a file here" in tip for tip in tips)
+
+
+def test_every_hint_names_a_real_command() -> None:
+    for tip in shell.HINTS:
+        for word in tip.split():
+            if word.startswith("/"):
+                assert word in shell.COMMANDS, word

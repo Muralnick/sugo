@@ -64,6 +64,7 @@ _STYLE = Style.from_dict(
         "bottom-toolbar": "noreverse #8a8a8a",
         "bottom-toolbar.on": "noreverse #7fbf7f",
         "bottom-toolbar.off": "noreverse #8a8a8a",
+        "placeholder": "#6c6c6c italic",
         "completion-menu.completion": "bg:#2b2b2b #d0d0d0",
         "completion-menu.completion.current": f"bg:{ACCENT} #1a1a1a bold",
     }
@@ -100,6 +101,8 @@ class State:
     receipt: bool = False
     cache: bool = True
     last: list[Result] = field(default_factory=list)
+    # Lines read so far: picks the next hint.
+    lines_read: int = 0
 
     @property
     def persistent_cache(self) -> bool:
@@ -653,6 +656,28 @@ def _banner() -> None:
     )
 
 
+# Before the first conversion: what to do at all.
+FIRST_HINT = N_("Drag a file here (PDF, Word, Excel, PowerPoint, image) or type its name · /help")
+# After a conversion: one tip per line, in turn.
+HINTS = (
+    N_("/save writes the Markdown to a folder"),
+    N_("/explain shows what was removed and why"),
+    N_("/stats compares the tokens per AI provider"),
+    N_("Copy a screenshot, then type /clip to convert it"),
+    N_("Tab completes file names and commands"),
+    N_("Several files at once: *.pdf, or names separated by spaces"),
+    N_("/receipt keeps a record of every change, checkable with /verify"),
+    N_("/chunks splits the next files into pieces for RAG"),
+)
+
+
+def hint(state: State) -> str:
+    """The grey tip on the empty input line: what to try next."""
+    if not state.last:
+        return i18n.gettext(FIRST_HINT)
+    return i18n.gettext(HINTS[state.lines_read % len(HINTS)])
+
+
 def run_shell(lines: Iterable[str] | None = None) -> None:
     """Run the shell until /exit or Ctrl+D; ``lines`` replaces the keyboard in tests."""
     with cli._failures(json_output=False):
@@ -675,6 +700,7 @@ def run_shell(lines: Iterable[str] | None = None) -> None:
             continue
         except EOFError:
             return
+        state.lines_read += 1
         try:
             run_line(state, line)
         except _Exit:
@@ -723,6 +749,14 @@ def _line_reader(state: State) -> Callable[[], str]:
         _say(
             _("Simple mode in this terminal: no Tab completion; use /clip for screenshots."), "dim"
         )
-        return lambda: input(PROMPT)
+
+        def plain() -> str:
+            # No grey text inside a plain line: the tip goes just above it.
+            _say(hint(state), "dim italic")
+            return input(PROMPT)
+
+        return plain
     message = FormattedText([("class:brand", "sugo"), ("class:arrow", f" {ARROW} ")])
-    return lambda: session.prompt(message)
+    return lambda: session.prompt(
+        message, placeholder=lambda: FormattedText([("class:placeholder", hint(state))])
+    )
