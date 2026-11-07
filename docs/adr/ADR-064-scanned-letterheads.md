@@ -98,4 +98,4 @@ Results:
 | Synthetic controls without letterhead (repeating articles, footnotes) | Nothing removed |
 | Synthetic control: a small running title that changes on every page ("…, section 3: notices") | **Known limit:** removed on 2 of 6 pages; the section name is in the receipt, not in the Markdown |
 
-The known limit is for the maintainer to accept or not.
+**Maintainer decision (2026-11-07):** the known limit is accepted, and so are the deviations above.
