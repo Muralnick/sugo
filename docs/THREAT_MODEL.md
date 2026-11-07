@@ -90,6 +90,7 @@ v0.1 web UI (`sugo ui`, ADR-055):
 - Refusals use one code, `WEB_REQUEST_REFUSED`, whose message never says which check failed.
 - Document text, file names and messages are inserted as text, never HTML; a strict Content-Security-Policy forbids inline and external scripts.
 - Uploads need a `Content-Length` within the file size limits, checked before the body is read; one conversion runs at a time; there is no path parameter.
+- ADR-059 additions: every new route (`/api/verify`, `/api/doctor`) and header goes through the same token, `Host` and `Origin` checks, and unknown or repeated values are refused. The file name the page sends for a receipt is a name only, never a path: anything with a separator, `.`/`..`, control or other non-printable characters is refused, and it is never logged. A receipt uploaded for verification may come from someone else: it is parsed by the strict receipt model, its length is checked before the body is read, and the answer lists block ids and pages, never text. The page can turn the cache off, never on against the configuration. ZIP files built by the page hold names without paths or reserved characters, so unpacking them cannot write outside the chosen folder.
 - Residual: another program of the same user can reach the server, and a malicious browser extension can read the page and its token.
 
 ### F. Malicious extensions
