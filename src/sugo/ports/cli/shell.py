@@ -15,6 +15,7 @@ commands.
 import glob
 import logging
 import os
+import sys
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -705,6 +706,9 @@ def _line_reader(state: State) -> Callable[[], str]:
         parts.append(("", "     " + _("Tab completes · Esc clears · /help")))
         return FormattedText(parts)
 
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        # Lines piped in, e.g. `sugo shell < commands.txt`: no keyboard to edit with.
+        return lambda: input(PROMPT)
     try:
         session: PromptSession[str] = PromptSession(
             history=InMemoryHistory(),
