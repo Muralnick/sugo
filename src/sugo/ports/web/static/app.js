@@ -593,16 +593,106 @@
 
   $("doctor").addEventListener("click", runDoctor);
 
+  // --- Verifying a receipt (ADR-059), as sugo verify. ---
+
+  function showVerifyError(error) {
+    $("verify-error-code").textContent = error.code ? texts.error + " " + error.code + ":" : texts.error + ":";
+    $("verify-error-message").textContent = error.message || "";
+    $("verify-error-hint").textContent = error.hint ? fill(texts.hint, { hint: error.hint }) : "";
+    show($("verify-error"), true);
+  }
+
+  function describeDifference(difference) {
+    if (difference.category === "tokens_after") {
+      return fill(texts.diff_tokens, { stored: number(difference.stored), fresh: number(difference.fresh) });
+    }
+    const what = texts["diff_" + difference.category] || String(difference.category);
+    const where = fill(texts.diff_block, { page: number(difference.page), block: String(difference.block_id) });
+    const kind = texts["diff_" + difference.kind] || String(difference.kind);
+    return what + ", " + where + ": " + kind;
+  }
+
+  function showVerifyResult(result) {
+    const verdict = $("verify-verdict");
+    const differences = Array.isArray(result.differences) ? result.differences : [];
+    verdict.className = "verdict " + (result.match ? "match" : "mismatch");
+    verdict.textContent = result.match
+      ? texts.verify_match
+      : fill(texts.verify_mismatch, { count: number(differences.length) });
+    show($("verify-drifted"), result.version_drifted === true);
+    const list = $("verify-differences");
+    list.replaceChildren();
+    for (const difference of differences) {
+      const item = document.createElement("li");
+      item.textContent = describeDifference(difference);
+      list.append(item);
+    }
+    show($("verify-result"), true);
+  }
+
+  async function verify() {
+    if (busy || !token) return;
+    const documentFile = $("verify-document").files[0];
+    const receiptFile = $("verify-receipt").files[0];
+    show($("verify-error"), false);
+    show($("verify-result"), false);
+    if (!documentFile || !receiptFile) { showVerifyError({ message: texts.verify_missing_files }); return; }
+    if (documentFile.size === 0) { showVerifyError({ message: texts.empty }); return; }
+    if (documentFile.size > data.max_bytes) { showVerifyError({ message: texts.too_large }); return; }
+    if (receiptFile.size === 0 || receiptFile.size > data.max_receipt_bytes) {
+      showVerifyError({ message: texts.receipt_too_large });
+      return;
+    }
+    busy = true;
+    $("verify-run").disabled = true;
+    $("verify-status").textContent = texts.verifying;
+    try {
+      const response = await fetch("/api/verify", {
+        method: "POST",
+        headers: {
+          "X-Sugo-Token": token,
+          "Content-Type": "application/octet-stream",
+          "X-Sugo-Language": settings.ui_language,
+          "X-Sugo-Receipt-Length": String(receiptFile.size),
+          ...(settings.cache ? {} : { "X-Sugo-Cache": "off" }),
+        },
+        // The receipt first, then the document: one body, no multipart.
+        body: new Blob([receiptFile, documentFile]),
+        cache: "no-store",
+        credentials: "omit",
+        referrerPolicy: "no-referrer",
+      });
+      let body = null;
+      try { body = await response.json(); } catch (e) { body = null; }
+      if (response.ok && body) {
+        showVerifyResult(body);
+      } else if (body && body.error) {
+        showVerifyError(body.error);
+      } else {
+        showVerifyError({ message: texts.unexpected });
+      }
+    } catch (e) {
+      showVerifyError({ message: texts.unexpected });
+    } finally {
+      busy = false;
+      $("verify-run").disabled = !token;
+      $("verify-status").textContent = "";
+    }
+  }
+
+  $("verify-run").addEventListener("click", verify);
+
   // --- Start ---
 
   renderSettings();
   applyTexts();
   const view = load("sessionStorage", VIEW_KEY);
-  selectView(["convert", "settings", "questions"].includes(view) ? view : "convert");
+  selectView(["convert", "verify", "settings", "questions"].includes(view) ? view : "convert");
   if (!token) {
     showError({ message: texts.no_token });
     drop.classList.add("busy");
     input.disabled = true;
     $("paste").disabled = true;
+    $("verify-run").disabled = true;
   }
 })();

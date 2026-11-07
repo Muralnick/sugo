@@ -32,8 +32,10 @@ from sugo.ports.web.server import (
     LANGUAGES_HEADER,
     NAME_HEADER,
     RECEIPT_HEADER,
+    RECEIPT_LENGTH_HEADER,
     TOKEN_HEADER,
     TRACKING_HEADER,
+    VERIFY_PATH,
     Options,
     WebServer,
     converter,
@@ -80,8 +82,9 @@ def running(
     convert: Callable[[bytes, Options], dict[str, Any]],
     settings: Settings | None = None,
     doctor: Callable[[], dict[str, Any]] | None = None,
+    verifier: Callable[[bytes, bytes, Options], dict[str, Any]] | None = None,
 ) -> Iterator[WebServer]:
-    server = WebServer(convert, settings or Settings(), doctor)
+    server = WebServer(convert, settings or Settings(), doctor, verifier)
     thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05})
     thread.start()
     try:
@@ -881,3 +884,118 @@ def test_the_installation_check_takes_no_body(server: WebServer) -> None:
     assert_refused(doctor_request(server, body=b"x"), 400)
     assert_refused(doctor_request(server, (LANGUAGE_HEADER, "fr")), 400)
     assert request(server, "GET", DOCTOR_PATH).status == 404
+
+
+# --- Verifying a receipt (ADR-059) ------------------------------------------------------
+
+NOTE = b"<doc><p>See https://example.com/page?utm_source=news&amp;id=3 for more.</p></doc>"
+
+
+def verify_request(
+    server: WebServer, receipt: bytes, document: bytes, *extra: tuple[str, str]
+) -> Response:
+    body = receipt + document
+    headers = [*api_headers(server, body), (RECEIPT_LENGTH_HEADER, str(len(receipt))), *extra]
+    return request(server, "POST", VERIFY_PATH, headers=headers, body=body)
+
+
+def recording_verifier(
+    called: list[bool],
+) -> Callable[[bytes, bytes, Options], dict[str, Any]]:
+    """A verifier that only notes it was called."""
+
+    def verify(receipt: bytes, document: bytes, options: Options) -> dict[str, Any]:
+        called.append(True)
+        return {}
+
+    return verify
+
+
+def made_receipt(server: WebServer, document: bytes) -> bytes:
+    headers = [*api_headers(server, document), (RECEIPT_HEADER, "true")]
+    response = request(server, "POST", CONVERT_PATH, headers=headers, body=document)
+    return str(response.json()["receipt_file"]).encode()
+
+
+def test_a_receipt_verifies_like_sugo_verify(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(CACHE_DIR_ENV, str(tmp_path / "cache"))
+    for server in running(converter(Settings())):
+        receipt = made_receipt(server, NOTE)
+        assert json.loads(receipt)["edited"], "the tracking parameter should be an edit"
+        same = verify_request(server, receipt, NOTE)
+        tampered = json.loads(receipt)
+        tampered["tokens_after"] += 1
+        tampered["edited"] = []
+        different = verify_request(server, json.dumps(tampered).encode(), NOTE)
+        other_file = verify_request(server, receipt, NOTE.replace(b"more", b"less"))
+        broken = verify_request(server, b"{not json", NOTE)
+        foreign = json.loads(receipt)
+        foreign["languages"] = ["xx"]
+        unknown_language = verify_request(server, json.dumps(foreign).encode(), NOTE)
+        italian = verify_request(server, b"{not json", NOTE, (LANGUAGE_HEADER, "it"))
+    assert same.status == 200
+    assert same.json() == {"match": True, "version_drifted": False, "differences": []}
+    result = different.json()
+    assert result["match"] is False
+    assert {d["category"] for d in result["differences"]} == {"edited", "tokens_after"}
+    # Block ids and pages only, never the text (ADR-056).
+    assert b"utm_source" not in different.body
+    assert other_file.status == 422
+    assert other_file.json()["error"]["code"] == "FILE_CHANGED"
+    assert broken.json()["error"]["code"] == "RECEIPT_INVALID"
+    assert unknown_language.json()["error"]["code"] == "RECEIPT_INVALID"
+    assert italian.json()["error"]["message"].startswith("La ricevuta")
+
+
+def test_the_receipt_and_document_are_split_where_the_page_says(
+    server: WebServer, recorder: Recorder
+) -> None:
+    seen: list[tuple[bytes, bytes]] = []
+
+    def verifier(receipt: bytes, document: bytes, options: Options) -> dict[str, Any]:
+        seen.append((receipt, document))
+        return {"match": True}
+
+    server.verifier = verifier
+    assert verify_request(server, b'{"r": 1}', b"%PDF-doc").status == 200
+    assert seen == [(b'{"r": 1}', b"%PDF-doc")]
+    assert recorder.calls == []
+
+
+@pytest.mark.parametrize("value", [None, "", "0", "-1", "abc", "1.5", "99", "9" * 30])
+def test_a_wrong_receipt_length_is_refused(server: WebServer, value: str | None) -> None:
+    called: list[bool] = []
+    server.verifier = recording_verifier(called)
+    body = b"{}" + b"%PDF"
+    headers = api_headers(server, body)
+    if value is not None:
+        headers.append((RECEIPT_LENGTH_HEADER, value))
+    # Too many digits is malformed, like any other bad value.
+    assert_refused(request(server, "POST", VERIFY_PATH, headers=headers, body=body), 400)
+    assert called == []
+
+
+def test_receipt_and_document_limits_are_checked_apart(
+    server: WebServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    server.verifier = lambda receipt, document, options: {"match": True}
+    monkeypatch.setattr(web_server, "MAX_RECEIPT_BYTES", 4)
+    monkeypatch.setattr(web_server, "MAX_INPUT_BYTES", 8)
+    assert verify_request(server, b"1234", b"12345678").status == 200
+    assert_refused(verify_request(server, b"12345", b"1234"), 413)
+    assert_refused(verify_request(server, b"1234", b"123456789"), 413)
+
+
+def test_verify_is_protected_like_a_conversion(server: WebServer) -> None:
+    called: list[bool] = []
+    server.verifier = recording_verifier(called)
+    body = b"{}%PDF"
+    for headers in (
+        replaced(api_headers(server, body), TOKEN_HEADER, "wrong"),
+        replaced(api_headers(server, body), "Origin", "http://evil.example"),
+    ):
+        headers.append((RECEIPT_LENGTH_HEADER, "2"))
+        assert_refused(request(server, "POST", VERIFY_PATH, headers=headers, body=body), 403)
+    assert called == []

@@ -15,13 +15,16 @@ names the receipt's ``source`` and is never logged (ADR-059).
 ``X-Sugo-Cache: off`` converts without the page cache. ``/api/doctor`` runs
 the read-only installation checks of ``sugo doctor``; it is a POST with an
 empty body, because browsers send ``Origin`` with POST but not always with a
-same-origin GET.
+same-origin GET. ``/api/verify`` takes a receipt and its document in one
+body, the receipt first, its length in ``X-Sugo-Receipt-Length``, and
+answers as ``sugo verify --json`` (ADR-056, ADR-059).
 
 Every refusal is ``WEB_REQUEST_REFUSED``, with one message whatever the
 check. The access log is off; failures are logged by exception type only,
 never with document text or file names.
 """
 
+import hashlib
 import hmac
 import json
 import logging
@@ -51,8 +54,14 @@ from sugo.core.constants import (
 )
 from sugo.languages.packs import PACKS
 from sugo.ports.cache import page_cache
-from sugo.ports.errors import PortError, from_exception, web_request_refused
-from sugo.ports.web.page import render_page, static_file
+from sugo.ports.errors import (
+    PortError,
+    file_changed,
+    from_exception,
+    receipt_invalid,
+    web_request_refused,
+)
+from sugo.ports.web.page import MAX_RECEIPT_BYTES, render_page, static_file
 
 _log = logging.getLogger(__name__)
 
@@ -60,6 +69,8 @@ LOOPBACK = "127.0.0.1"
 TOKEN_HEADER = "X-Sugo-Token"  # noqa: S105 - a header name, not a secret
 CONVERT_PATH = "/api/convert"
 DOCTOR_PATH = "/api/doctor"
+VERIFY_PATH = "/api/verify"
+_API_PATHS = frozenset({CONVERT_PATH, DOCTOR_PATH, VERIFY_PATH})
 # Bytes read from the socket at a time.
 _READ_BYTES = 1024 * 1024
 
@@ -89,6 +100,8 @@ RECEIPT_HEADER = "X-Sugo-Receipt"
 NAME_HEADER = "X-Sugo-Name"
 # Only "off": the page can turn the cache off, never on against the configuration.
 CACHE_HEADER = "X-Sugo-Cache"
+# How many bytes at the start of a verify request are the receipt.
+RECEIPT_LENGTH_HEADER = "X-Sugo-Receipt-Length"
 _BOOLEANS = {"true": True, "false": False}
 # A file name, as most file systems allow it; percent-encoding takes at most
 # twelve characters per character (four UTF-8 bytes, three characters each).
@@ -119,6 +132,8 @@ class Options:
 Converter = Callable[[bytes, Options], dict[str, Any]]
 # Runs the installation checks, in the active interface language.
 Doctor = Callable[[], dict[str, Any]]
+# Checks a receipt (first bytes) against its document (second bytes).
+Verifier = Callable[[bytes, bytes, Options], dict[str, Any]]
 
 
 class _Refused(Exception):  # noqa: N818 - a signal, not an error the user sees
@@ -137,11 +152,16 @@ class WebServer(ThreadingHTTPServer):
     allow_reuse_address = False
 
     def __init__(
-        self, converter: Converter, settings: Settings, doctor: "Doctor | None" = None
+        self,
+        converter: Converter,
+        settings: Settings,
+        doctor: Doctor | None = None,
+        verifier: Verifier | None = None,
     ) -> None:
         super().__init__((LOOPBACK, 0), _Handler)
         self.converter = converter
         self.doctor = doctor or installation_checks
+        self.verifier = verifier or receipt_verifier(settings)
         self.settings = settings
         # Fixed at start: a conversion switches the process's language for
         # its own messages, which other threads must not pick up.
@@ -215,10 +235,13 @@ class _Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         try:
             self._check_host()
-            if self.path not in {CONVERT_PATH, DOCTOR_PATH}:
+            if self.path not in _API_PATHS:
                 self._send(HTTPStatus.NOT_FOUND, b"")
                 return
             self._check_origin_and_token()
+            if self.path == VERIFY_PATH:
+                self._verify()
+                return
             length = self._content_length()
             if self.path == DOCTOR_PATH:
                 self._doctor(length)
@@ -239,6 +262,37 @@ class _Handler(BaseHTTPRequestHandler):
                     self._convert(data, options)
         except _Refused as refused:
             self._refuse(refused.status)
+
+    def _verify(self) -> None:
+        """A receipt and its document: the receipt's length is checked before reading."""
+        length = self._content_length(MAX_RECEIPT_BYTES + MAX_INPUT_BYTES)
+        try:
+            options = self._options()
+            receipt_length = self._receipt_length(length)
+        except _Refused:
+            self._read_body(length)
+            raise
+        with self._one_at_a_time(length):
+            data = self._read_body(length)
+            if data is None:
+                self.close_connection = True
+                return
+            receipt, document = data[:receipt_length], data[receipt_length:]
+            with _speaking(options.language):
+                self._answer(lambda: self.server.verifier(receipt, document, options))
+
+    def _receipt_length(self, length: int) -> int:
+        value = self._single(RECEIPT_LENGTH_HEADER)
+        if value is None or not (
+            value.isascii() and value.isdigit() and len(value) <= len(str(MAX_RECEIPT_BYTES))
+        ):
+            raise _Refused(HTTPStatus.BAD_REQUEST)
+        receipt_length = int(value)
+        if not 0 < receipt_length < length:
+            raise _Refused(HTTPStatus.BAD_REQUEST)
+        if receipt_length > MAX_RECEIPT_BYTES or length - receipt_length > MAX_INPUT_BYTES:
+            raise _Refused(HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
+        return receipt_length
 
     def _doctor(self, length: int) -> None:
         """The installation checks; the request carries no body."""
@@ -280,17 +334,19 @@ class _Handler(BaseHTTPRequestHandler):
         if not hmac.compare_digest(given, expected):
             raise _Refused(HTTPStatus.FORBIDDEN)
 
-    def _content_length(self) -> int:
+    def _content_length(self, limit: int | None = None) -> int:
+        # Read when called, not when defined: tests lower the module's limits.
+        limit = MAX_INPUT_BYTES if limit is None else limit
         if self.headers.get_all("Transfer-Encoding"):
             raise _Refused(HTTPStatus.LENGTH_REQUIRED)
         lengths = self.headers.get_all("Content-Length") or []
         if len(lengths) != 1 or not lengths[0].isascii() or not lengths[0].isdigit():
             raise _Refused(HTTPStatus.LENGTH_REQUIRED)
         # Too many digits is too large, and int() refuses more than 4 300 of them.
-        if len(lengths[0].lstrip("0")) > len(str(MAX_INPUT_BYTES)):
+        if len(lengths[0].lstrip("0")) > len(str(limit)):
             raise _Refused(HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
         length = int(lengths[0])
-        if length > MAX_INPUT_BYTES:
+        if length > limit:
             raise _Refused(HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
         return length
 
@@ -382,8 +438,12 @@ class _Handler(BaseHTTPRequestHandler):
         return b"".join(parts)
 
     def _convert(self, data: bytes, options: Options) -> None:
+        self._answer(lambda: self.server.converter(data, options))
+
+    def _answer(self, work: Callable[[], dict[str, Any]]) -> None:
+        """Send the work's result, or the error model of ADR-022 for a refused input."""
         try:
-            result = self.server.converter(data, options)
+            result = work()
         except Exception as error:  # noqa: BLE001 - the server outlives a failing file
             failure = error if isinstance(error, PortError) else from_exception(error)
             if failure is None:
@@ -475,6 +535,45 @@ def converter(settings: Settings) -> Converter:
         return result
 
     return convert
+
+
+def receipt_verifier(settings: Settings) -> Verifier:
+    """What ``sugo verify --json`` does, on bytes: re-convert with the receipt's own settings."""
+
+    def verify(receipt_data: bytes, document: bytes, options: Options) -> dict[str, Any]:
+        from sugo.core import pipeline
+        from sugo.core.receipt import Receipt, diff_receipts
+
+        try:
+            # pydantic's ValidationError is a ValueError; invalid UTF-8 is one too.
+            stored = Receipt.model_validate_json(receipt_data)
+        except ValueError:
+            raise receipt_invalid() from None
+        if any(code not in PACKS for code in stored.languages):
+            # A well-formed receipt from a Sugo with other language packs.
+            raise receipt_invalid()
+        if hashlib.sha256(document).hexdigest() != stored.source_sha256:
+            raise file_changed()
+        persistent = options.cache and settings.storage.cache == "persistent"
+        with page_cache(enabled=persistent) as cache:
+            fresh = pipeline.convert(
+                document,
+                cache=cache,
+                source=stored.source,
+                languages=stored.languages,
+                strip_tracking_urls=stored.strip_tracking_urls,
+                receipt=True,
+            )
+        if fresh.receipt is None:
+            raise RuntimeError("internal error: receipt=True did not produce a receipt")
+        differences = diff_receipts(stored, fresh.receipt)
+        return {
+            "match": not differences,
+            "version_drifted": fresh.sugo_version != stored.sugo_version,
+            "differences": differences,
+        }
+
+    return verify
 
 
 def installation_checks() -> dict[str, Any]:
