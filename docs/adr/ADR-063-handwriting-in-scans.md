@@ -1,6 +1,6 @@
 # ADR-063: Handwriting in scanned pages (signatures)
 
-**Status:** Proposed
+**Status:** Accepted (maintainer decisions 1-3, 2026-11-08)
 **Date:** 2026-11-08
 **Deciders:** project author
 **Applies:** PRINCIPLES 3 (no silent loss), 4 (no invented content) and 12 (stable contracts)
@@ -97,8 +97,8 @@ The implementation is accepted only with numbers:
 
 The same document showed a second, separate problem: the letterhead at the top of each scanned page is read differently on every page (different OCR errors in the logo text), so the repeated-header cleaner (ADR-044) does not recognise it and saves nothing. Fuzzy matching of repeated OCR headers needs its own ADR.
 
-## Open decisions for the maintainer
+## Maintainer decisions (2026-11-08)
 
-1. The marker text: `[handwriting]` (proposed) or another word.
-2. Whether damaged typed lines (section 3) should also show a visible marker in the Markdown, or only in the receipt (proposed).
-3. Whether this ships in 0.1.x or waits for 0.2.
+1. The marker text is `[handwriting]`.
+2. Typed lines damaged by ink (section 3) are flagged only in the receipt; the Markdown shows no marker for them.
+3. Release: the output contract changes, so, as section 4 says, it ships in the next minor release (0.2.0), not in a 0.1.x patch release. 0.2.0 may be released before the rest of the ROADMAP v0.2 scope is ready.
