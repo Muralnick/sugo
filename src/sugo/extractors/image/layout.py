@@ -22,6 +22,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 
+from sugo.core.constants import LAYOUT_SIZE_MIN_CHARS, LAYOUT_SIZE_SPLIT_RATIO
 from sugo.core.models import Block, BlockFlag, BlockType, Page, PageOrigin
 from sugo.extractors.image.detectors import Detection, detect, is_ui_chrome, plain_text
 from sugo.extractors.image.ocr_engine import OcrLine
@@ -115,7 +116,21 @@ def _paragraphs(group: Group, *, screenshot: bool) -> list[_Paragraph]:
             result.append(_Paragraph(_Kind.TEXT, tuple(tuple(row) for row in rows)))
             rows.clear()
 
+    previous_height: float | None = None
     for row_index, row in enumerate(text_rows(group)):
+        height = _row_height(row)
+        if (
+            not screenshot
+            and rows
+            and height is not None
+            and previous_height is not None
+            and max(height, previous_height)
+            >= LAYOUT_SIZE_SPLIT_RATIO * min(height, previous_height)
+        ):
+            # Text of a very different size, such as a letterhead's small
+            # captions above the body, is never merged into one paragraph
+            # (ADR-064).
+            flush()
         for line in row:
             if line.illegible or line.handwriting or (screenshot and is_ui_chrome(line)):
                 flush()
@@ -133,8 +148,21 @@ def _paragraphs(group: Group, *, screenshot: bool) -> list[_Paragraph]:
                 rows.append([])
             rows[-1].append(line)
             last_row = row_index
+            previous_height = height
     flush()
     return result
+
+
+def _row_height(row: Sequence[OcrLine]) -> float | None:
+    """The median height of a row's readable lines, None if too short to measure.
+
+    A short row's box depends on its letters ("nei termini" has no descender),
+    not on its type size, so it neither splits a paragraph nor sets the size.
+    """
+    readable = [line for line in row if not (line.illegible or line.handwriting)]
+    if sum(len(line.text.strip()) for line in readable) < LAYOUT_SIZE_MIN_CHARS:
+        return None
+    return statistics.median(line.bbox.y1 - line.bbox.y0 for line in readable)
 
 
 def _make_block(
