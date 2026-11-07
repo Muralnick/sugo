@@ -696,6 +696,12 @@ msgstr "Nessun testo modificato."
 msgid "Receipt"
 msgstr "Ricevuta"
 
+msgid "Sugo is not installed correctly, so some files may not convert:"
+msgstr "Sugo non è installato correttamente, quindi alcuni file potrebbero non convertirsi:"
+
+msgid "See the installation check"
+msgstr "Vedi il controllo dell'installazione"
+
 msgid "Files: {done} of {count} converted"
 msgstr "File: {done} di {count} convertiti"
 
