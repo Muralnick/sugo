@@ -1,6 +1,6 @@
 # ADR-064: Repeated letterheads in scanned documents
 
-**Status:** Proposed
+**Status:** Accepted (maintainer decisions 1-3, 2026-11-07)
 **Date:** 2026-11-07
 **Deciders:** project author
 **Amends:** ADR-044 (running headers and footers) for pages read with OCR; the image layout (roadmap step 2c)
@@ -20,7 +20,7 @@ On 2026-11-07 the maintainer converted a real scanned PDF, a three-page meeting 
 
 Native PDFs are not affected: their running headers are exact copies, and ADR-044 handles them.
 
-## Decision (proposed)
+## Decision
 
 Two changes, each measured on its own, both for **pages read with OCR only** (`PageOrigin.OCR`). Native pages keep ADR-044 exactly as it is.
 
@@ -63,8 +63,8 @@ For OCR pages, the edge analyzer also records, for each text block in the edge b
 - Residual risk: a body block near the top of several pages that shares most of its trigrams with others (a repeated form title, a table header) may be removed after its first copy. The first copy always stays, every removal records its reason, and the benchmark bounds it.
 - Native PDFs and screenshots are unchanged.
 
-## Open decisions for the maintainer
+## Maintainer decisions (2026-11-07)
 
-1. The order: the layout fix (part 1) first in its own PR, then the letterhead matching (part 2). Proposed: yes, since part 1 is useful alone and part 2 depends on it.
-2. `[illegible]` blocks inside a matched letterhead area (unreadable logo pieces): keep them on every page (as ADR-044 does for all flagged blocks), or remove the later copies with the letterhead. Proposed: keep them for now; they cost two tokens each.
-3. Release: removing more page furniture changes what a cleaner removes, but no format, flag or error code. Proposed: the next release after ADR-063, 0.2.0.
+1. Order: the layout fix (part 1) comes first, in its own pull request; the letterhead matching (part 2) follows.
+2. `[illegible]` blocks inside a matched letterhead area stay on every page, as ADR-044 does for all flagged blocks.
+3. Release: 0.2.0, with ADR-063.
