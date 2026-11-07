@@ -1,7 +1,9 @@
-"""The ``sugo`` command: convert, stats, clip, doctor, mcp, ui and verify (ADR-022, ADR-048,
-ADR-055, ADR-056).
+"""The ``sugo`` command: convert, stats, clip, doctor, mcp, ui, verify and shell (ADR-022,
+ADR-048, ADR-055, ADR-056, ADR-062).
 
-``sugo FILE`` is short for ``sugo convert FILE``. Results go to stdout,
+``sugo FILE`` is short for ``sugo convert FILE``. ``sugo`` alone opens the
+interactive shell in a terminal and prints the help anywhere else, so a
+script calling it never waits for input. Results go to stdout,
 messages and progress to stderr; Rich turns colours off when stderr is not a
 terminal and honours ``NO_COLOR``. ``--json`` prints one JSON object instead.
 Exit codes follow ``ExitCode``. Typer's rich tracebacks are off: they print
@@ -16,6 +18,7 @@ import hashlib
 import io
 import json
 import logging
+import os
 import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -89,7 +92,6 @@ app = typer.Typer(
         "Markdown, locally."
     ),
     add_completion=False,
-    no_args_is_help=True,
     pretty_exceptions_enable=False,
 )
 
@@ -129,8 +131,9 @@ def _show_version(value: bool) -> None:
         raise typer.Exit()
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def _root(
+    ctx: typer.Context,
     show_version: Annotated[
         bool,
         typer.Option(
@@ -142,6 +145,31 @@ def _root(
     ] = False,
 ) -> None:
     """Options of the ``sugo`` command itself; the help is the Typer app's."""
+    if ctx.invoked_subcommand is not None:
+        return
+    if _interactive():
+        from sugo.ports.cli.shell import run_shell
+
+        run_shell()
+        raise typer.Exit()
+    # As before ADR-062: no command outside a terminal is a usage error.
+    _write(ctx.get_help() + "\n")
+    raise typer.Exit(ExitCode.USAGE)
+
+
+def _interactive() -> bool:
+    """Whether a person is at the keyboard: stdin and stdout are terminals with a size.
+
+    The size check matters on Windows, where the NUL device claims to be a
+    terminal: ``sugo < NUL`` must print the help, not wait for input.
+    """
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return False
+    try:
+        os.get_terminal_size(sys.stdout.fileno())
+    except (OSError, ValueError):
+        return False
+    return True
 
 
 # --- convert ------------------------------------------------------------------
@@ -672,6 +700,24 @@ def ui_command(
                 server.serve_forever()
         except KeyboardInterrupt:
             _stderr.print(_("Stopped."))
+
+
+# --- shell --------------------------------------------------------------------
+
+
+@app.command(
+    "shell",
+    cls=TranslatedCommand,
+    help=N_(
+        "Open the interactive shell: drag a file onto the window, Ctrl+V a screenshot, "
+        "/help for the commands (ADR-062). sugo alone does the same in a terminal."
+    ),
+)
+def shell_command() -> None:
+    """Open the shell; the help text is in the decorator, for translation."""
+    from sugo.ports.cli.shell import run_shell
+
+    run_shell()
 
 
 # --- verify -------------------------------------------------------------------

@@ -1080,3 +1080,108 @@ msgstr "il sistema non indica una lingua chiara; inglese"
 
 msgid "from the variable {name}"
 msgstr "dalla variabile {name}"
+
+msgid "Also make a receipt for the next files"
+msgstr "Crea anche una ricevuta per i prossimi file"
+
+msgid "Also split the next files into chunks for RAG"
+msgstr "Dividi anche i prossimi file in chunk per RAG"
+
+msgid "Cache on disk: {value}"
+msgstr "Cache sul disco: {value}"
+
+msgid "Cancelled."
+msgstr "Annullato."
+
+msgid "Check a receipt, as sugo verify"
+msgstr "Controlla una ricevuta, come sugo verify"
+
+msgid "Check the installation, as sugo doctor"
+msgstr "Controlla l'installazione, come sugo doctor"
+
+msgid "Chunk size must be between {min} and {max} tokens."
+msgstr "La dimensione dei chunk deve essere tra {min} e {max} token."
+
+msgid "Chunks: off"
+msgstr "Chunk: disattivati"
+
+msgid "Chunks: on, {tokens} tokens each"
+msgstr "Chunk: attivi, {tokens} token ciascuno"
+
+msgid "Convert the image in the clipboard"
+msgstr "Converti l'immagine negli appunti"
+
+msgid "Ctrl+V on an empty line converts the image in the clipboard."
+msgstr "Ctrl+V su una riga vuota converte l'immagine negli appunti."
+
+msgid "Drag a file onto this window or type its path, then press Enter."
+msgstr "Trascina un file su questa finestra o scrivi il suo percorso, poi premi Invio."
+
+msgid "Edited text: {count}"
+msgstr "Testo modificato: {count}"
+
+msgid "Give the file and its receipt: /verify FILE RECEIPT"
+msgstr "Indica il file e la sua ricevuta: /verify FILE RICEVUTA"
+
+msgid "Keep the page cache on disk or not"
+msgstr "Tieni o no la cache delle pagine sul disco"
+
+msgid "Leave the shell (or Ctrl+D)"
+msgstr "Esci dalla shell (o Ctrl+D)"
+
+msgid "Nothing converted yet: drag a file here first."
+msgstr "Non hai ancora convertito niente: prima trascina qui un file."
+
+msgid "Open the interactive shell: drag a file onto the window, Ctrl+V a screenshot, /help for the commands (ADR-062). sugo alone does the same in a terminal."
+msgstr "Apri la shell interattiva: trascina un file sulla finestra, Ctrl+V per uno screenshot, /help per i comandi (ADR-062). In un terminale basta scrivere sugo."
+
+msgid "Receipt: {value}"
+msgstr "Ricevuta: {value}"
+
+msgid "Removed blocks: {count}"
+msgstr "Blocchi rimossi: {count}"
+
+msgid "Saving here would overwrite the file itself; choose another folder."
+msgstr "Salvare qui sovrascriverebbe il file stesso; scegli un'altra cartella."
+
+msgid "Show this help"
+msgstr "Mostra questo aiuto"
+
+msgid "Simple mode in this terminal: no Tab completion; use /clip for screenshots."
+msgstr "Modalità semplice in questo terminale: niente completamento con Tab; usa /clip per gli screenshot."
+
+msgid "Some entries are not shown; /receipt and /save write them all."
+msgstr "Alcune voci non sono mostrate; /receipt e /save le scrivono tutte."
+
+msgid "Tokens saved per LLM provider for the last result"
+msgstr "Token risparmiati per fornitore di LLM per l'ultimo risultato"
+
+msgid "Type /help for the commands, /exit or Ctrl+D to leave."
+msgstr "Scrivi /help per i comandi, /exit o Ctrl+D per uscire."
+
+msgid "Type /save to write the Markdown to a folder, /stats or /explain for more."
+msgstr "Scrivi /save per salvare il Markdown in una cartella, /stats o /explain per saperne di più."
+
+msgid "Uncertain blocks: {count}"
+msgstr "Blocchi incerti: {count}"
+
+msgid "Unknown command {name}; type /help."
+msgstr "Comando sconosciuto {name}; scrivi /help."
+
+msgid "What was removed or edited, and why"
+msgstr "Cosa è stato rimosso o modificato, e perché"
+
+msgid "Write the last result as NAME.md (default: here)"
+msgstr "Scrivi l'ultimo risultato come NOME.md (di base: qui)"
+
+msgid "off"
+msgstr "disattivata"
+
+msgid "on"
+msgstr "attiva"
+
+msgid "page {page}, {cleaner}: {reason}"
+msgstr "pagina {page}, {cleaner}: {reason}"
+
+msgid "{source}: {pages}, {before} -> {after} tokens ({saved:.1f}% saved)"
+msgstr "{source}: {pages}, {before} -> {after} token (risparmiato il {saved:.1f}%)"

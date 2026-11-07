@@ -22,6 +22,10 @@ dependencies = [
     # its layout module or pymupdf4llm.
     "pymupdf>=2.0,<2.1",
     "rapidocr==3.10.0",
+    # The interactive shell's input line (ADR-062). wcwidth stays below 0.9,
+    # the first release with compiled native wheels.
+    "prompt_toolkit>=3.0.53,<3.1",
+    "wcwidth>=0.8.5,<0.9",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -460,6 +464,23 @@ forbidden_modules = [
     "typer",
     "rich",
 ]
+
+# Typer 0.27 carries its own copy of Click (ADR-048); the click package is not
+# installed with Sugo, only with some development tools.
+[[tool.importlinter.contracts]]
+name = "Sugo never imports click, which is not a dependency"
+type = "forbidden"
+source_modules = ["sugo"]
+forbidden_modules = ["click"]
+
+# The interactive shell's input library stays in the shell (ADR-062).
+[[tool.importlinter.contracts]]
+name = "prompt_toolkit only in the interactive shell"
+type = "forbidden"
+source_modules = ["sugo"]
+forbidden_modules = ["prompt_toolkit", "wcwidth"]
+ignore_imports = ["sugo.ports.cli.shell -> prompt_toolkit", "sugo.ports.cli.shell -> prompt_toolkit.**"]
+unmatched_ignore_imports_alerting = "none"
 
 # The MCP server always speaks English: it never switches the interface
 # language, which only the sugo command does (ADR-052).
