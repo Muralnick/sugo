@@ -322,3 +322,11 @@ footer { margin-top: 40px; }
   word-break: break-word;
   font: 13px/1.45 ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
+
+/* Installation check (ADR-059) */
+#doctor-checks td:nth-child(1) { white-space: nowrap; }
+#doctor-checks td:nth-child(2) { white-space: nowrap; font-weight: 600; }
+#doctor-checks td:nth-child(3) { overflow-wrap: anywhere; }
+#doctor-checks td.number { text-align: left; }
+.check-warning { color: var(--warn); }
+.check-error { color: var(--error); }
