@@ -549,6 +549,9 @@ def receipt_verifier(settings: Settings) -> Verifier:
             stored = Receipt.model_validate_json(receipt_data)
         except ValueError:
             raise receipt_invalid() from None
+        if any(code not in PACKS for code in stored.languages):
+            # A well-formed receipt from a Sugo with other language packs.
+            raise receipt_invalid()
         if hashlib.sha256(document).hexdigest() != stored.source_sha256:
             raise file_changed()
         persistent = options.cache and settings.storage.cache == "persistent"
