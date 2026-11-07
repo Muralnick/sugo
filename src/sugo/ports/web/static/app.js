@@ -209,6 +209,8 @@
   // --- Converting ---
 
   const token = sessionToken();
+  // The installation check run at start; requests wait for it (see checkAtStart).
+  let startupCheck = Promise.resolve();
   const drop = $("drop");
   const input = $("file");
   let baseName = "document";
@@ -260,6 +262,7 @@
   async function requestConversion(file) {
     if (file.size === 0) return { error: { message: texts.empty } };
     if (file.size > data.max_bytes) return { error: { message: texts.too_large } };
+    await startupCheck;
     try {
       const response = await fetch("/api/convert", {
         method: "POST",
@@ -739,12 +742,8 @@
 
   // --- Installation check (ADR-059): the checks of sugo doctor. ---
 
-  async function runDoctor() {
-    const rows = $("doctor-checks").querySelector("tbody");
-    rows.replaceChildren();
-    show($("doctor-checks"), false);
-    $("doctor").disabled = true;
-    $("doctor-status").textContent = texts.doctor_running;
+  // The checks as {checks: [...]}, or {error} / null when they could not run.
+  async function fetchChecks() {
     try {
       const response = await fetch("/api/doctor", {
         method: "POST",
@@ -755,25 +754,60 @@
       });
       let body = null;
       try { body = await response.json(); } catch (e) { body = null; }
-      if (!response.ok || !body || !Array.isArray(body.checks)) {
-        $("doctor-status").textContent = body && body.error ? body.error.message : texts.doctor_failed;
-        return;
-      }
-      for (const check of body.checks) {
-        const tr = row([check.label, texts["status_" + check.status] || check.status, check.detail]);
-        tr.children[1].className = "check-" + check.status;
-        rows.append(tr);
-      }
-      $("doctor-status").textContent = "";
-      show($("doctor-checks"), true);
+      if (response.ok && body && Array.isArray(body.checks)) return body;
+      return body && body.error ? { error: body.error } : null;
     } catch (e) {
-      $("doctor-status").textContent = texts.doctor_failed;
-    } finally {
-      $("doctor").disabled = !token;
+      return null;
     }
   }
 
+  function showChecks(body) {
+    const rows = $("doctor-checks").querySelector("tbody");
+    rows.replaceChildren();
+    for (const check of body.checks) {
+      const tr = row([check.label, texts["status_" + check.status] || check.status, check.detail]);
+      tr.children[1].className = "check-" + check.status;
+      rows.append(tr);
+    }
+    $("doctor-status").textContent = "";
+    show($("doctor-checks"), true);
+  }
+
+  async function runDoctor() {
+    show($("doctor-checks"), false);
+    $("doctor").disabled = true;
+    $("doctor-status").textContent = texts.doctor_running;
+    await startupCheck;
+    const body = await fetchChecks();
+    if (body && body.checks) {
+      showChecks(body);
+    } else {
+      $("doctor-status").textContent = body && body.error ? body.error.message : texts.doctor_failed;
+    }
+    $("doctor").disabled = !token;
+  }
+
   $("doctor").addEventListener("click", runDoctor);
+
+  // At start the page runs the checks once and warns only about errors:
+  // warnings (such as a missing Linux clipboard tool) do not stop the page.
+  async function checkAtStart() {
+    const body = await fetchChecks();
+    if (!body || !body.checks) return;
+    const problems = body.checks.filter((check) => check.status === "error");
+    if (problems.length === 0) return;
+    const list = $("health-problems");
+    list.replaceChildren();
+    for (const check of problems) {
+      const item = document.createElement("li");
+      item.textContent = check.label + ": " + check.detail;
+      list.append(item);
+    }
+    showChecks(body);
+    show($("health"), true);
+  }
+
+  $("health-details").addEventListener("click", () => selectView("settings"));
 
   // --- Verifying a receipt (ADR-059), as sugo verify. ---
 
@@ -828,6 +862,7 @@
     busy = true;
     $("verify-run").disabled = true;
     $("verify-status").textContent = texts.verifying;
+    await startupCheck;
     try {
       const response = await fetch("/api/verify", {
         method: "POST",
@@ -876,5 +911,7 @@
     input.disabled = true;
     $("paste").disabled = true;
     $("verify-run").disabled = true;
+  } else {
+    startupCheck = checkAtStart();
   }
 })();

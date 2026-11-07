@@ -160,6 +160,8 @@ _TEXTS = {
     ),
     "cache_off_config": N_("The cache is off in your configuration file."),
     "doctor_title": N_("Installation"),
+    "health_problem": N_("Sugo is not installed correctly, so some files may not convert:"),
+    "health_details": N_("See the installation check"),
     "doctor_run": N_("Check installation"),
     "doctor_running": N_("Checking…"),
     "doctor_failed": N_("The check could not run; the terminal running sugo ui may say more."),

@@ -349,3 +349,7 @@ footer { margin-top: 40px; }
 .batch-state { white-space: nowrap; font-size: 0.85rem; color: var(--muted); }
 .batch-state.done { color: var(--accent); }
 .batch-state.refused { color: var(--error); }
+
+/* Installation warning at start (ADR-059) */
+.health { margin-bottom: 16px; }
+.health ul { margin: 6px 0 10px; padding-left: 20px; }
