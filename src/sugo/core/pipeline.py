@@ -374,7 +374,7 @@ class _Job:
 
     def run(self) -> Conversion:
         count = self._extract()
-        edges, words = EdgeAnalyzer(), LexiconAnalyzer()
+        edges, words = EdgeAnalyzer(bytes.fromhex(self._sha256)), LexiconAnalyzer()
         for index in range(count):
             page = self._extracted(index)
             edges.observe(page)

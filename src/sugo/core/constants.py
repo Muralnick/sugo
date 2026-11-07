@@ -439,6 +439,29 @@ PAGE_EDGE_BAND: Final = 0.1
 # to three; the cap bounds memory on hostile pages with thousands of blocks.
 MAX_EDGE_BLOCKS_PER_BAND: Final = 8
 
+# Letterheads on pages read with OCR (ADR-064): the top band is taller, since
+# a scanned letterhead of logos and captions reaches about 15% of the page.
+# Only the top band is matched by similarity; see sugo.analyzers.letterheads.
+OCR_EDGE_BAND: Final = 0.2
+# A block is a copy of a letterhead when at least this share of its
+# character trigrams is found in the same band of another page: OCR errors
+# and a different grouping of the logo captions change the rest.
+LETTERHEAD_MIN_CONTAINMENT: Final = 0.5
+# Blocks with fewer distinct trigrams are too short to compare ("O", "11").
+LETTERHEAD_MIN_TRIGRAMS: Final = 4
+# Only text clearly smaller than the page's typical text can be a letterhead
+# copy: logo captions are small print. Body text that repeats at a page edge
+# (formulaic clauses) is set at body size, and matching it by similarity
+# could remove the part that is new on its page. Measured 2026-11-07 on a
+# real scan: letterhead rows 0.3 to 0.7 of the body's line height.
+LETTERHEAD_MAX_SIZE_RATIO: Final = 0.8
+# Pages compared with each page, before and after it: a letterhead repeats
+# on neighbouring pages, and the bound keeps the work linear in pages.
+LETTERHEAD_WINDOW_PAGES: Final = 5
+# Size of the keyed trigram bitsets, per block and per band. A band of about
+# 500 trigrams fills about 11% of it, well below the containment threshold.
+LETTERHEAD_SKETCH_BITS: Final = 4096
+
 # Text repeated on fewer pages than this is never treated as a running
 # header or footer: two matches can be chance, three rarely are.
 REPEAT_MIN_PAGES: Final = 3

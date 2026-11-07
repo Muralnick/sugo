@@ -24,6 +24,10 @@ still change, with notice, before 1.0).
 - Scanned pages: text of very different sizes, such as a letterhead's small
   captions touching the body below them, is no longer merged into one
   paragraph (ADR-064, part 1).
+- Scanned pages: later copies of a letterhead at the top of the page are
+  removed even though the OCR reads them differently on each page; the
+  first copy always stays, and each removal records its reason (ADR-064,
+  part 2). On a real three-page record this saves 14% of the tokens.
 - When cleaning removes nothing, the shell says the text was already clean
   instead of showing an empty "0% saved" bar.
 
