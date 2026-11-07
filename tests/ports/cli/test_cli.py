@@ -350,6 +350,19 @@ def test_verify_refuses_an_invalid_receipt(workdir: Path) -> None:
 
 
 @pytest.mark.usefixtures("workdir")
+def test_verify_refuses_a_receipt_with_an_unknown_language(workdir: Path) -> None:
+    # Well formed, but from a Sugo with a language pack this one lacks.
+    run("report.pdf", "-o", "out", "--receipt")
+    receipt_path = workdir / "out" / "report.receipt.json"
+    foreign = json.loads(receipt_path.read_text(encoding="utf-8"))
+    foreign["languages"] = ["xx"]
+    receipt_path.write_text(json.dumps(foreign), encoding="utf-8")
+    result = run("verify", "report.pdf", "out/report.receipt.json", "--json")
+    assert result.exit_code == ExitCode.ERROR
+    assert "RECEIPT_INVALID" in result.stdout + result.stderr
+
+
+@pytest.mark.usefixtures("workdir")
 def test_verify_reports_a_tampered_receipt_without_quoting_text(workdir: Path) -> None:
     run("report.pdf", "-o", "out", "--receipt")
     receipt_path = workdir / "out" / "report.receipt.json"
