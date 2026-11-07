@@ -155,6 +155,25 @@ def test_receipt_write_round_trips(tmp_path: Path) -> None:
     assert chr(0x2028).encode() not in raw
 
 
+def test_receipt_file_is_indented_for_people(tmp_path: Path) -> None:
+    # ADR-058: one field per line, two-space indent, so a person can read it.
+    target = tmp_path / "doc.receipt.json"
+    write_receipt(target, receipt_sample())
+    lines = target.read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "{"
+    assert lines[1] == '  "schema_version": "1.0",'
+    assert lines[-1] == "}"
+
+
+def test_receipt_compact_and_indented_files_read_the_same(tmp_path: Path) -> None:
+    # Receipts written before ADR-058 were one line; both must still be read.
+    receipt = receipt_sample()
+    target = tmp_path / "doc.receipt.json"
+    write_receipt(target, receipt)
+    indented = Receipt.model_validate_json(target.read_bytes())
+    assert indented == Receipt.model_validate_json(receipt.model_dump_json()) == receipt
+
+
 @pytest.mark.skipif(os.name != "posix", reason="POSIX permissions")
 def test_receipt_file_is_private(tmp_path: Path) -> None:
     target = tmp_path / "doc.receipt.json"

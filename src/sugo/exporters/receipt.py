@@ -1,4 +1,4 @@
-"""Write a conversion receipt as one JSON document (schema v1, ADR-056).
+"""Write a conversion receipt as one indented JSON document (schema v1, ADR-056, ADR-058).
 
 Written through the same atomic writer as the Markdown and JSONL exporters:
 a reader sees the old file or the new one, never half.
@@ -18,4 +18,4 @@ _LINE_SEPARATORS = str.maketrans(
 
 def write_receipt(path: Path, receipt: Receipt) -> None:
     """Write the receipt to ``path``, replacing it atomically."""
-    write_text_atomic(path, (receipt.model_dump_json().translate(_LINE_SEPARATORS), "\n"))
+    write_text_atomic(path, (receipt.model_dump_json(indent=2).translate(_LINE_SEPARATORS), "\n"))
