@@ -645,11 +645,11 @@ msgstr "Usa la pagina aperta da sugo ui, un file alla volta, fino a {size} MB."
 msgid "Documents, reduced: drop a file to get its compact Markdown."
 msgstr "Documenti, ridotti: trascina un file per avere il suo Markdown compatto."
 
-msgid "Drop a file here"
-msgstr "Trascina qui un file"
+msgid "Drop files here"
+msgstr "Trascina qui i file"
 
-msgid "Choose a file"
-msgstr "Scegli un file"
+msgid "Choose files"
+msgstr "Scegli i file"
 
 msgid "PDF, DOCX, XLSX or PPTX up to {large} MB; PNG, JPEG, WEBP or XML up to {small} MB."
 msgstr "PDF, DOCX, XLSX o PPTX fino a {large} MB; PNG, JPEG, WEBP o XML fino a {small} MB."
@@ -695,6 +695,33 @@ msgstr "Nessun testo modificato."
 
 msgid "Receipt"
 msgstr "Ricevuta"
+
+msgid "Files: {done} of {count} converted"
+msgstr "File: {done} di {count} convertiti"
+
+msgid "Choose at most {max_files} files at a time."
+msgstr "Scegli al massimo {max_files} file per volta."
+
+msgid "waiting"
+msgstr "in attesa"
+
+msgid "converting…"
+msgstr "in conversione…"
+
+msgid "done"
+msgstr "fatto"
+
+msgid "refused"
+msgstr "rifiutato"
+
+msgid "Save all (.zip)"
+msgstr "Salva tutto (.zip)"
+
+msgid "Can I convert several files at once?"
+msgstr "Posso convertire più file insieme?"
+
+msgid "Yes, up to {max_files} at a time: drop or choose them together. They are converted one after the other, and a file that fails does not stop the others. Click a file to see its result; Save all puts every result into one .zip file. Nothing is kept after you close the page."
+msgstr "Sì, fino a {max_files} per volta: trascinali o sceglili insieme. Vengono convertiti uno dopo l'altro, e un file che non riesce non ferma gli altri. Clicca un file per vederne il risultato; Salva tutto mette ogni risultato in un unico file .zip. Quando chiudi la pagina non resta niente."
 
 msgid "Verify"
 msgstr "Verifica"

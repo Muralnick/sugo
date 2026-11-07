@@ -31,6 +31,8 @@ from sugo.languages.packs import PACKS
 _MB = 1024 * 1024
 _LARGE_MB = max(MAX_PDF_FILE_BYTES, MAX_OFFICE_FILE_BYTES) // _MB
 _SMALL_MB = max(MAX_IMAGE_FILE_BYTES, MAX_XML_FILE_BYTES) // _MB
+# Files the page converts in one batch, one request each (ADR-059).
+MAX_BATCH_FILES = 50
 # A receipt holds at most the text of a document, as large as an XML file may be (ADR-059).
 MAX_RECEIPT_BYTES = MAX_XML_FILE_BYTES
 
@@ -51,8 +53,15 @@ _TEXTS = {
     "tab_verify": N_("Verify"),
     "tab_settings": N_("Settings"),
     "tab_questions": N_("Questions"),
-    "drop": N_("Drop a file here"),
-    "choose": N_("Choose a file"),
+    "drop": N_("Drop files here"),
+    "choose": N_("Choose files"),
+    "batch_title": N_("Files: {done} of {count} converted"),
+    "batch_too_many": N_("Choose at most {max_files} files at a time."),
+    "state_waiting": N_("waiting"),
+    "state_converting": N_("converting…"),
+    "state_done": N_("done"),
+    "state_refused": N_("refused"),
+    "save_all": N_("Save all (.zip)"),
     "paste": N_("Paste a screenshot"),
     "paste_hint": N_("Or press Ctrl+V on this page to convert the image in the clipboard."),
     "paste_none": N_("The clipboard holds no image."),
@@ -209,6 +218,15 @@ _QUESTIONS = (
         ),
     ),
     (
+        N_("Can I convert several files at once?"),
+        N_(
+            "Yes, up to {max_files} at a time: drop or choose them together. They are "
+            "converted one after the other, and a file that fails does not stop the others. "
+            "Click a file to see its result; Save all puts every result into one .zip file. "
+            "Nothing is kept after you close the page."
+        ),
+    ),
+    (
         N_("What is the receipt?"),
         N_(
             "A record of the conversion: every block Sugo removed and every text it edited, "
@@ -266,6 +284,7 @@ def render_page(settings: Settings, language: str) -> bytes:
         "packs": sorted(PACKS),
         "max_bytes": MAX_INPUT_BYTES,
         "max_receipt_bytes": MAX_RECEIPT_BYTES,
+        "max_batch_files": MAX_BATCH_FILES,
         "chunk_min": CHUNK_MIN_TOKENS,
         "chunk_max": CHUNK_MAX_TOKENS_LIMIT,
     }
@@ -305,6 +324,7 @@ def _texts(language: str) -> dict[str, Any]:
         "small": _SMALL_MB,
         "size": MAX_INPUT_BYTES // _MB,
         "receipt_size": MAX_RECEIPT_BYTES // _MB,
+        "max_files": MAX_BATCH_FILES,
         "min": CHUNK_MIN_TOKENS,
         "max": CHUNK_MAX_TOKENS_LIMIT,
     }

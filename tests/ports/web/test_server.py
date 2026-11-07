@@ -250,8 +250,8 @@ def test_texts_reach_the_page_escaped_in_every_language() -> None:
     assert b'<html lang="it">' in page
     data = page_data(page)
     assert data["language"] == "it"
-    assert data["texts"]["it"]["choose"] == "Scegli un file"
-    assert data["texts"]["en"]["choose"] == "Choose a file"
+    assert data["texts"]["it"]["choose"] == "Scegli i file"
+    assert data["texts"]["en"]["choose"] == "Choose files"
     assert data["max_bytes"] == MAX_INPUT_BYTES
     for texts in data["texts"].values():
         assert "{large}" not in texts["formats"]
