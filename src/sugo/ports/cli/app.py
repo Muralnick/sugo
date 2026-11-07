@@ -205,6 +205,13 @@ def convert_command(
 ) -> None:
     """Convert files; the help text is in the decorator, for translation."""
     _english_for_json(json_output)
+    split = _split_name(files)
+    if split is not None:
+        # The shell cut an unquoted name at its spaces; say so, not "several files".
+        raise typer.BadParameter(
+            _('a file name with spaces needs quotes, like "{name}"').format(name=_shown(split)),
+            param_hint="FILE...",
+        )
     if max_tokens is not None and not chunks:
         raise typer.BadParameter(_("--max-tokens needs --chunks"), param_hint="'--max-tokens'")
     if output is None and len(files) > 1:
@@ -279,6 +286,30 @@ def convert_command(
         if json_output:
             _write_json({"documents": documents})
         _finish(len(files), errors, partial=partial)
+
+
+def _split_name(files: list[Path]) -> str | None:
+    """A file whose name has spaces, typed without quotes and split by the shell, if any.
+
+    Only a run of arguments that starts with a missing file is joined back,
+    so a file that was typed correctly is never second-guessed.
+    """
+    names = [str(path) for path in files]
+    for start in range(len(names)):
+        if _is_file(names[start]):
+            continue
+        for end in range(len(names), start + 1, -1):
+            joined = " ".join(names[start:end])
+            if _is_file(joined):
+                return joined
+    return None
+
+
+def _is_file(name: str) -> bool:
+    try:
+        return Path(name).is_file()
+    except (OSError, ValueError):
+        return False
 
 
 def _targets(
