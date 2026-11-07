@@ -46,7 +46,7 @@ Only what Sugo can already do; the rest of ARCHITECTURE §12's list comes with t
 |---|---|
 | A path, dragged onto the window or typed, with or without quotes, or `@path` | Converts it; Markdown shown, tokens before and after, where the output went |
 | Several paths on one line, or a folder's `*.pdf` | Converts each, one after the other, as `sugo convert` |
-| `Ctrl+V` on an empty line | Converts the image in the clipboard, as `sugo clip`; text in the clipboard is pasted as text |
+| `Ctrl+V` on an empty line, or `/clip` | Converts the image in the clipboard, as `sugo clip`. Windows Terminal keeps `Ctrl+V` for its own paste and never sends it to programs, so there `/clip` is the way |
 | `/save [folder]` | Writes the last result as `NAME.md` (and `.jsonl` / `.receipt.json` when made) |
 | `/stats` | Tokens per LLM provider for the last file, as `sugo stats` |
 | `/explain` | What was removed or edited and why, from the last file's receipt |
@@ -55,9 +55,14 @@ Only what Sugo can already do; the rest of ARCHITECTURE §12's list comes with t
 | `/doctor` | As `sugo doctor` |
 | `/help`, `/exit` (or `Ctrl+D`) | |
 | `Tab` | Completes slash commands and paths |
-| `Esc` or `Ctrl+C` during a conversion | Cancels it and returns to the prompt |
+| `Esc` | Clears the line being typed |
+| `Ctrl+C` during a conversion | Cancels it and returns to the prompt |
 
-Live progress: page by page, with a running count of tokens saved.
+Progress: one line per file while it converts, then its tokens before and after. Page-by-page progress needs the pipeline to report pages and comes with that change (implementation note, 2026-11-07).
+
+Where prompt_toolkit cannot run, such as Git Bash's mintty terminal on Windows, which is not a Windows console, the shell falls back to a plain input line: every command works, without Tab completion, history or `Ctrl+V` (implementation note, 2026-11-07).
+
+Shell-only messages (a wrong argument, nothing converted yet) are plain messages, not new error codes: the CLI's error codes are a public contract.
 
 Left for when the features exist: `/level` (only `lite` exists), `/profile` (v0.3), `/provider`, `/compress`, `/preview`, user-defined aliases.
 
