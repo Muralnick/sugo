@@ -181,6 +181,7 @@ def convert_file(
     languages: tuple[str, ...] = DEFAULT_LANGUAGES,
     strip_tracking_urls: bool = True,
     receipt: bool = False,
+    on_page: Callable[[int], None] | None = None,
 ) -> Conversion:
     """Read a file and convert it; ``source`` defaults to the path as given.
 
@@ -202,6 +203,7 @@ def convert_file(
         languages=languages,
         strip_tracking_urls=strip_tracking_urls,
         receipt=receipt,
+        on_page=on_page,
     )
 
 
@@ -227,6 +229,7 @@ def convert(
     languages: tuple[str, ...] = DEFAULT_LANGUAGES,
     strip_tracking_urls: bool = True,
     receipt: bool = False,
+    on_page: Callable[[int], None] | None = None,
 ) -> Conversion:
     """Convert a document's bytes into Markdown, and into chunks if asked.
 
@@ -244,6 +247,9 @@ def convert(
         receipt: Also build a self-contained receipt of every removal, edit
             and flagged block, for ``sugo verify`` (ADR-056). Costs memory
             and a second rendering pass, like ``count_raw_tokens``.
+        on_page: Called with the page number (from 1) each time a page has
+            been read, for progress; pages taken from the cache are not
+            reported. It must not raise.
 
     Raises:
         ValueError: If a language has no pack, or ``max_chunk_tokens`` is too small.
@@ -266,16 +272,16 @@ def convert(
         receipt=receipt,
     )
     if cache is not None:
-        return _Job(data, kind, cache, ocr, options).run()
+        return _Job(data, kind, cache, ocr, options, on_page).run()
     try:
         job_cache = PageCache.ephemeral()
     except (CacheUnavailableError, StorageDirError, OSError):
         # No room even for a temporary store: the job still runs, with its
         # pages in memory.
         _log.warning("no temporary page store; pages kept in memory")
-        return _Job(data, kind, None, ocr, options).run()
+        return _Job(data, kind, None, ocr, options, on_page).run()
     with job_cache:
-        return _Job(data, kind, job_cache, ocr, options).run()
+        return _Job(data, kind, job_cache, ocr, options, on_page).run()
 
 
 def detect_kind(data: bytes) -> InputKind:
@@ -351,8 +357,10 @@ class _Job:
         cache: PageCache | None,
         ocr: Callable[[], OcrEngine],
         options: _Options,
+        on_page: Callable[[int], None] | None = None,
     ) -> None:
         self._data = data
+        self._on_page = on_page
         self._options = options
         self._kind = kind
         self._cache = cache
@@ -540,6 +548,8 @@ class _Job:
 
     def _keep(self, page: Page) -> None:
         """Store an extracted page, or keep it in memory if it cannot or must not be cached."""
+        if self._on_page is not None:
+            self._on_page(page.index + 1)
         if self._is_failed(page):
             # A page the worker could not read may read fine next time.
             self._failed.add(page.index)
