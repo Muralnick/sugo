@@ -9,11 +9,25 @@ still change, with notice, before 1.0).
 
 ### Added
 
+- Interactive shell (ADR-062): `sugo` alone in a terminal opens it; drag a
+  file or type its name, then use slash commands such as `/save`, `/stats`,
+  `/explain`, `/clip` and `/help`.
+- The shell shows the page being read while a document converts.
 - Handwriting in scanned pages, such as signatures, is marked
   `[handwriting]` instead of being read as made-up words (ADR-063). Typed
   text crossed by ink keeps its text and is flagged `ink_overlap` in the
   receipt. Receipts with these new flags cannot be checked by `sugo verify`
   of an older Sugo.
+
+### Changed
+
+- When cleaning removes nothing, the shell says the text was already clean
+  instead of showing an empty "0% saved" bar.
+
+### Fixed
+
+- The shell's `/help` translates argument names (`CARTELLA`, `DIMENSIONE`,
+  `RICEVUTA` in Italian).
 
 ## [0.1.2] - 2026-11-07
 
