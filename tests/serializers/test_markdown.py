@@ -138,6 +138,17 @@ class TestRemovalAndIllegible:
     def test_text_cannot_pretend_to_be_illegible(self) -> None:
         assert render([block(BlockType.PARAGRAPH, "[illegible]")]) == "\\[illegible]"
 
+    def test_handwriting_is_marked_and_its_ocr_text_never_shown(self) -> None:
+        signature = block(BlockType.PARAGRAPH, "dliise Matep", flags=(BlockFlag.HANDWRITING,))
+        assert render([signature]) == "[handwriting]"
+
+    def test_text_cannot_pretend_to_be_handwriting(self) -> None:
+        assert render([block(BlockType.PARAGRAPH, "[handwriting]")]) == "\\[handwriting]"
+
+    def test_text_crossed_by_ink_is_kept(self) -> None:
+        name = block(BlockType.PARAGRAPH, "Anna Rossi", flags=(BlockFlag.INK_OVERLAP,))
+        assert render([name]) == "Anna Rossi"
+
     def test_empty_blocks_render_nothing(self) -> None:
         assert render(blocks(block(BlockType.IMAGE), block(BlockType.PARAGRAPH, "  \n"))) == ""
 

@@ -72,12 +72,16 @@ class OcrLine:
     """One detected line of text.
 
     An illegible line has empty text: its area is known, its content is not.
+    A handwriting line keeps what the OCR read, which is never shown as text;
+    an ``ink_overlap`` line is typed text that handwriting crosses (ADR-063).
     """
 
     text: str
     confidence: float
     bbox: BBox
     illegible: bool
+    handwriting: bool = False
+    ink_overlap: bool = False
 
 
 def bundled_models() -> tuple[OcrModel, OcrModel]:

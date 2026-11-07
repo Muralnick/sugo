@@ -7,6 +7,14 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+### Added
+
+- Handwriting in scanned pages, such as signatures, is marked
+  `[handwriting]` instead of being read as made-up words (ADR-063). Typed
+  text crossed by ink keeps its text and is flagged `ink_overlap` in the
+  receipt. Receipts with these new flags cannot be checked by `sugo verify`
+  of an older Sugo.
+
 ## [0.1.2] - 2026-11-07
 
 ### Added

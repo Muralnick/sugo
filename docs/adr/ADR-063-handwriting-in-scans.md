@@ -102,3 +102,27 @@ The same document showed a second, separate problem: the letterhead at the top o
 1. The marker text is `[handwriting]`.
 2. Typed lines damaged by ink (section 3) are flagged only in the receipt; the Markdown shows no marker for them.
 3. Release: the output contract changes, so, as section 4 says, it ships in the next minor release (0.2.0), not in a 0.1.x patch release. 0.2.0 may be released before the rest of the ROADMAP v0.2 scope is ready.
+
+## Implementation notes (2026-11-07)
+
+Measured with `benchmarks/handwriting.py` (6 synthetic signed pages, 18 signatures, and a control page) and the maintainer's real signed scan (not in the repository).
+
+- **Colour is not used.** On the real scan, a blue typed heading in the letterhead ("ACCREDITAMENTO …") would have become `[handwriting]` through the colour signal. Without colour, no false positive was found on the real scan or the control page, and no pixel work is needed.
+- **The typical height is weighted by characters.** A plain median was set by the many short logo words of the real letterhead, which made body lines look 1.6 times taller than "typical". Weighted by characters, body lines set it.
+- **Thresholds kept as proposed:** 1.6 times the typical height and confidence below 0.95. Typed lines read below 0.95 were at most 1.1 times taller; taller typed headings were read with at least 0.99.
+- **Illegible lines stay `[illegible]`**, also when tall: on the real scan one such tall line was part of a logo, not ink.
+- **The receipt lists the block, not its text.** `FlaggedBlock` has no text field, and adding one would change the receipt schema version; the OCR text stays in the IR (page cache) only. Section 2 said "in the IR and in the receipt"; the maintainer is asked to confirm.
+- **Screenshots are not checked**: their tall, uncertain lines are emoji and interface glyphs.
+
+### Gate result (section 5): not fully met
+
+| Page | Signatures | `[handwriting]` | Made-up words left | Typed text lost |
+|---|---|---|---|---|
+| Under the names, black | 3 | 3 | none | none |
+| Under the names, blue | 3 | 1 | `00000000` (confidence 0.98) | none |
+| Beside, black / blue | 3 / 3 | 3 / 3 | none | none |
+| Across, black / blue | 3 / 3 | 3 / 3 | none | none (the names under the ink were already unreadable before this change) |
+| Control (no handwriting) | 0 | 0 | none | none |
+| Real signed scan | 2 read as words | 2 | none | none; one damaged name flagged `ink_overlap` |
+
+One synthetic signature in blue ink is read with 0.98 confidence and stays as made-up text; another becomes `[illegible]`, which invents nothing. Catching the first would need the colour signal back, with the false positive above. The maintainer decides whether to accept this limit.

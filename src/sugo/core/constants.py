@@ -86,6 +86,17 @@ OCR_DETECTION_MAX_SIDE: Final = 960
 # lines silently. Initial value, to be calibrated (step 8).
 OCR_MIN_CONFIDENCE: Final = 0.5
 
+# Handwriting in scans (ADR-063): an OCR line at least this many times taller
+# than the page's typical text line, read with less than this confidence, is
+# a pen stroke such as a signature, never text. The typical height is the
+# median weighted by characters, so long body lines set it, not short logo
+# words. Measured on 2026-11-07 (benchmarks/handwriting.py and one real
+# signed scan): signatures read as words were 1.6 to 2.6 times taller and
+# read with at most 0.92 confidence; typed lines read below 0.95 were at most
+# 1.1 times taller, and taller typed headings were read with at least 0.99.
+HANDWRITING_MIN_HEIGHT_RATIO: Final = 1.6
+HANDWRITING_MAX_CONFIDENCE: Final = 0.95
+
 # --- Layout (roadmap step 2c) -----------------------------------------------
 # Gaps are measured in median text-line heights, so the same rules work at any
 # resolution and font size. Initial values, to be calibrated (step 8).

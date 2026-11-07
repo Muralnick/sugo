@@ -12,9 +12,11 @@ import re
 from sugo.core.constants import MARKDOWN_MAX_STRUCTURE_INDENT, MARKDOWN_TAB_STOP
 from sugo.core.models import ChatSide
 
-# Marks unreadable content (principle 4, ADR-026). The same text inside a
-# document is escaped, so a document cannot pretend some of it is unreadable.
+# Marks unreadable content (principle 4, ADR-026), and handwriting such as a
+# signature (ADR-063). The same text inside a document is escaped, so a
+# document cannot pretend some of it is unreadable or handwritten.
 ILLEGIBLE_MARKER = "[illegible]"
+HANDWRITING_MARKER = "[handwriting]"
 
 # Characters that open structure at the start of a line: headings, quotes,
 # tables and their delimiter rows, lists, thematic breaks, setext underlines
@@ -29,7 +31,9 @@ _HEADING_CLOSER = re.compile(r"(^|\s)(#+)(\s*)$")
 # literal and the marker's own backslash still escapes it. A match starts only
 # at the beginning of a run of backslashes and never gives them back, so a
 # long run without the marker costs linear time, not quadratic.
-_MARKER = re.compile(rf"(?<!\\)(\\*+){re.escape(ILLEGIBLE_MARKER)}")
+_MARKER = re.compile(
+    rf"(?<!\\)(\\*+)({re.escape(ILLEGIBLE_MARKER)}|{re.escape(HANDWRITING_MARKER)})"
+)
 # C0 controls but tab and line feed, DEL and C1. The line-breaking ones (CR,
 # VT, FF, FS, GS, RS, NEL) become line feeds; the rest are dropped.
 _LINE_BREAKS = frozenset({0x0D, 0x0B, 0x0C, 0x1C, 0x1D, 0x1E, 0x85})
@@ -54,8 +58,8 @@ def drop_controls(text: str) -> str:
 
 
 def escape_marker(text: str) -> str:
-    """Escape every literal occurrence of the illegible marker."""
-    return _MARKER.sub(lambda m: m[1] * 2 + "\\" + ILLEGIBLE_MARKER, text)
+    """Escape every literal occurrence of the illegible and handwriting markers."""
+    return _MARKER.sub(lambda m: m[1] * 2 + "\\" + m[2], text)
 
 
 def escape_line_start(line: str) -> str:

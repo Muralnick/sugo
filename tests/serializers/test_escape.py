@@ -102,6 +102,7 @@ def test_heading_made_only_of_hashes_keeps_them() -> None:
     [
         ("\\[illegible]", "\\\\\\[illegible]"),
         ("a\\\\[illegible]", "a\\\\\\\\\\[illegible]"),
+        ("\\[handwriting]", "\\\\\\[handwriting]"),
     ],
 )
 def test_backslashes_before_the_marker_stay_literal(text: str, expected: str) -> None:

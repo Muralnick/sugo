@@ -1,0 +1,75 @@
+[
+  {
+    "page": "signed_under_black",
+    "signatures": 3,
+    "markers": 3,
+    "made_up": [],
+    "typed_missing": [],
+    "names_missing": [],
+    "ok": true
+  },
+  {
+    "page": "signed_under_blue",
+    "signatures": 3,
+    "markers": 1,
+    "made_up": [
+      "00000000"
+    ],
+    "typed_missing": [],
+    "names_missing": [],
+    "ok": false
+  },
+  {
+    "page": "signed_beside_black",
+    "signatures": 3,
+    "markers": 3,
+    "made_up": [],
+    "typed_missing": [],
+    "names_missing": [],
+    "ok": true
+  },
+  {
+    "page": "signed_beside_blue",
+    "signatures": 3,
+    "markers": 3,
+    "made_up": [],
+    "typed_missing": [],
+    "names_missing": [],
+    "ok": true
+  },
+  {
+    "page": "signed_across_black",
+    "signatures": 3,
+    "markers": 3,
+    "made_up": [],
+    "typed_missing": [],
+    "names_missing": [
+      "Anna Rossi",
+      "Marco Bianchi",
+      "Elena Ferrari"
+    ],
+    "ok": true
+  },
+  {
+    "page": "signed_across_blue",
+    "signatures": 3,
+    "markers": 3,
+    "made_up": [],
+    "typed_missing": [],
+    "names_missing": [
+      "Anna Rossi",
+      "Marco Bianchi",
+      "Elena Ferrari"
+    ],
+    "ok": true
+  },
+  {
+    "page": "control_1",
+    "signatures": 0,
+    "markers": 0,
+    "made_up": [],
+    "typed_missing": [],
+    "names_missing": [],
+    "ok": true
+  }
+]
