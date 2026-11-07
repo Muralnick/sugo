@@ -9,7 +9,9 @@ fragment, and a custom header forces a CORS preflight, which the server never
 answers with CORS headers. Uploads need a ``Content-Length`` within the size
 limits, checked before reading; one conversion runs at a time. The page's
 settings come as one header each, checked against the known values; the
-server keeps nothing between conversions and writes nothing to disk.
+server keeps nothing between conversions and writes nothing to disk. The
+file's name, never a path, may come percent-encoded in ``X-Sugo-Name``: it
+names the receipt's ``source`` and is never logged (ADR-059).
 
 Every refusal is ``WEB_REQUEST_REFUSED``, with one message whatever the
 check. The access log is off; failures are logged by exception type only,
@@ -25,6 +27,7 @@ import socketserver
 import sys
 import threading
 import time
+import urllib.parse
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -76,7 +79,14 @@ LANGUAGE_HEADER = "X-Sugo-Language"
 LANGUAGES_HEADER = "X-Sugo-Languages"
 TRACKING_HEADER = "X-Sugo-Strip-Tracking"
 CHUNKS_HEADER = "X-Sugo-Chunk-Tokens"
+# ADR-059.
+RECEIPT_HEADER = "X-Sugo-Receipt"
+NAME_HEADER = "X-Sugo-Name"
 _BOOLEANS = {"true": True, "false": False}
+# A file name, as most file systems allow it; percent-encoding takes at most
+# twelve characters per character (four UTF-8 bytes, three characters each).
+MAX_NAME_CHARS = 255
+_MAX_ENCODED_NAME = MAX_NAME_CHARS * 12
 
 
 @dataclass(frozen=True)
@@ -90,6 +100,10 @@ class Options:
     strip_tracking_urls: bool
     # Chunk size in tokens; None makes no chunks.
     chunk_tokens: int | None
+    # Also build the conversion receipt (ADR-056, ADR-059).
+    receipt: bool = False
+    # The file's name, for the receipt; None if the page sent none.
+    source: str | None = None
 
 
 # Turns a file's bytes into the JSON the page shows.
@@ -272,6 +286,10 @@ class _Handler(BaseHTTPRequestHandler):
             chunk_tokens = int(size)
             if not CHUNK_MIN_TOKENS <= chunk_tokens <= CHUNK_MAX_TOKENS_LIMIT:
                 raise _Refused(HTTPStatus.BAD_REQUEST)
+        receipt = self._single(RECEIPT_HEADER)
+        if receipt is not None and receipt not in _BOOLEANS:
+            raise _Refused(HTTPStatus.BAD_REQUEST)
+        name = self._single(NAME_HEADER)
         return Options(
             language=language,
             languages=languages,
@@ -279,6 +297,8 @@ class _Handler(BaseHTTPRequestHandler):
                 settings.cleaning.strip_tracking_urls if tracking is None else _BOOLEANS[tracking]
             ),
             chunk_tokens=chunk_tokens,
+            receipt=receipt is not None and _BOOLEANS[receipt],
+            source=None if name is None else _file_name(name),
         )
 
     def _single(self, name: str) -> str | None:
@@ -352,6 +372,25 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
+def _file_name(encoded: str) -> str:
+    """A file name the page sent percent-encoded; anything like a path is refused."""
+    if len(encoded) > _MAX_ENCODED_NAME or not encoded.isascii():
+        raise _Refused(HTTPStatus.BAD_REQUEST)
+    try:
+        name = urllib.parse.unquote(encoded, errors="strict")
+    except UnicodeDecodeError:
+        raise _Refused(HTTPStatus.BAD_REQUEST) from None
+    if (
+        not name
+        or len(name) > MAX_NAME_CHARS
+        or name in {".", ".."}
+        or any(separator in name for separator in "/\\")
+        or not name.isprintable()
+    ):
+        raise _Refused(HTTPStatus.BAD_REQUEST)
+    return name
+
+
 def converter(settings: Settings) -> Converter:
     """Convert uploads with the page's options, measuring tokens per provider."""
 
@@ -359,6 +398,7 @@ def converter(settings: Settings) -> Converter:
         from sugo.core import pipeline
         from sugo.core.estimate import estimate_json, estimate_savings
         from sugo.exporters.jsonl import jsonl_lines
+        from sugo.exporters.receipt import receipt_text
         from sugo.metrics.providers import list_providers
 
         with page_cache(enabled=settings.storage.cache == "persistent") as cache:
@@ -369,6 +409,8 @@ def converter(settings: Settings) -> Converter:
                 max_chunk_tokens=options.chunk_tokens,
                 languages=options.languages,
                 strip_tracking_urls=options.strip_tracking_urls,
+                receipt=options.receipt,
+                source=options.source,
             )
         estimate = estimate_savings(data, conversion, list_providers())
         # Kind, pages and token counts come from the estimate.
@@ -377,7 +419,12 @@ def converter(settings: Settings) -> Converter:
             "failed_pages": list(conversion.failed_pages),
             "markdown": conversion.markdown,
             "removed": dict(conversion.removed),
+            "edited": dict(conversion.edited),
         }
+        if conversion.receipt is not None:
+            # The object sugo convert --json --receipt prints, and the file it writes.
+            result["receipt"] = conversion.receipt.model_dump(mode="json")
+            result["receipt_file"] = receipt_text(conversion.receipt)
         if options.chunk_tokens is not None:
             result["chunk_tokens"] = options.chunk_tokens
             # The file sugo convert --chunks writes, byte for byte; the page

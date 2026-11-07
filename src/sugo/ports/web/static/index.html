@@ -84,6 +84,10 @@
             <h2 data-text="removed_title"></h2>
             <ul id="removed" class="removed"></ul>
           </div>
+          <div class="panel">
+            <h2 data-text="edited_title"></h2>
+            <ul id="edited" class="removed"></ul>
+          </div>
           <div id="images-panel" class="panel" hidden>
             <h2 data-text="images_title"></h2>
             <table id="images">
@@ -109,6 +113,26 @@
         </div>
         <p id="chunks-count" class="muted small"></p>
         <ol id="chunks" class="chunks"></ol>
+      </div>
+
+      <div id="receipt-panel" class="panel" hidden>
+        <div class="panel-head">
+          <h2 data-text="receipt_title"></h2>
+          <button id="save-receipt" type="button" data-text="save_receipt"></button>
+        </div>
+        <p class="muted small" data-text="receipt_intro"></p>
+        <details id="receipt-removed" class="receipt-part">
+          <summary></summary>
+          <ol class="receipt-list"></ol>
+        </details>
+        <details id="receipt-edited" class="receipt-part">
+          <summary></summary>
+          <ol class="receipt-list"></ol>
+        </details>
+        <details id="receipt-flagged" class="receipt-part">
+          <summary></summary>
+          <ol class="receipt-list"></ol>
+        </details>
       </div>
     </section>
   </section>
@@ -143,6 +167,11 @@
       <label class="field">
         <span class="field-label" data-text="chunk_size"></span>
         <input id="chunk-tokens" type="number" step="1" inputmode="numeric">
+      </label>
+
+      <label class="check">
+        <input id="make-receipt" type="checkbox">
+        <span data-text="make_receipt"></span>
       </label>
 
       <button id="reset" type="button" data-text="reset"></button>

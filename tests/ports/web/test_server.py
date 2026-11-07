@@ -28,6 +28,8 @@ from sugo.ports.web.server import (
     CONVERT_PATH,
     LANGUAGE_HEADER,
     LANGUAGES_HEADER,
+    NAME_HEADER,
+    RECEIPT_HEADER,
     TOKEN_HEADER,
     TRACKING_HEADER,
     Options,
@@ -261,6 +263,7 @@ def test_the_page_starts_from_the_users_configuration() -> None:
         "strip_tracking_urls": True,
         "chunks": False,
         "chunk_tokens": 256,
+        "receipt": False,
     }
     assert data["packs"] == ["de", "en", "es", "fr", "it"]
 
@@ -575,6 +578,19 @@ def test_the_page_settings_reach_the_conversion(server: WebServer, recorder: Rec
         (CHUNKS_HEADER, "-64"),
         (CHUNKS_HEADER, "9" * 5_000),
         (CHUNKS_HEADER, "abc"),
+        (RECEIPT_HEADER, "yes"),
+        (RECEIPT_HEADER, ""),
+        (NAME_HEADER, ""),
+        (NAME_HEADER, "."),
+        (NAME_HEADER, ".."),
+        (NAME_HEADER, "..%2Fsecret.pdf"),
+        (NAME_HEADER, "dir%5Creport.pdf"),
+        (NAME_HEADER, "dir/report.pdf"),
+        (NAME_HEADER, "bad%0Aname.pdf"),
+        (NAME_HEADER, "bad%1B%5B31mname.pdf"),
+        (NAME_HEADER, "half%E2%82.pdf"),
+        (NAME_HEADER, "a" * 256),
+        (NAME_HEADER, "%61" * 1_100),
     ],
 )
 def test_an_unknown_setting_is_refused(
@@ -584,6 +600,22 @@ def test_an_unknown_setting_is_refused(
     headers = [*api_headers(server, body), (name, value)]
     assert_refused(request(server, "POST", CONVERT_PATH, headers=headers, body=body), 400)
     assert recorder.calls == []
+
+
+def test_the_receipt_and_the_file_name_reach_the_conversion(
+    server: WebServer, recorder: Recorder
+) -> None:
+    body = b"%PDF"
+    name = "Città [bozza] l'ultima (1).pdf"
+    headers = [
+        *api_headers(server, body),
+        (RECEIPT_HEADER, "true"),
+        (NAME_HEADER, "Citt%C3%A0%20%5Bbozza%5D%20l'ultima%20(1).pdf"),
+    ]
+    assert request(server, "POST", CONVERT_PATH, headers=headers, body=body).status == 200
+    assert (recorder.options[0].receipt, recorder.options[0].source) == (True, name)
+    assert upload(server).status == 200
+    assert (recorder.options[1].receipt, recorder.options[1].source) == (False, None)
 
 
 def test_a_repeated_setting_is_refused(server: WebServer, recorder: Recorder) -> None:
@@ -706,6 +738,30 @@ def test_chunks_are_made_when_asked(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert len(chunks) > 1
     assert all(chunk["schema_version"] == "1.0" for chunk in chunks)
     assert "jsonl" not in plain.json()
+
+
+def test_a_receipt_is_made_when_asked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(CACHE_DIR_ENV, str(tmp_path / "cache"))
+    document = b"<note><title>Hello</title><body>Some text.</body></note>"
+    for server in running(converter(Settings())):
+        headers = [
+            *api_headers(server, document),
+            (RECEIPT_HEADER, "true"),
+            (NAME_HEADER, "my%20note.xml"),
+        ]
+        response = request(server, "POST", CONVERT_PATH, headers=headers, body=document)
+        plain = upload(server, document)
+    result = response.json()
+    receipt = result["receipt"]
+    assert receipt["schema_version"] == "1.0"
+    assert receipt["source"] == "my note.xml"
+    assert set(receipt) >= {"removed", "edited", "flagged"}
+    assert isinstance(result["edited"], dict)
+    # The file to save is the one sugo convert --receipt writes, and says the same.
+    assert result["receipt_file"].endswith("}\n")
+    assert json.loads(result["receipt_file"]) == receipt
+    assert "receipt" not in plain.json()
+    assert "receipt_file" not in plain.json()
 
 
 def test_a_conversion_in_another_language_does_not_leak(

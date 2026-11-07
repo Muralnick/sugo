@@ -16,6 +16,11 @@ _LINE_SEPARATORS = str.maketrans(
 )
 
 
+def receipt_text(receipt: Receipt) -> str:
+    """The receipt file's exact content, also what the web UI saves (ADR-059)."""
+    return receipt.model_dump_json(indent=2).translate(_LINE_SEPARATORS) + "\n"
+
+
 def write_receipt(path: Path, receipt: Receipt) -> None:
     """Write the receipt to ``path``, replacing it atomically."""
-    write_text_atomic(path, (receipt.model_dump_json(indent=2).translate(_LINE_SEPARATORS), "\n"))
+    write_text_atomic(path, (receipt_text(receipt),))
