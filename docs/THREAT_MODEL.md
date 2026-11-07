@@ -141,6 +141,8 @@ Background jobs at low CPU and I/O priority; memory budget and degradation (ARCH
 | Windows | Job Objects for memory and CPU; reduced integrity level (effectiveness to verify) |
 | macOS | Resource limits; limited third-party sandboxing |
 
+Workers start as `python -E -P -s -m <module>` (Python's isolated mode): the environment and the current folder cannot change their code. When Sugo itself is installed in the user's site-packages (`pip install --user`), `-s` is dropped so the worker can import Sugo; that folder is the user's own and the main process already runs from it (ADR-061).
+
 Minimum kernel versions per Landlock feature to verify; automatic fallback; `sugo doctor` reports the active protection level. The asymmetry is documented: Linux is best protected.
 
 ## 6. Declared residual risks

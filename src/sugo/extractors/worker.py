@@ -17,11 +17,13 @@ stdout into a queue that the caller waits on with a timeout.
 import contextlib
 import os
 import queue
+import site
 import struct
 import subprocess
 import sys
 import threading
 from collections.abc import Iterator, Sequence
+from pathlib import Path
 from typing import IO, Self
 
 _LENGTH = struct.Struct(">I")
@@ -68,12 +70,25 @@ def read_frame(stream: IO[bytes], max_bytes: int) -> bytes | None:
 
 
 def module_command(module: str) -> tuple[str, ...]:
-    """The command that runs a worker module.
+    """The command that runs a worker module (ADR-061).
 
-    "-I": isolated mode, so the environment and the current directory cannot
-    change which code the worker runs.
+    "-E" and "-P": the environment and the current directory cannot change
+    which code the worker runs. "-s" also leaves out the user's own
+    site-packages, unless Sugo itself is installed there (pip install --user,
+    pip's default on Windows without admin rights): the worker then needs it
+    to import Sugo, and the main process already runs code from it. With
+    "-s" this is exactly Python's isolated mode, "-I".
     """
-    return (sys.executable, "-I", "-m", module)
+    flags = ("-E", "-P") if _installed_in_user_site() else ("-E", "-P", "-s")
+    return (sys.executable, *flags, "-m", module)
+
+
+def _installed_in_user_site() -> bool:
+    """Whether this copy of Sugo lives in the user's site-packages."""
+    if not site.ENABLE_USER_SITE:
+        return False
+    user_site = Path(site.getusersitepackages()).resolve()
+    return Path(__file__).resolve().is_relative_to(user_site)
 
 
 class WorkerProcess:
