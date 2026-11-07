@@ -868,7 +868,12 @@ def test_the_installation_check_is_protected_like_a_conversion(
     server: WebServer, change: Callable[[list[tuple[str, str]]], list[tuple[str, str]]]
 ) -> None:
     called: list[bool] = []
-    server.doctor = lambda: called.append(True) or {"checks": []}
+
+    def doctor() -> dict[str, Any]:
+        called.append(True)
+        return {"checks": []}
+
+    server.doctor = doctor
     headers = change(api_headers(server, b""))
     assert_refused(request(server, "POST", DOCTOR_PATH, headers=headers), 403)
     assert called == []
@@ -894,6 +899,18 @@ def verify_request(
     return request(server, "POST", VERIFY_PATH, headers=headers, body=body)
 
 
+def recording_verifier(
+    called: list[bool],
+) -> Callable[[bytes, bytes, Options], dict[str, Any]]:
+    """A verifier that only notes it was called."""
+
+    def verify(receipt: bytes, document: bytes, options: Options) -> dict[str, Any]:
+        called.append(True)
+        return {}
+
+    return verify
+
+
 def made_receipt(server: WebServer, document: bytes) -> bytes:
     headers = [*api_headers(server, document), (RECEIPT_HEADER, "true")]
     response = request(server, "POST", CONVERT_PATH, headers=headers, body=document)
@@ -914,6 +931,9 @@ def test_a_receipt_verifies_like_sugo_verify(
         different = verify_request(server, json.dumps(tampered).encode(), NOTE)
         other_file = verify_request(server, receipt, NOTE.replace(b"more", b"less"))
         broken = verify_request(server, b"{not json", NOTE)
+        foreign = json.loads(receipt)
+        foreign["languages"] = ["xx"]
+        unknown_language = verify_request(server, json.dumps(foreign).encode(), NOTE)
         italian = verify_request(server, b"{not json", NOTE, (LANGUAGE_HEADER, "it"))
     assert same.status == 200
     assert same.json() == {"match": True, "version_drifted": False, "differences": []}
@@ -925,6 +945,7 @@ def test_a_receipt_verifies_like_sugo_verify(
     assert other_file.status == 422
     assert other_file.json()["error"]["code"] == "FILE_CHANGED"
     assert broken.json()["error"]["code"] == "RECEIPT_INVALID"
+    assert unknown_language.json()["error"]["code"] == "RECEIPT_INVALID"
     assert italian.json()["error"]["message"].startswith("La ricevuta")
 
 
@@ -946,7 +967,7 @@ def test_the_receipt_and_document_are_split_where_the_page_says(
 @pytest.mark.parametrize("value", [None, "", "0", "-1", "abc", "1.5", "99", "9" * 30])
 def test_a_wrong_receipt_length_is_refused(server: WebServer, value: str | None) -> None:
     called: list[bool] = []
-    server.verifier = lambda receipt, document, options: called.append(True) or {}
+    server.verifier = recording_verifier(called)
     body = b"{}" + b"%PDF"
     headers = api_headers(server, body)
     if value is not None:
@@ -969,7 +990,7 @@ def test_receipt_and_document_limits_are_checked_apart(
 
 def test_verify_is_protected_like_a_conversion(server: WebServer) -> None:
     called: list[bool] = []
-    server.verifier = lambda receipt, document, options: called.append(True) or {}
+    server.verifier = recording_verifier(called)
     body = b"{}%PDF"
     for headers in (
         replaced(api_headers(server, body), TOKEN_HEADER, "wrong"),
