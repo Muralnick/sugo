@@ -133,6 +133,8 @@ Oppure con pip:
 pip install sugo-cli
 ```
 
+Se dopo l'installazione con pip il comando `sugo` "non è riconosciuto" o "non è stato trovato", pip lo ha messo in una cartella in cui il sistema non cerca. Succede su Windows quando pip installa solo per il tuo utente ("Defaulting to user installation"). Puoi installare con `uv tool install sugo-cli` ed eseguire una volta `uv tool update-shell`, oppure aggiungere al `Path` la cartella indicata da pip nel suo avviso (su Windows, `%APPDATA%\Python\Python3XX\Scripts`) e aprire un nuovo terminale.
+
 > [!TIP]
 > Il pacchetto si chiama `sugo-cli` perché il nome `sugo` su PyPI è tenuto da un progetto estraneo e vuoto (è aperta una richiesta di trasferimento). Il comando installato resta `sugo`; funziona anche `sugo-cli`. Le vecchie istruzioni con `sugo-cli[lite]` funzionano ancora: ora tutto è incluso di serie.
 
@@ -170,6 +172,31 @@ claude mcp add sugo -- sugo mcp --root ~/Documenti
 ```
 
 L'agente riceve due strumenti: `convert_document` ed `estimate_savings`.
+
+### Disinstallare
+
+Togli il programma nello stesso modo in cui l'hai installato:
+
+```bash
+uv tool uninstall sugo-cli
+```
+
+Oppure, se hai usato pip:
+
+```bash
+pip uninstall sugo-cli
+```
+
+Se hai aggiunto Sugo a un agente, toglilo anche da lì, per esempio con `claude mcp remove sugo`.
+
+Disinstallare il programma non cancella i file che Sugo ha creato. Stanno solo sul tuo computer e puoi cancellarli a mano:
+
+| Cosa | Windows | macOS | Linux |
+|---|---|---|---|
+| Impostazioni (`config.toml`) | `%LOCALAPPDATA%\sugo` | `~/Library/Application Support/sugo` | `~/.config/sugo` |
+| Cache (testo dei documenti convertiti) | `%LOCALAPPDATA%\sugo\Cache` | `~/Library/Caches/sugo` | `~/.cache/sugo` |
+
+Se hai impostato `SUGO_CACHE_DIR`, la cache è in quella cartella. La cache contiene testo dei documenti che hai convertito: cancellala se quei documenti erano privati. Oltre a queste due cartelle e ai file che hai chiesto di scrivere (come l'output di `-o` o le ricevute), Sugo non tiene nient'altro sul disco.
 
 ## Su un computer vecchio
 

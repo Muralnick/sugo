@@ -7,8 +7,39 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-07
+
+### Added
+
+- Web UI level with the command line (ADR-059): an opt-in receipt with the
+  list of every removed, edited and uncertain block and its reason, saved as
+  `NAME.receipt.json`; a Verify tab that checks a receipt as `sugo verify`
+  does; pasting a screenshot with Ctrl+V, as `sugo clip`; up to 50 files at
+  once, saved together as one ZIP; a "keep a cache on disk" setting, as
+  `--no-cache`; an installation check, as `sugo doctor`, run once when the
+  page opens, with a warning only if something is broken.
+- `sugo-cli` command, the same as `sugo`, so `uvx sugo-cli` works, and a
+  `server.json` describing Sugo for the official MCP Registry (ADR-060).
+- README: how to uninstall Sugo and delete its files, and what to do when
+  `sugo` is not found after installing with pip.
+
+### Changed
+
+- `pip install sugo-cli` installs everything needed to convert: the `lite`
+  packages are base dependencies now (ADR-060). `sugo-cli[lite]` still works.
+- The receipt file is indented, one field per line, so people can read it
+  (ADR-058). Older one-line receipts still verify.
+- A file name with spaces typed without quotes gets a clear message showing
+  the name in quotes, instead of "several files need an output folder".
+
 ### Fixed
 
+- PDF and Office files failed (`PDF_EXTRACTION_FAILED`,
+  `OFFICE_EXTRACTION_FAILED`) when Sugo was installed with `pip install
+  --user`, which pip does on its own on Windows without admin rights: the
+  reading process could not find Sugo (ADR-061).
+- `sugo verify` crashed on a receipt naming a language pack this Sugo does
+  not have; it now reports `RECEIPT_INVALID`.
 - README: the logo and the links to files in the repository use absolute URLs,
   because PyPI shows the README without the repository around it (the logo did
   not load and the links led nowhere on the PyPI page).
