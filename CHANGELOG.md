@@ -33,6 +33,11 @@ still change, with notice, before 1.0).
 
 ### Fixed
 
+- Security (review finding F3): PDF text at almost no opacity over a visible
+  paragraph, or under an opaque shape with another mark in its box, is now
+  marked hidden and never reaches the LLM as visible text. Each page is
+  rendered a second time without its text (ADR-043 amendment); reading a PDF
+  takes about 16 ms more per page.
 - Security (review findings of 2026-11-02): `sugo ui` no longer puts the
   page's access token on the browser's command line, where other local users
   could read it (F7); XML files with passwords in common formats (KeePass,

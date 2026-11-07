@@ -215,6 +215,18 @@ PDF_MIN_VISIBLE_FONT_SIZE: Final = 2.0
 # under an opaque shape. Anti-aliased small text still differs by 60 or more.
 PDF_MIN_TEXT_CONTRAST: Final = 32
 
+# Opacity (0-255) under which text drawn over other text is hidden: at 1%
+# opacity over a visible paragraph it reads as that paragraph's pixels
+# (security review F3, 2026-11-02). Faint text over nothing else is judged
+# by the rendered page, so outlined text with an opaque stroke stays visible.
+PDF_MIN_TEXT_ALPHA: Final = 64
+
+# Share of a text span's box that must change on the rendered page when the
+# page's text is removed. Text that changes nothing is hidden: under an
+# opaque shape, the colour of what it covers, or almost transparent (F3).
+# Measured 2026-11-07: visible text changes 20 to 35% of its box.
+PDF_MIN_VISIBLE_SHARE: Final = 0.02
+
 # Pages are read with OCR when images cover at least this share of the page
 # and less than this many characters of visible text exist: a scan, possibly
 # with a stamp or page number in native text.

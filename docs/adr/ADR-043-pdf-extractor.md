@@ -1,7 +1,7 @@
 # ADR-043: Native PDF extractor in an isolated worker
 
 **Status:** Accepted.  
-**Date:** 2026-10-29; amended 2026-11-02 (PyMuPDF 2.0 adopted)  
+**Date:** 2026-10-29; amended 2026-11-02 (PyMuPDF 2.0 adopted), 2026-11-07 (near-invisible text, security review F3)  
 **Deciders:** project author  
 **Implements:** ADR-001 (per-page routing), ADR-007 (`lite` level), ADR-018 (process isolation, first slice), ADR-031 (hardening)  
 **Amends:** IR flags (ADR-005): new `hidden` flag
@@ -59,7 +59,7 @@ Licence: AGPL-3.0 (dual-licensed by Artifex), on the allow-list (ADR-010). The w
 ### Pages
 
 - **Native page:** text lines with font size, bold and monospace; reading order by the XY-cut shared with the image extractor (`sugo.extractors.reading_order`, which also holds the shared code-indentation and box helpers). Paragraphs split on style changes and bullets. Block types: heading (font ≥ 1.2 × the page's body size, ≤ 3 lines; levels by size rank on the page, sizes within 10% of each other sharing a level), list item (bullet `•◦▪‣●○■·` dropped; dashes are not bullets), code (all monospaced; indentation rebuilt from position and leading spaces), paragraph.
-- **Hidden text:** a span is hidden when it is drawn invisible (render mode 3, zero alpha, clipped away), smaller than 2 pt, outside the page, or does not stand out on the page rendered at 72 DPI (its colour is within 32 levels of the background, or nothing at all is drawn in its box, as for text under an opaque shape). Hidden spans are split from visible ones on the same line; a run's visibility is set by its first span with text, so a hidden space cannot carry a hidden word into visible text. A page's hidden lines form **one block flagged `hidden`**, after the visible blocks. The new `HiddenTextCleaner` proposes removing it with a reason; the core applies it as a soft deletion (principle 3).
+- **Hidden text:** a span is hidden when it is drawn invisible (render mode 3, zero alpha, clipped away), smaller than 2 pt, outside the page, or does not stand out on the page rendered at 72 DPI (its colour is within 32 levels of the background, or nothing at all is drawn in its box, as for text under an opaque shape), or changes nothing on the page when the page's text is removed, or is almost transparent (opacity below 64 of 255) over another span with text (amendment of 2026-11-07, below). Hidden spans are split from visible ones on the same line; a run's visibility is set by its first span with text, so a hidden space cannot carry a hidden word into visible text. A page's hidden lines form **one block flagged `hidden`**, after the visible blocks. The new `HiddenTextCleaner` proposes removing it with a reason; the core applies it as a soft deletion (principle 3).
 - **Scanned page:** images cover ≥ 50% of the page and fewer than 20 visible characters exist. The page is rendered at 200 DPI (less for very large pages) and read by the image OCR pipeline, with screenshot rules (chat, status bar) switched off. **Its own text layer is not trusted:** it may differ from what the page shows. It is kept as a hidden block.
 
 ### Measured
@@ -83,7 +83,19 @@ On the reference machine: 100 dense native pages in 3.1 s (**32 pages/s**, targe
 - New IR flag `hidden`, part of the output schema.
 - Each document pays for a worker start (about 0.3 s) and one decoding of all its streams, and each page for a 72 DPI render.
 - Residual risks:
-  - text hidden by other means stays visible to the LLM: clipping paths MuPDF does not report, colour tricks over images, or a text layer that disagrees with an image on a page that is not a scan;
+  - text hidden by other means stays visible to the LLM: clipping paths MuPDF does not report, colour tricks over images, or a text layer that disagrees with an image on a page that is not a scan; outlined text with a near-transparent stroke drawn over other text;
   - headings are judged page by page, so levels may differ between pages; harmonising them needs a cleaner decision that changes a block, deferred to the extension API (ADR-044);
   - Windows has no memory cap or core-dump switch in the worker.
   - until MuPDF 1.28.6, false refusals: a document whose text or objects contain the name `/Br` or `/BrotliDecode` (a manual about PDF filters), and any document with one stream MuPDF cannot decode (6 of the 74 measured PDFs). The latter is to be revisited in step 8.
+
+## Amendment, 2026-11-07: near-invisible text (security review F3)
+
+The security review of 2026-11-02 (finding F3, MEDIUM) showed two ways past the contrast check: text at 1% opacity drawn over a visible paragraph, and text under an opaque shape with any other mark drawn in its box. In both, the box "has ink", so the text was judged visible and reached the LLM unflagged. A first patch (an opacity threshold) was rejected because it also hid legible outlined text.
+
+Decision:
+
+- **The page is rendered a second time without its text.** The worker copies the page into a new document, redacts all its text (images and drawings untouched) and renders it at the same 72 DPI. A span is hidden when less than 2% of its box changes between the two renders: text under an opaque shape, the colour of what it covers, or too faint to see. Visible text changes 20 to 35% of its box.
+- **Faint text over other text** (opacity below 64 of 255, its box overlapping another span with text) is hidden: removing all text also removes the text underneath, so the second render cannot judge it. Faint text over nothing else is judged by the render, so outlined text with an opaque stroke stays visible.
+- If MuPDF cannot redact a page, the second render is skipped and the earlier checks apply.
+
+Measured: the synthetic PDFs of the benchmark corpus and a 50-page text PDF give the same lines and the same visibility as before; reading costs about 16 ms more per page (50 pages: 1.0 s → 1.8 s). The real EUR-Lex sample was not available locally for this measurement.

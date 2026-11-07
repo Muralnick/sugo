@@ -24,8 +24,11 @@ Checks before any page is interpreted:
 Each page is either native, with every text line marked visible or hidden, or
 a scan, rendered for OCR. Text is hidden when a reader cannot see it on the
 rendered page: drawn invisible or clipped away, smaller than
-``PDF_MIN_VISIBLE_FONT_SIZE``, outside the page, or the same colour as what
-is drawn around it (white on white, text under an opaque shape).
+``PDF_MIN_VISIBLE_FONT_SIZE``, outside the page, the same colour as what is
+drawn around it (white on white), almost transparent without an outline, or
+changing nothing on the page when the page's text is removed (under an
+opaque shape, faint over other marks). The last check renders the page a
+second time without its text (security review F3, ADR-043 update).
 """
 
 import contextlib
@@ -42,8 +45,10 @@ import numpy.typing as npt
 from sugo.core.constants import (
     MAX_PDF_FILE_BYTES,
     MAX_PDF_PAGES,
+    PDF_MIN_TEXT_ALPHA,
     PDF_MIN_TEXT_CONTRAST,
     PDF_MIN_VISIBLE_FONT_SIZE,
+    PDF_MIN_VISIBLE_SHARE,
     PDF_OCR_DPI,
     PDF_OCR_MAX_PIXELS,
     PDF_SCAN_MAX_VISIBLE_CHARS,
@@ -297,14 +302,17 @@ def _read_page(page: pymupdf.Page, index: int) -> tuple[Message, bytes | None]:
     rect = page.rect
     pixmap = page.get_pixmap(dpi=PDF_VISIBILITY_DPI, alpha=False, colorspace=pymupdf.csRGB)
     rendered = _pixels(pixmap)
+    textless = _render_without_text(page, rendered.shape)
     scale = PDF_VISIBILITY_DPI / _POINTS_PER_INCH
     text = page.get_text("dict", flags=_TEXT_FLAGS, clip=pymupdf.INFINITE_RECT())
+    raw_lines = [
+        raw_line for block in text["blocks"] if block["type"] == 0 for raw_line in block["lines"]
+    ]
+    faint = _faint_over_text([span for raw_line in raw_lines for span in raw_line["spans"]])
     lines = [
         line
-        for block in text["blocks"]
-        if block["type"] == 0
-        for raw_line in block["lines"]
-        for line in _split_line(raw_line, rect, rendered, scale)
+        for raw_line in raw_lines
+        for line in _split_line(raw_line, rect, (rendered, textless), scale, faint)
     ]
     visible_chars = sum(len("".join(line.text.split())) for line in lines if not line.hidden)
     if (
@@ -331,8 +339,65 @@ def _pixels(pixmap: pymupdf.Pixmap) -> Pixels:
     return rows[:, : pixmap.width * 3].reshape(pixmap.height, pixmap.width, 3)
 
 
+def _render_without_text(page: pymupdf.Page, shape: tuple[int, ...]) -> Pixels | None:
+    """The page rendered as ``_read_page`` does, with all its text removed.
+
+    The page is copied into a new document and its text redacted, leaving
+    images and drawings as they are. None if MuPDF cannot do it: the other
+    visibility checks still apply.
+    """
+    try:
+        with pymupdf.open() as copy:
+            copy.insert_pdf(page.parent, from_page=page.number, to_page=page.number)
+            blank = copy[0]
+            rotation = blank.rotation
+            # Redaction areas are in unrotated coordinates; the whole media box
+            # covers every character, wherever the crop box puts the page.
+            blank.set_rotation(0)
+            blank.add_redact_annot(blank.mediabox, fill=False)
+            # PyMuPDF's type stubs lack the redaction constants.
+            blank.apply_redactions(
+                images=pymupdf.PDF_REDACT_IMAGE_NONE,  # type: ignore[attr-defined]
+                graphics=pymupdf.PDF_REDACT_LINE_ART_NONE,  # type: ignore[attr-defined]
+                text=pymupdf.PDF_REDACT_TEXT_REMOVE,  # type: ignore[attr-defined]
+            )
+            blank.set_rotation(rotation)
+            pixmap = blank.get_pixmap(dpi=PDF_VISIBILITY_DPI, alpha=False, colorspace=pymupdf.csRGB)
+            pixels = _pixels(pixmap).copy()
+    except Exception:  # noqa: BLE001 - a hostile page must not stop the visibility checks
+        return None
+    return pixels if pixels.shape == shape else None
+
+
+def _faint_over_text(spans: list[dict[str, Any]]) -> set[int]:
+    """Ids of almost transparent spans drawn over another span with text.
+
+    Removing the page's text removes the text underneath too, so the rendered
+    comparison sees a change in their box and cannot judge them; their
+    opacity does (F3). Faint text alone is judged by the rendered page, so
+    outlined text with an opaque stroke stays visible.
+    """
+    faint = [span for span in spans if int(span.get("alpha", 255)) < PDF_MIN_TEXT_ALPHA]
+    if not faint:
+        return set()
+    inked = [span for span in spans if span["text"].strip()]
+    return {
+        id(span)
+        for span in faint
+        if any(other is not span and _overlap(span["bbox"], other["bbox"]) for other in inked)
+    }
+
+
+def _overlap(a: Any, b: Any) -> bool:
+    return bool(a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3])
+
+
 def _split_line(
-    line: dict[str, Any], rect: pymupdf.Rect, rendered: Pixels, scale: float
+    line: dict[str, Any],
+    rect: pymupdf.Rect,
+    rendered: tuple[Pixels, Pixels | None],
+    scale: float,
+    faint: set[int] = frozenset(),  # type: ignore[assignment]
 ) -> list[NativeLine]:
     """Split a MuPDF line into runs of visible and hidden spans.
 
@@ -343,7 +408,7 @@ def _split_line(
     runs: list[list[_Span]] = []
     hidden: list[bool | None] = []  # per run; None while it holds only spaces
     for raw in line["spans"]:
-        span = _span(raw, rect, rendered, scale)
+        span = _span(raw, rect, rendered, scale, faint_over_text=id(raw) in faint)
         blank = not span.text.strip()
         if runs and (blank or hidden[-1] is None or hidden[-1] == span.hidden):
             runs[-1].append(span)
@@ -355,21 +420,28 @@ def _split_line(
     return [native for run in runs if (native := _native_line(run, rect)) is not None]
 
 
-def _span(raw: dict[str, Any], rect: pymupdf.Rect, rendered: Pixels, scale: float) -> _Span:
+def _span(
+    raw: dict[str, Any],
+    rect: pymupdf.Rect,
+    rendered: tuple[Pixels, Pixels | None],
+    scale: float,
+    *,
+    faint_over_text: bool = False,
+) -> _Span:
     x0, y0, x1, y1 = (float(value) for value in raw["bbox"])
     bbox = (x0, y0, x1, y1)
     char_flags = int(raw.get("char_flags", _FILLED))
-    invisible = (
-        int(raw.get("alpha", 255)) == 0
-        or not char_flags & (_FILLED | _STROKED)
-        or bool(char_flags & _CLIPPED)
-    )
+    alpha = int(raw.get("alpha", 255))
+    invisible = alpha == 0 or not char_flags & (_FILLED | _STROKED) or bool(char_flags & _CLIPPED)
     off_page = x1 <= rect.x0 or x0 >= rect.x1 or y1 <= rect.y0 or y0 >= rect.y1
+    page, textless = rendered
     hidden = (
         invisible
+        or faint_over_text
         or off_page
         or float(raw["size"]) < PDF_MIN_VISIBLE_FONT_SIZE
-        or not _contrasts(raw, bbox, rect, rendered, scale)
+        or not _contrasts(raw, bbox, rect, page, scale)
+        or (textless is not None and not _changes(bbox, rect, page, textless, scale))
     )
     return _Span(
         text=str(raw["text"]),
@@ -407,6 +479,26 @@ def _contrasts(
     contrast = float(np.max(np.abs(text_rgb - background)))
     ink = float(np.max(np.abs(region - background)))
     return contrast >= PDF_MIN_TEXT_CONTRAST and ink >= PDF_MIN_TEXT_CONTRAST
+
+
+def _changes(
+    bbox: tuple[float, float, float, float],
+    rect: pymupdf.Rect,
+    page: Pixels,
+    textless: Pixels,
+    scale: float,
+) -> bool:
+    """Whether the page looks different in the span's box once its text is removed."""
+    left = max(0, int((bbox[0] - rect.x0) * scale))
+    top = max(0, int((bbox[1] - rect.y0) * scale))
+    right = min(page.shape[1], int(np.ceil((bbox[2] - rect.x0) * scale)))
+    bottom = min(page.shape[0], int(np.ceil((bbox[3] - rect.y0) * scale)))
+    if right <= left or bottom <= top:
+        return True  # Too small to judge here; the font size rule covers it.
+    before = page[top:bottom, left:right].astype(np.int16)
+    after = textless[top:bottom, left:right].astype(np.int16)
+    changed = np.abs(before - after).max(axis=2) >= PDF_MIN_TEXT_CONTRAST
+    return float(changed.mean()) >= PDF_MIN_VISIBLE_SHARE
 
 
 def _native_line(run: list[_Span], rect: pymupdf.Rect) -> NativeLine | None:
