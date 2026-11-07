@@ -7,6 +7,18 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+### Added
+
+- Interactive shell (ADR-062): `sugo` alone in a terminal opens it; drag a
+  file or type its name, then use slash commands such as `/save`, `/stats`,
+  `/explain`, `/clip` and `/help`.
+- The shell shows the page being read while a document converts.
+
+### Fixed
+
+- The shell's `/help` translates argument names (`CARTELLA`, `DIMENSIONE`,
+  `RICEVUTA` in Italian).
+
 ## [0.1.2] - 2026-11-07
 
 ### Added

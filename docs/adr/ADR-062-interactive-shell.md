@@ -58,7 +58,7 @@ Only what Sugo can already do; the rest of ARCHITECTURE §12's list comes with t
 | `Esc` | Clears the line being typed |
 | `Ctrl+C` during a conversion | Cancels it and returns to the prompt |
 
-Progress: one line per file while it converts, then its tokens before and after. Page-by-page progress needs the pipeline to report pages and comes with that change (implementation note, 2026-11-07).
+Progress: one line per file while it converts, then its tokens before and after. Page-by-page progress needs the pipeline to report pages and comes with that change (implementation note, 2026-11-07). Done on 2026-11-08: the internal pipeline takes an `on_page` callback, and the shell shows "Converting NAME, page N"; pages taken from the cache are not reported, and the total is not shown because the PDF extractor does not expose it (implementation note).
 
 Where prompt_toolkit cannot run, such as Git Bash's mintty terminal on Windows, which is not a Windows console, the shell falls back to a plain input line: every command works, without Tab completion, history or `Ctrl+V` (implementation note, 2026-11-07).
 

@@ -20,7 +20,7 @@ import json
 import logging
 import os
 import sys
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from importlib.metadata import version
 from pathlib import Path
@@ -933,12 +933,13 @@ def _failures(json_output: bool) -> Iterator[None]:
 
 
 @contextmanager
-def _progress(message: str, quiet: bool) -> Iterator[None]:
+def _progress(message: str, quiet: bool) -> Iterator[Callable[[str], None]]:
+    """Show ``message`` with a spinner; yield a function that changes the message."""
     if quiet or not _stderr.is_terminal:
-        yield
+        yield lambda _message: None
         return
-    with _stderr.status(Text(message)):
-        yield
+    with _stderr.status(Text(message)) as status:
+        yield lambda new: status.update(Text(new))
 
 
 def _make_folder(output: Path) -> None:

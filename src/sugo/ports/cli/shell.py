@@ -221,9 +221,10 @@ def _convert_files(state: State, names: list[str]) -> None:
             path = Path(name).expanduser()
             source = path.as_posix()
             try:
-                with cli._progress(cli._converting(source), quiet=False):
+                with cli._progress(cli._converting(source), quiet=False) as update:
                     conversion = pipeline.convert_file(
                         path,
+                        on_page=_pages_shown(update, source),
                         cache=cache,
                         count_raw_tokens=True,
                         max_chunk_tokens=state.chunk_tokens,
@@ -246,6 +247,15 @@ def _convert_files(state: State, names: list[str]) -> None:
     if results:
         state.last = results
         _say(_("Type /save to write the Markdown to a folder, /stats or /explain for more."), "dim")
+
+
+def _pages_shown(update: Callable[[str], None], source: str) -> Callable[[int], None]:
+    """A pipeline ``on_page`` that shows the page being read next to the file name."""
+
+    def show(number: int) -> None:
+        update(_("Converting {source}, page {page}").format(source=cli._shown(source), page=number))
+
+    return show
 
 
 def _convert_clipboard(state: State, _argument: str = "") -> None:
@@ -429,10 +439,11 @@ def _with_receipt(state: State, result: Result) -> Result:
     settings = state.settings
     with (
         page_cache(enabled=state.persistent_cache) as cache,
-        cli._progress(cli._converting(result.source), quiet=False),
+        cli._progress(cli._converting(result.source), quiet=False) as update,
     ):
         conversion = pipeline.convert(
             data,
+            on_page=_pages_shown(update, result.source),
             cache=cache,
             source=None if result.path is None else result.path.as_posix(),
             count_raw_tokens=True,
@@ -517,7 +528,7 @@ def _help(_state: State, _argument: str) -> None:
     table.add_column(style=f"bold {ACCENT}", no_wrap=True)
     table.add_column()
     for command in COMMANDS.values():
-        table.add_row(command.usage, i18n.gettext(command.help))
+        table.add_row(i18n.gettext(command.usage), i18n.gettext(command.help))
     cli._stdout.print(table)
     _say(_("Drag a file onto this window or type its path, then press Enter."), "dim")
     _say(_("Ctrl+V on an empty line converts the image in the clipboard."), "dim")
@@ -533,19 +544,19 @@ def _exit(_state: State, _argument: str) -> None:
 
 COMMANDS: dict[str, Command] = {
     "/save": Command(
-        "/save [FOLDER]", N_("Write the last result as NAME.md (default: here)"), _save
+        N_("/save [FOLDER]"), N_("Write the last result as NAME.md (default: here)"), _save
     ),
     "/stats": Command("/stats", N_("Tokens saved per LLM provider for the last result"), _stats),
     "/explain": Command("/explain", N_("What was removed or edited, and why"), _explain),
     "/clip": Command("/clip", N_("Convert the image in the clipboard"), _convert_clipboard),
     "/chunks": Command(
-        "/chunks [on|off|SIZE]", N_("Also split the next files into chunks for RAG"), _chunks
+        N_("/chunks [on|off|SIZE]"), N_("Also split the next files into chunks for RAG"), _chunks
     ),
     "/receipt": Command(
         "/receipt [on|off]", N_("Also make a receipt for the next files"), _receipt
     ),
     "/cache": Command("/cache [on|off]", N_("Keep the page cache on disk or not"), _cache),
-    "/verify": Command("/verify FILE RECEIPT", N_("Check a receipt, as sugo verify"), _verify),
+    "/verify": Command(N_("/verify FILE RECEIPT"), N_("Check a receipt, as sugo verify"), _verify),
     "/doctor": Command("/doctor", N_("Check the installation, as sugo doctor"), _doctor),
     "/help": Command("/help", N_("Show this help"), _help),
     "/exit": Command("/exit", N_("Leave the shell (or Ctrl+D)"), _exit),

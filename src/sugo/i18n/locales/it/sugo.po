@@ -1230,3 +1230,24 @@ msgstr "/receipt registra ogni modifica, da controllare poi con /verify"
 
 msgid "/chunks splits the next files into pieces for RAG"
 msgstr "/chunks divide i prossimi file in pezzi per RAG"
+
+msgid "/save [FOLDER]"
+msgstr "/save [CARTELLA]"
+
+msgid "/chunks [on|off|SIZE]"
+msgstr "/chunks [on|off|DIMENSIONE]"
+
+msgid "/verify FILE RECEIPT"
+msgstr "/verify FILE RICEVUTA"
+
+msgid "/save [FOLDER]"
+msgstr "/save [CARTELLA]"
+
+msgid "/chunks [on|off|SIZE]"
+msgstr "/chunks [on|off|DIMENSIONE]"
+
+msgid "/verify FILE RECEIPT"
+msgstr "/verify FILE RICEVUTA"
+
+msgid "Converting {source}, page {page}"
+msgstr "Conversione di {source}, pagina {page}"

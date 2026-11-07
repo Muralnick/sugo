@@ -235,6 +235,17 @@ def test_second_run_reads_everything_from_the_cache(
     assert (counting.starts, counting.pages) == ([4], 0)
 
 
+def test_each_page_read_is_reported_once(cache: PageCache) -> None:
+    data = report(3)
+    first: list[int] = []
+    convert(data, cache=cache, on_page=first.append)
+    assert first == [1, 2, 3]
+    # Pages taken from the cache are not read, so not reported.
+    second: list[int] = []
+    convert(data, cache=cache, on_page=second.append)
+    assert second == []
+
+
 def test_interrupted_job_resumes_where_it_stopped(
     cache: PageCache, monkeypatch: pytest.MonkeyPatch
 ) -> None:

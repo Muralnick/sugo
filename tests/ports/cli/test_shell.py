@@ -14,6 +14,7 @@ import pymupdf
 import pytest
 from typer.testing import CliRunner
 
+from sugo import i18n
 from sugo.ports.cli import app as cli
 from sugo.ports.cli import shell
 from sugo.ports.cli.doctor import Check, Status
@@ -192,6 +193,19 @@ def test_help_lists_every_command(capsys: pytest.CaptureFixture[str]) -> None:
     output = run(capsys, "/help")
     for name in shell.COMMANDS:
         assert name in output
+
+
+@pytest.mark.usefixtures("workdir")
+def test_help_translates_the_argument_names(capsys: pytest.CaptureFixture[str]) -> None:
+    i18n.activate("it")
+    try:
+        output = run(capsys, "/help")
+    finally:
+        i18n.activate("en")
+    assert "/save [CARTELLA]" in output
+    assert "/chunks [on|off|DIMENSIONE]" in output
+    assert "/verify FILE RICEVUTA" in output
+    assert "FOLDER" not in output
 
 
 # --- How the shell opens ----------------------------------------------------------------
