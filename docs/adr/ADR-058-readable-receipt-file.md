@@ -1,6 +1,6 @@
 # ADR-058: Write the receipt file indented
 
-**Status:** Proposed
+**Status:** Accepted (maintainer decision, 2026-11-07)
 **Date:** 2026-11-07
 **Deciders:** project author
 **Amends:** ADR-056 (conversion receipt: file layout)
