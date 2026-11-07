@@ -1,6 +1,7 @@
 """Tests for the sugo command: output streams, exit codes, files written and error reports."""
 
 import json
+import re
 from importlib.metadata import version as package_version
 from io import BytesIO
 from pathlib import Path
@@ -193,6 +194,31 @@ def test_missing_file_is_reported_without_stopping_the_others(workdir: Path) -> 
     batch = run("missing.pdf", "report.pdf", "-o", "out")
     assert batch.exit_code == ExitCode.PARTIAL
     assert (workdir / "out" / "report.md").exists()
+
+
+@pytest.mark.parametrize("extra", [[], ["-o", "out"]])
+def test_unquoted_name_with_spaces_gets_a_clear_hint(
+    workdir: Path, extra: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("COLUMNS", "200")  # Rich would wrap the error box.
+    # The shell turns `sugo my [bozza] report.pdf` into three arguments.
+    (workdir / "my [bozza] report.pdf").write_bytes(report())
+    result = run("my", "[bozza]", "report.pdf", *extra)
+    assert result.exit_code == ExitCode.USAGE
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", result.stderr)  # Rich colours in CI.
+    assert 'needs quotes, like "my [bozza] report.pdf"' in plain
+    assert not (workdir / "out").exists()
+
+
+def test_split_name_is_found_only_among_missing_arguments(workdir: Path) -> None:
+    (workdir / "a b.pdf").write_bytes(report())
+    (workdir / "a").write_text("a real file")
+    # "a" exists, so "a b.pdf" is not rebuilt from it; "x a b.pdf" does not exist.
+    assert cli._split_name([Path("report.pdf"), Path("x"), Path("a"), Path("b.pdf")]) is None
+    assert cli._split_name([Path("report.pdf"), Path("a"), Path("b.pdf")]) is None
+    (workdir / "a").unlink()
+    assert cli._split_name([Path("report.pdf"), Path("a"), Path("b.pdf")]) == "a b.pdf"
+    assert cli._split_name([Path("report.pdf"), Path("missing.pdf")]) is None
 
 
 @pytest.mark.usefixtures("workdir")

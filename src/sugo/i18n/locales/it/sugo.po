@@ -189,6 +189,9 @@ msgstr "Il valore deve essere un elenco."
 msgid "--max-tokens needs --chunks"
 msgstr "--max-tokens richiede --chunks"
 
+msgid "a file name with spaces needs quotes, like \"{name}\""
+msgstr "un nome di file con spazi va scritto tra virgolette, così: \"{name}\""
+
 msgid "several files need an output folder"
 msgstr "più file richiedono una cartella di uscita"
 

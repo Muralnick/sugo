@@ -236,3 +236,12 @@ def test_page_count_refusal_is_translated_and_only_when_recognised() -> None:
     assert str(_refusal(other)) == "il PDF ha più di {pages} pagine"
     unknown = Refused(code="PDF_INVALID", message="{0.__class__} something new")
     assert str(_refusal(unknown)) == "{0.__class__} something new"
+
+
+def test_unquoted_name_with_spaces_hint_is_italian(tmp_path: Path) -> None:
+    (tmp_path / "a b.pdf").write_bytes(b"%PDF-1.7")
+    result = run("a", "b.pdf")
+    assert result.exit_code == ExitCode.USAGE
+    assert 'un nome di file con spazi va scritto tra virgolette, così: "a b.pdf"' in flat(
+        result.stderr
+    )
