@@ -44,6 +44,7 @@
       languages: languages.length > 0 ? languages : d.languages.slice(),
       strip_tracking_urls: typeof s.strip_tracking_urls === "boolean" ? s.strip_tracking_urls : d.strip_tracking_urls,
       chunks: typeof s.chunks === "boolean" ? s.chunks : d.chunks,
+      receipt: typeof s.receipt === "boolean" ? s.receipt : d.receipt,
       chunk_tokens: Math.min(data.chunk_max, Math.max(data.chunk_min, size)),
     };
   }
@@ -146,6 +147,7 @@
     size.max = String(data.chunk_max);
     size.value = String(settings.chunk_tokens);
     size.disabled = !settings.chunks;
+    $("make-receipt").checked = settings.receipt;
   }
 
   $("ui-language").addEventListener("change", (event) => {
@@ -160,6 +162,10 @@
   $("make-chunks").addEventListener("change", (event) => {
     settings.chunks = event.target.checked;
     $("chunk-tokens").disabled = !settings.chunks;
+    saveSettings();
+  });
+  $("make-receipt").addEventListener("change", (event) => {
+    settings.receipt = event.target.checked;
     saveSettings();
   });
   $("chunk-tokens").addEventListener("change", (event) => {
@@ -214,7 +220,7 @@
     setStatus("", false);
   }
 
-  function requestHeaders() {
+  function requestHeaders(name) {
     const headers = {
       "X-Sugo-Token": token,
       "Content-Type": "application/octet-stream",
@@ -223,7 +229,21 @@
       "X-Sugo-Strip-Tracking": String(settings.strip_tracking_urls),
     };
     if (settings.chunks) headers["X-Sugo-Chunk-Tokens"] = String(settings.chunk_tokens);
+    if (settings.receipt) headers["X-Sugo-Receipt"] = "true";
+    const encoded = settings.receipt && name ? encodedName(name) : null;
+    if (encoded) headers["X-Sugo-Name"] = encoded;
     return headers;
+  }
+
+  // The file's name for the receipt, sent only if the server would accept it
+  // (ADR-059): otherwise the receipt simply has no name. The test mirrors
+  // Python's str.isprintable(): no control, format, private-use, unassigned
+  // or separator characters, except the plain space (U+202F, for example,
+  // is in macOS screenshot names).
+  function encodedName(name) {
+    if ([...name].length > 255 || name === "." || name === "..") return null;
+    if (/[/\\]/.test(name) || /(?! )[\p{C}\p{Z}]/u.test(name)) return null;
+    try { return encodeURIComponent(name); } catch (e) { return null; }  // a lone surrogate
   }
 
   async function convert(file) {
@@ -239,7 +259,7 @@
     try {
       const response = await fetch("/api/convert", {
         method: "POST",
-        headers: requestHeaders(),
+        headers: requestHeaders(file.name),
         body: file,
         cache: "no-store",
         credentials: "omit",
@@ -294,13 +314,21 @@
     }
     show($("images-panel"), result.images.length + result.rejected_by.length > 0);
 
-    const removed = $("removed");
-    removed.replaceChildren();
-    const entries = Object.entries(result.removed).filter(([, count]) => count > 0);
+    showCounts($("removed"), result.removed, texts.removed_none);
+    showCounts($("edited"), result.edited || {}, texts.edited_none);
+
+    showChunks(result);
+    showReceipt(result);
+    show($("result"), true);
+  }
+
+  function showCounts(list, counts, none) {
+    list.replaceChildren();
+    const entries = Object.entries(counts).filter(([, count]) => count > 0);
     if (entries.length === 0) {
       const item = document.createElement("li");
-      item.textContent = texts.removed_none;
-      removed.append(item);
+      item.textContent = none;
+      list.append(item);
     }
     for (const [cleaner, count] of entries) {
       const item = document.createElement("li");
@@ -310,11 +338,73 @@
       amount.className = "count";
       amount.textContent = number(count);
       item.append(name, amount);
-      removed.append(item);
+      list.append(item);
     }
+  }
 
-    showChunks(result);
-    show($("result"), true);
+  // --- Receipt (ADR-059): every value is text, never HTML. ---
+
+  // A long receipt would make the page slow; the saved file has every entry.
+  const RECEIPT_SHOWN = 500;
+
+  function showReceipt(result) {
+    const panel = $("receipt-panel");
+    const receipt = result.receipt;
+    if (!receipt || typeof result.receipt_file !== "string") { show(panel, false); return; }
+    receiptPart("receipt-removed", texts.receipt_removed, receipt.removed, (entry) => [
+      [texts.receipt_page.replace("{page}", number(entry.page)), entry.block_type, entry.removed_by, entry.reason],
+      [entry.text || texts.receipt_no_text],
+    ]);
+    receiptPart("receipt-edited", texts.receipt_edited, receipt.edited, (entry) => [
+      [texts.receipt_page.replace("{page}", number(entry.page)), entry.edited_by, entry.kind, entry.reason],
+      [texts.edit_before + ": " + entry.original, texts.edit_after + ": " + entry.replacement],
+    ]);
+    receiptPart("receipt-flagged", texts.receipt_flagged, receipt.flagged, (entry) => {
+      const meta = [texts.receipt_page.replace("{page}", number(entry.page)), entry.block_type, ...entry.flags];
+      if (entry.confidence !== null) {
+        meta.push(fill(texts.receipt_confidence, { confidence: number(entry.confidence) }));
+      }
+      return [meta, []];
+    });
+    show(panel, true);
+  }
+
+  function receiptPart(id, title, entries, describe) {
+    const part = $(id);
+    part.querySelector("summary").textContent = fill(title, { count: number(entries.length) });
+    const list = part.querySelector("ol");
+    list.replaceChildren();
+    if (entries.length === 0) {
+      const item = document.createElement("li");
+      item.textContent = texts.receipt_none;
+      list.append(item);
+    }
+    for (const entry of entries.slice(0, RECEIPT_SHOWN)) {
+      const [meta, bodies] = describe(entry);
+      const item = document.createElement("li");
+      const head = document.createElement("div");
+      head.className = "receipt-meta";
+      meta.forEach((value, index) => {
+        if (index > 0) head.append(" · ");
+        const code = document.createElement("code");
+        code.textContent = String(value);
+        head.append(code);
+      });
+      item.append(head);
+      for (const value of bodies) {
+        const body = document.createElement("pre");
+        body.className = "receipt-text";
+        body.textContent = value;
+        item.append(body);
+      }
+      list.append(item);
+    }
+    if (entries.length > RECEIPT_SHOWN) {
+      const more = document.createElement("li");
+      more.className = "muted small";
+      more.textContent = fill(texts.receipt_more, { shown: number(RECEIPT_SHOWN), count: number(entries.length) });
+      list.append(more);
+    }
   }
 
   function showChunks(result) {
@@ -398,6 +488,11 @@
   });
   $("save").addEventListener("click", () => {
     download($("markdown").value, baseName + ".md", "text/markdown;charset=utf-8");
+  });
+  $("save-receipt").addEventListener("click", () => {
+    if (lastResult && typeof lastResult.receipt_file === "string") {
+      download(lastResult.receipt_file, baseName + ".receipt.json", "application/json;charset=utf-8");
+    }
   });
   $("save-jsonl").addEventListener("click", () => {
     if (lastResult && typeof lastResult.jsonl === "string") {

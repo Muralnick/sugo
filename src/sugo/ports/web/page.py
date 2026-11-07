@@ -40,7 +40,8 @@ STATIC = {
 }
 
 # Text the script fills its placeholders into: {before}, {after}, {saved},
-# {pages}, {count}, {provider}, {hint}, {tokens} and {number}. {large},
+# {pages}, {count}, {provider}, {hint}, {tokens}, {number}, {shown}, {page} and
+# {confidence}. {large},
 # {small}, {size}, {min} and {max} are filled here.
 _TEXTS = {
     "tagline": N_("Documents, reduced: drop a file to get its compact Markdown."),
@@ -78,6 +79,24 @@ _TEXTS = {
     "failed_pages": N_("Pages that could not be read: {pages}"),
     "removed_title": N_("Blocks removed, per cleaner"),
     "removed_none": N_("No blocks removed."),
+    "edited_title": N_("Text edits, per cleaner"),
+    "edited_none": N_("No text edited."),
+    "receipt_title": N_("Receipt"),
+    "receipt_intro": N_(
+        "What Sugo removed or changed, with the reason, and the blocks it was not sure it "
+        "read correctly. Save it to check this conversion later with sugo verify."
+    ),
+    "save_receipt": N_("Save receipt"),
+    "receipt_removed": N_("Removed blocks ({count})"),
+    "receipt_edited": N_("Edited text ({count})"),
+    "receipt_flagged": N_("Uncertain blocks ({count})"),
+    "receipt_none": N_("None."),
+    "receipt_more": N_("Only the first {shown} are shown; the saved receipt has all {count}."),
+    "receipt_page": N_("page {page}"),
+    "receipt_confidence": N_("confidence {confidence}"),
+    "receipt_no_text": N_("(no text)"),
+    "edit_before": N_("Before"),
+    "edit_after": N_("After"),
     "chunks_title": N_("Chunks"),
     "chunks_count": N_("{count} chunks (chosen size: {tokens} tokens)"),
     "chunk_label": N_("Chunk {number} · {tokens} tokens"),
@@ -98,6 +117,7 @@ _TEXTS = {
     "text_languages_help": N_("Sugo applies their text rules when cleaning. Choose at least one."),
     "strip_tracking": N_("Remove tracking parameters from links (utm_source and similar)"),
     "make_chunks": N_("Also split into chunks for RAG"),
+    "make_receipt": N_("Also make a receipt: every block removed or edited, with its reason"),
     "chunk_size": N_("Chunk size in tokens ({min} to {max})"),
     "reset": N_("Back to my configuration"),
     "lang_en": N_("English"),
@@ -146,6 +166,15 @@ _QUESTIONS = (
             "Each cleaner removes one kind of noise, and the page shows how many blocks "
             "each one removed. Text that cannot be read is marked as illegible, never "
             "guessed."
+        ),
+    ),
+    (
+        N_("What is the receipt?"),
+        N_(
+            "A record of the conversion: every block Sugo removed and every text it edited, "
+            "with the reason and the original text, and the blocks it was not sure it read "
+            "correctly. Turn it on in Settings. Later, sugo verify FILE RECEIPT checks that "
+            "converting the same file still gives the same result."
         ),
     ),
     (
@@ -214,6 +243,7 @@ def defaults(settings: Settings, language: str) -> dict[str, Any]:
         "languages": list(settings.languages),
         "strip_tracking_urls": settings.cleaning.strip_tracking_urls,
         "chunks": False,
+        "receipt": False,
         "chunk_tokens": settings.chunking.max_tokens,
     }
 

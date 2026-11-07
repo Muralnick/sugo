@@ -687,6 +687,60 @@ msgstr "Pagine che non si sono potute leggere: {pages}"
 msgid "Blocks removed, per cleaner"
 msgstr "Blocchi rimossi, per pulitore"
 
+msgid "Text edits, per cleaner"
+msgstr "Modifiche al testo, per pulitore"
+
+msgid "No text edited."
+msgstr "Nessun testo modificato."
+
+msgid "Receipt"
+msgstr "Ricevuta"
+
+msgid "What Sugo removed or changed, with the reason, and the blocks it was not sure it read correctly. Save it to check this conversion later with sugo verify."
+msgstr "Cosa Sugo ha rimosso o cambiato, con il motivo, e i blocchi che non è sicuro di aver letto bene. Salvala per controllare più avanti questa conversione con sugo verify."
+
+msgid "Save receipt"
+msgstr "Salva la ricevuta"
+
+msgid "Removed blocks ({count})"
+msgstr "Blocchi rimossi ({count})"
+
+msgid "Edited text ({count})"
+msgstr "Testo modificato ({count})"
+
+msgid "Uncertain blocks ({count})"
+msgstr "Blocchi incerti ({count})"
+
+msgid "None."
+msgstr "Nessuno."
+
+msgid "Only the first {shown} are shown; the saved receipt has all {count}."
+msgstr "Sono mostrati solo i primi {shown}; la ricevuta salvata li contiene tutti e {count}."
+
+msgid "page {page}"
+msgstr "pagina {page}"
+
+msgid "confidence {confidence}"
+msgstr "affidabilità {confidence}"
+
+msgid "(no text)"
+msgstr "(senza testo)"
+
+msgid "Before"
+msgstr "Prima"
+
+msgid "After"
+msgstr "Dopo"
+
+msgid "Also make a receipt: every block removed or edited, with its reason"
+msgstr "Crea anche una ricevuta: ogni blocco rimosso o modificato, con il motivo"
+
+msgid "What is the receipt?"
+msgstr "Che cos'è la ricevuta?"
+
+msgid "A record of the conversion: every block Sugo removed and every text it edited, with the reason and the original text, and the blocks it was not sure it read correctly. Turn it on in Settings. Later, sugo verify FILE RECEIPT checks that converting the same file still gives the same result."
+msgstr "Un resoconto della conversione: ogni blocco che Sugo ha rimosso e ogni testo che ha modificato, con il motivo e il testo originale, e i blocchi che non è sicuro di aver letto bene. Si attiva nelle Impostazioni. Più avanti, sugo verify FILE RICEVUTA controlla che convertire lo stesso file dia ancora lo stesso risultato."
+
 msgid "No blocks removed."
 msgstr "Nessun blocco rimosso."
 
