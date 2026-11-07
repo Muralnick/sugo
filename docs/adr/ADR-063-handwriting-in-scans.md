@@ -1,7 +1,7 @@
 # ADR-063: Handwriting in scanned pages (signatures)
 
-**Status:** Accepted (maintainer decisions 1-3, 2026-11-08)
-**Date:** 2026-11-08
+**Status:** Accepted (maintainer decisions 1-3, 2026-11-07)
+**Date:** 2026-11-07
 **Deciders:** project author
 **Applies:** PRINCIPLES 3 (no silent loss), 4 (no invented content) and 12 (stable contracts)
 **Amends:** the Markdown output (ADR-042) and the receipt (ADR-056): one new block flag and one new marker
@@ -9,7 +9,7 @@
 
 ## Context
 
-On 2026-11-08 the maintainer converted a real scanned PDF: a three-page meeting record signed by hand by three people, each signature under or across the typed name. At the `lite` level every word of a scanned page comes from the bundled OCR (ADR-039), and the signatures came out like this (names replaced):
+On 2026-11-07 the maintainer converted a real scanned PDF: a three-page meeting record signed by hand by three people, each signature under or across the typed name. At the `lite` level every word of a scanned page comes from the bundled OCR (ADR-039), and the signatures came out like this (names replaced):
 
 | On the page | What Sugo wrote | Problem |
 |---|---|---|
@@ -97,7 +97,7 @@ The implementation is accepted only with numbers:
 
 The same document showed a second, separate problem: the letterhead at the top of each scanned page is read differently on every page (different OCR errors in the logo text), so the repeated-header cleaner (ADR-044) does not recognise it and saves nothing. Fuzzy matching of repeated OCR headers needs its own ADR.
 
-## Maintainer decisions (2026-11-08)
+## Maintainer decisions (2026-11-07)
 
 1. The marker text is `[handwriting]`.
 2. Typed lines damaged by ink (section 3) are flagged only in the receipt; the Markdown shows no marker for them.
