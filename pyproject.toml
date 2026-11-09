@@ -17,7 +17,7 @@ dependencies = [
     # Image stack: ADR-039.
     "numpy>=2.5.4,<3",
     "onnxruntime>=1.31.0,<2",
-    "pillow>=12.3.0,<13",
+    "pillow>=13.0.0,<14",
     # Native PDFs (ADR-043): 2.0 bundles MuPDF 1.28.5. The worker never loads
     # its layout module or pymupdf4llm.
     "pymupdf>=2.0,<2.1",

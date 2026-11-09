@@ -7,6 +7,16 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+### Security
+
+- Pillow 13.0.0 (was 12.3.0): fixes a heap overflow in JPEG decoding
+  (GHSA-8g5g-8vmr-9782) that a crafted JPEG given to Sugo could reach, and
+  PNG decoding slowdowns. Most other Pillow advisories of the same release
+  concern formats Sugo never opens (Sugo reads only PNG, JPEG and WebP).
+- certifi 2026.10.23 (was 2026.7.22): drops the compromised emSign root
+  certificates. Sugo makes no network connections when converting, so this
+  only matters to libraries that bring certifi in.
+
 ## [0.1.3] - 2026-11-09
 
 This release changes the Markdown output of scanned pages (`[handwriting]`
