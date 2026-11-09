@@ -7,6 +7,13 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-09
+
+This release changes the Markdown output of scanned pages (`[handwriting]`
+blocks, letterheads removed after the first page), as the 0.x caveat above
+allows. The version stays 0.1.x because `v0.2` names a roadmap milestone
+(the `normal` level with Docling) that is not part of it.
+
 ### Added
 
 - Interactive shell (ADR-062): `sugo` alone in a terminal opens it; drag a
