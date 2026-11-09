@@ -7,6 +7,8 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-11-09
+
 ### Security
 
 - Pillow 13.0.0 (was 12.3.0): fixes a heap overflow in JPEG decoding
