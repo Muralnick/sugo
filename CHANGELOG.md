@@ -16,6 +16,8 @@ still change, with notice, before 1.0).
   an unprivileged user; no image is published yet. A new CI job builds it
   and checks, with no network, that the server answers `initialize` and
   `tools/list`, as the Glama directory does.
+- `glama.json`, naming the maintainer for the Glama directory listing
+  (ADR-065 amendment).
 
 ### Changed
 
