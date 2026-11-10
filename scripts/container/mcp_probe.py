@@ -1,8 +1,11 @@
 """Check that an MCP server command answers like Glama's introspection (ADR-065).
 
-Starts the command, sends ``initialize`` and ``tools/list`` over stdio, as
-Glama does with the container image, and checks that Sugo's two tools come
-back. Standard library only, so it runs before any environment is set up.
+Starts the command, sends ``initialize``, ``tools/list``, ``resources/list``
+and ``prompts/list`` over stdio, as Glama does with the container image, and
+checks that Sugo's two tools come back, that the other two lists get an
+answer (Sugo has neither, so a JSON-RPC error is fine) and that the server
+then exits cleanly. Standard library only, so it runs before any environment
+is set up.
 
 Usage (from the repository root):
     python3 scripts/container/mcp_probe.py docker run -i --rm sugo
@@ -15,6 +18,7 @@ import sys
 
 EXPECTED_TOOLS = {"convert_document", "estimate_savings"}
 TIMEOUT_SECONDS = 120
+STDERR_TAIL_LINES = 20
 
 
 def _requests() -> str:
@@ -31,8 +35,51 @@ def _requests() -> str:
         },
         {"jsonrpc": "2.0", "method": "notifications/initialized"},
         {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+        {"jsonrpc": "2.0", "id": 3, "method": "resources/list"},
+        {"jsonrpc": "2.0", "id": 4, "method": "prompts/list"},
     ]
     return "".join(json.dumps(message) + "\n" for message in messages)
+
+
+def _answers(stdout: str) -> dict[int, dict[str, object]] | None:
+    """The server's answers by request id, or None if stdout is not JSON-RPC."""
+    answers: dict[int, dict[str, object]] = {}
+    for line in stdout.splitlines():
+        try:
+            message = json.loads(line)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(message, dict):
+            return None
+        request_id = message.get("id")
+        if isinstance(request_id, int):
+            answers[request_id] = message
+    return answers
+
+
+def _tool_names(answer: dict[str, object]) -> set[str]:
+    result = answer.get("result")
+    tools = result.get("tools") if isinstance(result, dict) else None
+    if not isinstance(tools, list):
+        return set()
+    return {str(tool.get("name")) for tool in tools if isinstance(tool, dict)}
+
+
+def _check(finished: subprocess.CompletedProcess[str]) -> str | None:
+    answers = _answers(finished.stdout)
+    if answers is None:
+        return "the server wrote something that is not JSON-RPC to stdout"
+    if "result" not in answers.get(1, {}):
+        return f"initialize failed (exit code {finished.returncode})"
+    names = _tool_names(answers.get(2, {}))
+    if names != EXPECTED_TOOLS:
+        return f"tools/list returned {sorted(names)}"
+    for request_id, method in ((3, "resources/list"), (4, "prompts/list")):
+        if not answers.get(request_id, {}).keys() & {"result", "error"}:
+            return f"{method} got no answer"
+    if finished.returncode != 0:
+        return f"the server exited with code {finished.returncode}"
+    return None
 
 
 def probe(command: list[str]) -> str | None:
@@ -43,6 +90,8 @@ def probe(command: list[str]) -> str | None:
             input=_requests(),
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=TIMEOUT_SECONDS,
             check=False,
         )
@@ -50,21 +99,11 @@ def probe(command: list[str]) -> str | None:
         return f"no answer within {TIMEOUT_SECONDS} s"
     except OSError as error:
         return f"cannot start the command: {error}"
-    answers = {}
-    for line in finished.stdout.splitlines():
-        try:
-            message = json.loads(line)
-        except json.JSONDecodeError:
-            return "the server wrote something that is not JSON-RPC to stdout"
-        if isinstance(message, dict) and "id" in message:
-            answers[message["id"]] = message
-    if "result" not in answers.get(1, {}):
-        return f"initialize failed (exit code {finished.returncode})"
-    tools = answers.get(2, {}).get("result", {}).get("tools", [])
-    names = {tool.get("name") for tool in tools if isinstance(tool, dict)}
-    if names != EXPECTED_TOOLS:
-        return f"tools/list returned {sorted(map(str, names))}"
-    return None
+    problem = _check(finished)
+    if problem is not None and finished.stderr.strip():
+        tail = "\n".join(finished.stderr.splitlines()[-STDERR_TAIL_LINES:])
+        problem += f"; the server's stderr ends with:\n{tail}"
+    return problem
 
 
 def main() -> int:
@@ -75,7 +114,7 @@ def main() -> int:
     if problem is not None:
         sys.stderr.write(f"MCP probe failed: {problem}\n")
         return 1
-    sys.stderr.write("MCP probe passed: initialize and tools/list answered\n")
+    sys.stderr.write("MCP probe passed: the server answered and exited cleanly\n")
     return 0
 
 
