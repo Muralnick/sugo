@@ -94,6 +94,9 @@ def test_tools_are_listed_with_schemas_from_the_models(server: Server) -> None:
     assert schema["additionalProperties"] is False
     assert schema["properties"]["max_tokens"]["maximum"] == 20_000
     assert tools["convert_document"]["annotations"]["readOnlyHint"] is True
+    # Each description tells the agent when to use the other tool instead.
+    assert "estimate_savings" in tools["convert_document"]["description"]
+    assert "convert_document" in tools["estimate_savings"]["description"]
 
 
 def test_long_document_comes_in_parts_joined_by_cursors(server: Server) -> None:
