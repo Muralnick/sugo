@@ -7,6 +7,15 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+### Added
+
+- A `Dockerfile` for the MCP server (ADR-065): `docker run -i --rm -v
+  ~/Documents:/data:ro sugo` serves the folder mounted at `/data` and
+  nothing else. Base images pinned by digest, packages only from `uv.lock`,
+  an unprivileged user; no image is published yet. A new CI job builds it
+  and checks, with no network, that the server answers `initialize` and
+  `tools/list`, as the Glama directory does.
+
 ### Changed
 
 - README (English and Italian): screenshots of the web page, the interactive
