@@ -81,3 +81,7 @@ Input schemas are generated from strict pydantic models, with unknown fields ref
 - A first conversion of a long scanned PDF runs to completion without progress notifications and can exceed a client's timeout. The pipeline has no progress callback yet; progress and the plan-first answer come with the shared engine, after v0.1.
 - Not in v0.1: the plan returned above a size threshold, per-client rate limits, forced anonymisation (`legal`), the shared engine and the other tools of ARCHITECTURE §12.
 - Residual: a symbolic link swapped between the check and the read could point outside a root. That needs write access inside a root, which already means control of the user's files.
+
+## Amendment (2026-11-10): tool descriptions
+
+The Glama directory scores each tool's description for agents. Its first scores (A, 4.2/5 for `convert_document`; C, 2.9/5 for `estimate_savings`) pointed to the same gaps: no guidance on which of the two tools to use, and no description of what `estimate_savings` returns. The descriptions now say both, and `cursor` and `max_tokens` say how paging works. Only description texts change; tool names, input schemas and answers stay as above, and a test keeps each description naming the other tool.

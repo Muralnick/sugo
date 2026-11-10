@@ -21,6 +21,10 @@ still change, with notice, before 1.0).
 
 ### Changed
 
+- MCP: clearer tool and argument descriptions for agents. Each tool says
+  when to use the other one, `estimate_savings` says what it returns, and
+  `cursor` and `max_tokens` say how paging works. Names, arguments and
+  answers are unchanged.
 - README (English and Italian): screenshots of the web page, the interactive
   shell and the Verify tab; a section on the conversion receipt and
   `sugo verify`; the status, feature table and OCR timings brought up to
