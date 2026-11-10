@@ -20,7 +20,7 @@ Scope updated on 2026-10-30 (maintainer decision): Office and XML documents move
 | Language packs: Italian, Spanish, French, German, English (ADR-050) | Japanese, Chinese; Korean (separate OCR model); language detection |
 | Markdown and JSONL export, chunker | Hybrid image mode, optimizer |
 | Metrics with provider comparison (`sugo stats`) | Tray, watcher |
-| CLI one-shot commands, `sugo clip`, `sugo doctor` | Interactive shell, guided setup |
+| CLI one-shot commands, `sugo clip`, `sugo doctor`; interactive shell (ADR-062) | Guided setup |
 | MCP server: `convert_document`, `estimate_savings` with allowed roots and token budget | Other MCP tools |
 | Basic TOML configuration | Policies, profiles, recipes |
 | Local web UI, `sugo ui` (ADR-055, ADR-059): Markdown, tokens, removals, chunks, settings, questions; receipt with the removal and edit list, verify, paste, several files, no-cache setting, installation check | Side-by-side preview, progress events, work profiles |

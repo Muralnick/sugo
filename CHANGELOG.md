@@ -7,6 +7,14 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+### Changed
+
+- README (English and Italian): screenshots of the web page, the interactive
+  shell and the Verify tab; a section on the conversion receipt and
+  `sugo verify`; the status, feature table and OCR timings brought up to
+  v0.1.4 (the shell, handwriting and letterheads are no longer listed as
+  coming next).
+
 ## [0.1.4] - 2026-11-09
 
 ### Security

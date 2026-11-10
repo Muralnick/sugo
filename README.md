@@ -36,12 +36,16 @@
   <tr>
     <td align="center"><b>🔒 100% local</b><br>no cloud, no telemetry</td>
     <td align="center"><b>✂️ Fewer tokens</b><br>33–38% with repeated headers, ~3% on real legal text</td>
-    <td align="center"><b>🧾 Nothing lost silently</b><br>every removal is recorded</td>
+    <td align="center"><b>🧾 Nothing lost silently</b><br>every removal recorded, checkable with <code>sugo verify</code></td>
     <td align="center"><b>🪶 Light</b><br>runs on 8 GB RAM, no GPU</td>
   </tr>
 </table>
 
 Sugo turns PDFs, Office files, screenshots and images into clean, compact Markdown for RAG systems, AI agents and LLM chats. It removes what only costs tokens (repeated headers and footers, page numbers, hidden text, tracking parameters, app chrome around a screenshot) and keeps the content, the tables and the structure. Everything runs on your computer: no cloud API, no telemetry, nothing sent anywhere.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Muralnick/sugo/main/docs/images/web-ui-convert.png" alt="Sugo's local web page after converting a three-page report: 294 tokens before, 187 after, 36.4% saved; the Markdown on the left, the blocks each cleaner removed on the right" width="760">
+</p>
 
 > In Italian, *il sugo del discorso* means "the gist", and a *sugo* is a sauce you **reduce** until only the concentrated flavour remains. That is what Sugo does to your documents.
 
@@ -78,7 +82,7 @@ The board expects stable growth next year.
 Details: https://acme.example/report
 ```
 
-The header is kept once instead of on every page; the page numbers, the repeated "Confidential" and the tracking parameters are gone; the text is the same. `sugo stats` measures the difference: **180 → 97 tokens, 46% saved** on this small generated example; real documents with less page furniture save much less (see below). Every removal is recorded with the cleaner that made it and the reason, so you can always check what was dropped. Text that cannot be read is marked as illegible, never guessed.
+The header is kept once instead of on every page; the page numbers, the repeated "Confidential" and the tracking parameters are gone; the text is the same. `sugo stats` measures the difference: **180 → 97 tokens, 46% saved** on this small generated example; real documents with less page furniture save much less (see below). Every removal is recorded with the cleaner that made it and the reason, so you can always check what was dropped. Text that cannot be read is marked as illegible, and handwriting in a scan, such as a signature, as `[handwriting]`: never guessed.
 
 Across a benchmark corpus in five languages, no text went missing in any document (on 3 screenshots the OCR misread a few characters, 1–7%). Savings depend heavily on the document:
 
@@ -88,7 +92,7 @@ Across a benchmark corpus in five languages, no text went missing in any documen
 | Chat or code screenshot, Markdown vs. sending the image itself | 94–98% cheaper (Claude, Gemini, OpenAI) |
 | A real EU regulation from EUR-Lex, mostly substantive legal text | 2.9–3.5% |
 
-And it stays fast on an ordinary computer, not just a new one: on a 2010 desktop with 2 cores and no GPU, a 100-page PDF converts in 3.6 s and a phone screenshot in 13.7 s (full numbers in [TESTING](https://github.com/Muralnick/sugo/blob/main/docs/TESTING.md)).
+And it stays fast on an ordinary computer: on a 2020 laptop with 4 cores, 8 GB of RAM and no GPU, a dense phone screenshot becomes text in 1.5 s; even on a 2010 desktop with 2 cores, a 100-page PDF converts in 3.6 s (full numbers in [TESTING](https://github.com/Muralnick/sugo/blob/main/docs/TESTING.md)).
 
 ## How it compares
 
@@ -108,16 +112,18 @@ Fair caveats: the corpus is small and mostly synthetic, and it was built by the 
 ## Status
 
 > [!NOTE]
-> **v0.1.1 is out**, on [PyPI](https://pypi.org/project/sugo-cli/) as `sugo-cli` (v0.1.0 was the first signed release). It is still 0.x: contracts may change, with notice, before 1.0. Releases are built reproducibly, with an SBOM, Sigstore attestations and PyPI Trusted Publishing.
+> **v0.1.4 is out**, on [PyPI](https://pypi.org/project/sugo-cli/) as `sugo-cli` and in the official [MCP Registry](https://registry.modelcontextprotocol.io/) as `io.github.Muralnick/sugo`. See the [changelog](https://github.com/Muralnick/sugo/blob/main/CHANGELOG.md) for what changed. It is still 0.x: contracts may change, with notice, before 1.0. Releases are built reproducibly, with an SBOM, Sigstore attestations and PyPI Trusted Publishing.
 
 | Works today | Coming next |
 |---|---|
 | Native PDFs, DOCX, XLSX, PPTX, XML | Scanned-book cleaners, EPUB, email, web pages |
 | Images and screenshots with local OCR (PNG, JPEG, WEBP) | Larger tables, `normal` and `quality` engine levels |
-| Chat and code screenshot detection | Japanese, Chinese, Korean |
-| Markdown, and JSON Lines chunks for vector databases | Interactive shell, guided setup |
-| Token metrics per provider (`sugo stats`) | Background service and folder watcher |
-| Command line, MCP server for agents, local web page | Work profiles and recipes |
+| Scans: handwriting marked, repeated letterheads removed | Japanese, Chinese, Korean |
+| Chat and code screenshot detection | Guided setup |
+| Markdown, and JSON Lines chunks for vector databases | Background service and folder watcher |
+| Conversion receipt, checked by `sugo verify` | Work profiles and recipes |
+| Token metrics per provider (`sugo stats`) | Docker images |
+| Command line, interactive shell, MCP server for agents, local web page | |
 | Interface and text rules in English, Italian, Spanish, French, German | |
 
 See the [roadmap](https://github.com/Muralnick/sugo/blob/main/docs/ROADMAP.md) for the full plan.
@@ -153,11 +159,18 @@ Convert a file and print its Markdown:
 sugo report.pdf
 ```
 
+Or type `sugo` alone to open the interactive shell: drag a file onto the window, press Enter, then use `/stats`, `/save` or `/help`.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Muralnick/sugo/main/docs/images/shell.png" alt="Sugo's interactive shell: the report converted to Markdown, 294 to 187 tokens, 36% saved, then the /stats command" width="620">
+</p>
+
 More things you can do:
 
 ```bash
 sugo convert *.pdf -o out/            # one NAME.md per file, in out/
 sugo convert report.pdf --chunks      # chunks as JSON Lines, ready for RAG
+sugo convert report.pdf --receipt     # also write report.receipt.json (see below)
 sugo stats screenshot.png             # tokens saved, per LLM provider
 sugo clip                             # convert the screenshot in your clipboard
 sugo ui                               # open the local web page: drop a file, get Markdown
@@ -165,6 +178,22 @@ sugo doctor                           # check the installation
 ```
 
 Add `--json` for output a script can read.
+
+### Check what was removed: the receipt
+
+With `--receipt` (or the receipt setting on the web page), Sugo also writes `NAME.receipt.json`: the SHA-256 of the file, the Sugo version and settings used, the token counts, every block it removed or edited with the cleaner and the reason, and the blocks flagged as uncertain (such as low-confidence OCR). Later, anyone can check that the file still converts to the same result:
+
+```bash
+sugo verify report.pdf report.receipt.json
+```
+
+`sugo verify` converts the file again with the receipt's own settings and reports what differs, by block id only, never the text. The web page has the same check in its Verify tab:
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Muralnick/sugo/main/docs/images/web-ui-verify.png" alt="The Verify tab of Sugo's web page: a PDF and its receipt chosen, and the answer: the conversion is unchanged, it matches the receipt" width="640">
+</p>
+
+The receipt shows that the *conversion* is faithful to the file: nothing dropped without a recorded reason, nothing invented. It says nothing about whether the document itself is genuine.
 
 ### Use it from an AI agent (MCP)
 
@@ -174,7 +203,7 @@ Sugo can serve agents such as Claude Code or Codex over MCP. It reads only insid
 claude mcp add sugo -- sugo mcp --root ~/Documents
 ```
 
-The agent gets two tools: `convert_document` and `estimate_savings`.
+The agent gets two tools: `convert_document` and `estimate_savings`. Sugo is also listed in the official MCP Registry as `io.github.Muralnick/sugo`, so clients that read the registry can install it from there.
 
 ### Uninstall
 
@@ -212,7 +241,7 @@ Measured on 2026-11-03 on a 2010 desktop: Intel Core i5-650 (2 cores, 4 threads,
 | Dense phone screenshot (30 lines) → text, OCR | 30 of 30 lines, 0% character errors, 411 MB | < 1 GB |
 | Same screenshot, time | 13.7 s | < 2 s |
 
-Native documents run well within the targets even on this machine. OCR is accurate but slow on a CPU without AVX; making it faster is on the roadmap. Details and scripts are in [TESTING](https://github.com/Muralnick/sugo/blob/main/docs/TESTING.md).
+Native documents run well within the targets even on this machine. OCR is accurate but slow on a CPU without AVX; on the 4-core reference machine (Intel i5-10300H, 2020) the same screenshot takes 1.5 s, within the target. Details and scripts are in [TESTING](https://github.com/Muralnick/sugo/blob/main/docs/TESTING.md).
 
 ## Supported files
 
