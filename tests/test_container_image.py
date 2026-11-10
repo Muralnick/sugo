@@ -7,6 +7,10 @@ import tomllib
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+
+from sugo.storage.paths import CACHE_DIR_ENV
+
 ROOT = Path(__file__).resolve().parents[1]
 DOCKERFILE = (ROOT / "Dockerfile").read_text(encoding="utf-8")
 
@@ -59,6 +63,8 @@ def test_packages_come_only_from_the_lock() -> None:
     syncs = re.findall(r"^RUN uv sync (.+)$", DOCKERFILE, flags=re.MULTILINE)
     assert syncs
     assert all("--locked" in flags and "--no-dev" in flags for flags in syncs)
+    # Installing Sugo itself must not fetch an unpinned build backend.
+    assert "--offline" in syncs[-1]
     assert "pip install" not in DOCKERFILE
     assert "UV_PYTHON_DOWNLOADS=never" in DOCKERFILE
 
@@ -70,6 +76,9 @@ def test_the_server_runs_unprivileged_and_reads_only_data() -> None:
     assert users[-1] not in {"root", "0"}
     assert 'ENTRYPOINT ["sugo", "mcp"]' in stage
     assert 'CMD ["--root", "/data"]' in stage
+    # No document text is kept in the container between documents.
+    assert 'cache = "ephemeral"' in stage
+    assert "XDG_CONFIG_HOME=/etc/sugo" in stage
     # Neither uv nor the source tree reaches the final image.
     assert "/uv" not in stage
     assert "COPY src" not in stage
@@ -83,7 +92,13 @@ def test_the_build_context_is_an_allow_list() -> None:
     assert allowed == {"pyproject.toml", "uv.lock", "README.md", "LICENSE", "src"}
 
 
-def test_the_probe_accepts_sugos_mcp_server(tmp_path: Path) -> None:
+def test_the_probe_accepts_sugos_mcp_server(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The server runs in a child process: keep it off the real cache and, on
+    # Linux and macOS, off the real user configuration.
+    monkeypatch.setenv(CACHE_DIR_ENV, str(tmp_path / "cache"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     sugo = Path(sys.executable).with_name("sugo.exe" if sys.platform == "win32" else "sugo")
     command = [str(sugo), "mcp", "--root", str(tmp_path)]
     assert load_probe().probe(command) is None
