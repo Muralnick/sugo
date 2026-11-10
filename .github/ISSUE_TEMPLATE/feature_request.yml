@@ -1,0 +1,24 @@
+name: Feature request
+description: Suggest something Sugo should do.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! Sugo's plan is in the [roadmap](https://github.com/Muralnick/sugo/blob/main/docs/ROADMAP.md); open questions are also welcome in [Discussions](https://github.com/Muralnick/sugo/discussions).
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do, and where Sugo falls short today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like
+      description: How you imagine it working. Examples of input files and expected Markdown help a lot.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you use instead today
