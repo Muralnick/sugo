@@ -103,3 +103,21 @@ jobs:
 
       - name: Tests
         run: uv run --python ${{ matrix.python }} pytest
+
+  container:
+    # Builds the MCP server's image (ADR-065) and asks it what Glama asks:
+    # initialize and tools/list over stdio. The run has no network, as
+    # conversion never needs one. Not required by the ruleset at first.
+    name: container
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build image
+        run: docker build --pull --tag sugo:ci .
+
+      - name: MCP introspection
+        run: python3 scripts/container/mcp_probe.py docker run -i --rm --network none sugo:ci

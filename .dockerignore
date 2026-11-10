@@ -1,0 +1,9 @@
+# Send only what the image build needs (ADR-065): nothing else in the
+# repository, and none of the local files around it, reaches the build.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!LICENSE
+!src/
+**/__pycache__
