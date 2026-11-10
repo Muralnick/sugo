@@ -1,0 +1,9 @@
+# Blank issues stay possible; the links below point to the right place first.
+blank_issues_enabled: true
+contact_links:
+  - name: Security problem
+    url: https://github.com/Muralnick/sugo/security/advisories/new
+    about: Report vulnerabilities privately, never in a public issue (see SECURITY.md).
+  - name: Question or idea
+    url: https://github.com/Muralnick/sugo/discussions
+    about: Ask how to use Sugo or suggest something in Discussions.

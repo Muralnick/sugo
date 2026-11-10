@@ -1,0 +1,50 @@
+name: Bug report
+description: Sugo failed, crashed, or converted something wrongly.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Do not attach private or confidential documents**: issues are public.
+        If you can, reproduce the problem with a file you can share, or describe the file instead.
+        Security problems go to the [private report form](https://github.com/Muralnick/sugo/security/advisories/new), not here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command or port
+      description: For example `sugo report.pdf`, `sugo ui`, the interactive shell, or the MCP server with an agent.
+    validations:
+      required: true
+  - type: input
+    id: file
+    attributes:
+      label: Kind of file
+      description: Format, number of pages, and whether it is scanned, a screenshot or a native document.
+  - type: textarea
+    id: output
+    attributes:
+      label: Error message or output
+      description: Paste the message, including the error code if there is one. Remove any personal paths or text.
+      render: text
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `sugo doctor`
+      description: Remove any personal paths before pasting.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System
+      description: Operating system, Python version, and how you installed Sugo (uv, pip, from source, Docker).
+    validations:
+      required: true
