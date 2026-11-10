@@ -33,12 +33,16 @@
   <tr>
     <td align="center"><b>🔒 100% locale</b><br>niente cloud, niente telemetria</td>
     <td align="center"><b>✂️ Meno token</b><br>33–38% con intestazioni ripetute, ~3% su testo legale reale</td>
-    <td align="center"><b>🧾 Niente perso in silenzio</b><br>ogni rimozione è registrata</td>
+    <td align="center"><b>🧾 Niente perso in silenzio</b><br>ogni rimozione è registrata e verificabile con <code>sugo verify</code></td>
     <td align="center"><b>🪶 Leggero</b><br>gira con 8 GB di RAM, senza GPU</td>
   </tr>
 </table>
 
 Sugo trasforma PDF, file Office, screenshot e immagini in Markdown pulito e compatto, pensato per sistemi RAG, agenti AI e chat con gli LLM. Toglie ciò che costa solo token (intestazioni e piè di pagina ripetuti, numeri di pagina, testo nascosto, parametri di tracciamento, l'interfaccia dell'app intorno a uno screenshot) e tiene il contenuto, le tabelle e la struttura. Tutto gira sul tuo computer: nessuna API cloud, nessuna telemetria, niente viene inviato altrove.
+
+<p align="center">
+  <img src="docs/images/web-ui-convert.png" alt="La pagina web locale di Sugo dopo aver convertito un report di tre pagine: 294 token prima, 187 dopo, il 36,4% in meno; il Markdown a sinistra, i blocchi tolti da ogni cleaner a destra" width="760">
+</p>
 
 > "Il sugo del discorso" è il succo, l'essenza; e il sugo, in cucina, si **riduce** finché resta solo il sapore concentrato. È quello che Sugo fa con i tuoi documenti.
 
@@ -75,7 +79,7 @@ The board expects stable growth next year.
 Details: https://acme.example/report
 ```
 
-L'intestazione resta una volta sola invece che su ogni pagina; i numeri di pagina, il "Confidential" ripetuto e i parametri di tracciamento spariscono; il testo è lo stesso. `sugo stats` misura la differenza: **da 180 a 97 token, il 46% in meno** su questo piccolo esempio generato; i documenti reali con meno elementi ripetuti risparmiano molto meno (vedi sotto). Ogni rimozione viene registrata con il cleaner che l'ha fatta e il motivo, così puoi sempre controllare cosa è stato tolto. Il testo illeggibile viene segnato come illeggibile, mai indovinato.
+L'intestazione resta una volta sola invece che su ogni pagina; i numeri di pagina, il "Confidential" ripetuto e i parametri di tracciamento spariscono; il testo è lo stesso. `sugo stats` misura la differenza: **da 180 a 97 token, il 46% in meno** su questo piccolo esempio generato; i documenti reali con meno elementi ripetuti risparmiano molto meno (vedi sotto). Ogni rimozione viene registrata con il cleaner che l'ha fatta e il motivo, così puoi sempre controllare cosa è stato tolto. Il testo illeggibile viene segnato come illeggibile, e la scrittura a mano in una scansione, come una firma, come `[handwriting]`: mai indovinato.
 
 Su un corpus di prova in cinque lingue nessun testo è mancato in nessun documento (su 3 screenshot l'OCR ha letto male qualche carattere, 1–7%). Il risparmio dipende molto dal documento:
 
@@ -85,7 +89,7 @@ Su un corpus di prova in cinque lingue nessun testo è mancato in nessun documen
 | Screenshot di chat o codice, Markdown invece dell'immagine | 94–98% in meno (Claude, Gemini, OpenAI) |
 | Un vero regolamento UE da EUR-Lex, testo legale per lo più sostanziale | 2,9–3,5% |
 
-Ed è veloce anche su un computer normale, non solo su uno nuovo: su un desktop del 2010 con 2 core e senza GPU, un PDF di 100 pagine si converte in 3,6 s e uno screenshot di telefono in 13,7 s (numeri completi in [TESTING](docs/TESTING.md)).
+Ed è veloce anche su un computer normale: su un portatile del 2020 con 4 core, 8 GB di RAM e senza GPU, uno screenshot di telefono fitto diventa testo in 1,5 s; anche su un desktop del 2010 con 2 core, un PDF di 100 pagine si converte in 3,6 s (numeri completi in [TESTING](docs/TESTING.md)).
 
 ## Come si confronta
 
@@ -105,16 +109,18 @@ Limiti da tenere presenti: il corpus è piccolo e per lo più sintetico, ed è s
 ## Stato
 
 > [!NOTE]
-> **La v0.1.1 è uscita**, su [PyPI](https://pypi.org/project/sugo-cli/) con il nome `sugo-cli` (la v0.1.0 è stata la prima release firmata). È ancora 0.x: i contratti possono cambiare, con preavviso, prima della 1.0. Le release sono costruite in modo riproducibile, con SBOM, attestazioni Sigstore e PyPI Trusted Publishing.
+> **La v0.1.4 è uscita**, su [PyPI](https://pypi.org/project/sugo-cli/) con il nome `sugo-cli` e nel [registro MCP](https://registry.modelcontextprotocol.io/) ufficiale come `io.github.Muralnick/sugo`. Le novità sono nel [changelog](CHANGELOG.md) (in inglese). È ancora 0.x: i contratti possono cambiare, con preavviso, prima della 1.0. Le release sono costruite in modo riproducibile, con SBOM, attestazioni Sigstore e PyPI Trusted Publishing.
 
 | Funziona oggi | In arrivo |
 |---|---|
 | PDF nativi, DOCX, XLSX, PPTX, XML | Cleaner per libri scansionati, EPUB, email, pagine web |
 | Immagini e screenshot con OCR locale (PNG, JPEG, WEBP) | Tabelle più grandi, livelli di motore `normal` e `quality` |
-| Riconoscimento di screenshot di chat e di codice | Giapponese, cinese, coreano |
-| Markdown, e chunk in JSON Lines per i database vettoriali | Shell interattiva, configurazione guidata |
-| Metriche dei token per provider (`sugo stats`) | Servizio in background e controllo delle cartelle |
-| Riga di comando, server MCP per agenti, pagina web locale | Profili di lavoro e ricette |
+| Scansioni: scrittura a mano segnata, carta intestata ripetuta tolta | Giapponese, cinese, coreano |
+| Riconoscimento di screenshot di chat e di codice | Configurazione guidata |
+| Markdown, e chunk in JSON Lines per i database vettoriali | Servizio in background e controllo delle cartelle |
+| Ricevuta di conversione, controllata da `sugo verify` | Profili di lavoro e ricette |
+| Metriche dei token per provider (`sugo stats`) | Immagini Docker |
+| Riga di comando, shell interattiva, server MCP per agenti, pagina web locale | |
 | Interfaccia e regole del testo in inglese, italiano, spagnolo, francese, tedesco | |
 
 Il piano completo è nella [roadmap](docs/ROADMAP.md) (in inglese).
@@ -150,11 +156,18 @@ Converti un file e stampa il suo Markdown:
 sugo report.pdf
 ```
 
+Oppure scrivi solo `sugo` per aprire la shell interattiva: trascina un file nella finestra, premi Invio, poi usa `/stats`, `/save` o `/help`.
+
+<p align="center">
+  <img src="docs/images/shell.png" alt="La shell interattiva di Sugo: il report convertito in Markdown, da 294 a 187 token, il 36% in meno, poi il comando /stats" width="620">
+</p>
+
 Altre cose che puoi fare:
 
 ```bash
 sugo convert *.pdf -o out/            # un NOME.md per file, nella cartella out/
 sugo convert report.pdf --chunks      # chunk in JSON Lines, pronti per il RAG
+sugo convert report.pdf --receipt     # scrive anche report.receipt.json (vedi sotto)
 sugo stats screenshot.png             # token risparmiati, per provider LLM
 sugo clip                             # converte lo screenshot negli appunti
 sugo ui                               # apre la pagina web locale: trascini un file, ottieni il Markdown
@@ -162,6 +175,22 @@ sugo doctor                           # controlla l'installazione
 ```
 
 Aggiungi `--json` per un output leggibile da uno script.
+
+### Controllare cosa è stato tolto: la ricevuta
+
+Con `--receipt` (o con l'impostazione della ricevuta nella pagina web), Sugo scrive anche `NOME.receipt.json`: lo SHA-256 del file, la versione di Sugo e le impostazioni usate, il conteggio dei token, ogni blocco tolto o modificato con il cleaner e il motivo, e i blocchi segnati come incerti (per esempio OCR poco sicuro). Più tardi chiunque può controllare che il file si converta ancora nello stesso risultato:
+
+```bash
+sugo verify report.pdf report.receipt.json
+```
+
+`sugo verify` riconverte il file con le impostazioni salvate nella ricevuta e indica cosa è diverso, solo con l'id dei blocchi, mai il testo. La pagina web fa lo stesso controllo nella scheda Verify:
+
+<p align="center">
+  <img src="docs/images/web-ui-verify.png" alt="La scheda Verify della pagina web di Sugo: scelti un PDF e la sua ricevuta, la risposta è che la conversione non è cambiata e corrisponde alla ricevuta" width="640">
+</p>
+
+La ricevuta dimostra che la *conversione* è fedele al file: niente tolto senza un motivo registrato, niente inventato. Non dice nulla sull'autenticità del documento stesso.
 
 ### Usarlo da un agente AI (MCP)
 
@@ -171,7 +200,7 @@ Sugo può servire agenti come Claude Code o Codex tramite MCP. Legge solo dentro
 claude mcp add sugo -- sugo mcp --root ~/Documenti
 ```
 
-L'agente riceve due strumenti: `convert_document` ed `estimate_savings`.
+L'agente riceve due strumenti: `convert_document` ed `estimate_savings`. Sugo è anche nel registro MCP ufficiale come `io.github.Muralnick/sugo`, così i client che leggono il registro possono installarlo da lì.
 
 ### Disinstallare
 
@@ -209,7 +238,7 @@ Misurato il 3 novembre 2026 su un desktop del 2010: Intel Core i5-650 (2 core, 4
 | Screenshot fitto del telefono (30 righe) → testo, OCR | 30 righe su 30, 0% di errori sui caratteri, 411 MB | < 1 GB |
 | Stesso screenshot, tempo | 13,7 s | < 2 s |
 
-I documenti nativi restano ben dentro gli obiettivi anche su questa macchina. L'OCR è preciso ma lento su un processore senza AVX; renderlo più veloce è nella roadmap. Dettagli e script sono in [TESTING](docs/TESTING.md) (in inglese).
+I documenti nativi restano ben dentro gli obiettivi anche su questa macchina. L'OCR è preciso ma lento su un processore senza AVX; sulla macchina di riferimento con 4 core (Intel i5-10300H, 2020) lo stesso screenshot richiede 1,5 s, dentro l'obiettivo. Dettagli e script sono in [TESTING](docs/TESTING.md) (in inglese).
 
 ## File supportati
 
