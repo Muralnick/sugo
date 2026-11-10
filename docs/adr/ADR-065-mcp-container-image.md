@@ -52,3 +52,9 @@ A single `Dockerfile` that builds the MCP server from the checked-out source, wi
 - The image is about the same size as the install (~400 MB of packages plus the Python base).
 - Base image digests age: Debian security fixes arrive only when the digests are updated. Until a later ADR adds automated updates, they are refreshed by hand at each release (release checklist).
 - Residual: Glama's exact build form was read from its documentation and third-party notes, not yet exercised; the first build may need small changes. Glama may wrap stdio servers in its own proxy; nothing in Sugo depends on that.
+
+## Amendment (2026-11-10): what Glama actually builds
+
+On first use, Glama's admin page did not build the repository's `Dockerfile`. It generates its own from a build form: `debian:trixie-slim`, Node.js for its `mcp-proxy` wrapper, `uv` and a Python version installed from the internet, then `git clone` of the repository at a commit. The form is filled with Python `3.12`, the build step `uv sync --locked --no-dev --no-editable` (packages still come from `uv.lock` with hashes) plus `mkdir -p /data`, and the command `/app/.venv/bin/sugo mcp --root /data`, with no environment variables and no placeholder parameters.
+
+So Glama's image is Glama's, built on its infrastructure with its own installers; the repository's `Dockerfile` is not what it runs. The `Dockerfile`, its rules and the `container` CI job stay: they are what people running Sugo in Docker or Podman use, and the CI probe still checks the same MCP answers Glama asks for. The repository also gets a `glama.json` naming its maintainer, which Glama's listing asks for.
