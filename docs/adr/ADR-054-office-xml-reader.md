@@ -1,6 +1,6 @@
 # ADR-054: Light Office and XML reader
 
-**Status:** Proposed  
+**Status:** Accepted (maintainer decisions recorded below; shipped in 0.1.0a1, 2026-11-03; status recorded 2026-11-12)  
 **Date:** 2026-10-31  
 **Deciders:** project author  
 **Implements:** ROADMAP v0.1 "Office (DOCX, XLSX, PPTX) and XML through a light reader", ADR-007 (`lite` level), ADR-018 (process isolation), THREAT_MODEL (XXE, hidden text)  

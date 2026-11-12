@@ -1,6 +1,6 @@
 # ADR-057: Support Python 3.12 to 3.14
 
-**Status:** Proposed
+**Status:** Accepted (shipped in 0.1.1, 2026-11-06; status recorded 2026-11-12)
 **Date:** 2026-11-06
 **Deciders:** project author
 **Amends:** ADR-033 (release pipeline: package metadata)
