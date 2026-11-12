@@ -119,7 +119,7 @@ Limiti da tenere presenti: il corpus è piccolo e per lo più sintetico, ed è s
 | Riconoscimento di screenshot di chat e di codice | Configurazione guidata |
 | Markdown, e chunk in JSON Lines per i database vettoriali | Servizio in background e controllo delle cartelle |
 | Ricevuta di conversione, controllata da `sugo verify` | Profili di lavoro e ricette |
-| Metriche dei token per provider (`sugo stats`) | Immagini Docker |
+| Metriche dei token per provider (`sugo stats`) | Immagini Docker, loader per LangChain e LlamaIndex |
 | Riga di comando, shell interattiva, server MCP per agenti, pagina web locale | |
 | Interfaccia e regole del testo in inglese, italiano, spagnolo, francese, tedesco | |
 
