@@ -122,7 +122,7 @@ Fair caveats: the corpus is small and mostly synthetic, and it was built by the 
 | Chat and code screenshot detection | Guided setup |
 | Markdown, and JSON Lines chunks for vector databases | Background service and folder watcher |
 | Conversion receipt, checked by `sugo verify` | Work profiles and recipes |
-| Token metrics per provider (`sugo stats`) | Docker images |
+| Token metrics per provider (`sugo stats`) | Docker images, LangChain and LlamaIndex loaders |
 | Command line, interactive shell, MCP server for agents, local web page | |
 | Interface and text rules in English, Italian, Spanish, French, German | |
 

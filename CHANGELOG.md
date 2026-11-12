@@ -30,6 +30,10 @@ still change, with notice, before 1.0).
   `sugo verify`; the status, feature table and OCR timings brought up to
   v0.1.4 (the shell, handwriting and letterheads are no longer listed as
   coming next).
+- Roadmap reviewed after v0.1: a v0.1.x reliability cycle (PDFium evaluation,
+  PDFs refused as "broken stream", an uninstall command), then v0.2 with
+  Japanese, Chinese and Korean, LangChain and LlamaIndex loaders and a
+  published container image; the Docling `normal` level moves to v0.3.
 
 ## [0.1.4] - 2026-11-09
 
