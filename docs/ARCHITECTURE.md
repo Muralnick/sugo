@@ -318,6 +318,8 @@ sugo setup                           guided setup
 sugo models pull normal              models
 sugo mcp                             MCP server
 sugo ui                              web interface
+sugo cache clear                     delete the page cache
+sugo uninstall                       delete settings and cache (ADR-066)
 ```
 
 Results to **stdout**, progress and messages to **stderr**; colours and progress bars off when not a TTY; `NO_COLOR` respected; `--json` everywhere.

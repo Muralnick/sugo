@@ -204,7 +204,15 @@ L'agente riceve due strumenti: `convert_document` ed `estimate_savings`. Sugo è
 
 ### Disinstallare
 
-Togli il programma nello stesso modo in cui l'hai installato:
+Prima fai cancellare a Sugo i suoi file: le impostazioni e la cache delle pagine, che contiene testo dei documenti che hai convertito. Te li elenca, chiede prima di cancellare e poi mostra il comando che toglie il programma (da Sugo 0.1.5):
+
+```bash
+sugo uninstall
+```
+
+Per cancellare solo la cache e continuare a usare Sugo, usa `sugo cache clear`.
+
+Poi togli il programma nello stesso modo in cui l'hai installato:
 
 ```bash
 uv tool uninstall sugo-cli
@@ -218,7 +226,7 @@ pip uninstall sugo-cli
 
 Se hai aggiunto Sugo a un agente, toglilo anche da lì, per esempio con `claude mcp remove sugo`.
 
-Disinstallare il programma non cancella i file che Sugo ha creato. Stanno solo sul tuo computer e puoi cancellarli a mano:
+Disinstallare solo il programma non cancella i file che Sugo ha creato. Stanno solo sul tuo computer; `sugo uninstall` li cancella, oppure puoi cancellarli a mano:
 
 | Cosa | Windows | macOS | Linux |
 |---|---|---|---|

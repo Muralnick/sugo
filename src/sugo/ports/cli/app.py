@@ -1,5 +1,5 @@
-"""The ``sugo`` command: convert, stats, clip, doctor, mcp, ui, verify and shell (ADR-022,
-ADR-048, ADR-055, ADR-056, ADR-062).
+"""The ``sugo`` command: convert, stats, clip, doctor, mcp, ui, verify, shell, cache and
+uninstall (ADR-022, ADR-048, ADR-055, ADR-056, ADR-062, ADR-066).
 
 ``sugo FILE`` is short for ``sugo convert FILE``. ``sugo`` alone opens the
 interactive shell in a terminal and prints the help anywhere else, so a
@@ -43,6 +43,7 @@ from sugo.core.constants import (
 from sugo.i18n import N_, ngettext
 from sugo.i18n import gettext as _
 from sugo.ports.cache import page_cache as _page_cache
+from sugo.ports.cli import uninstall
 from sugo.ports.cli.doctor import Status, missing_lite_packages, run_checks
 from sugo.ports.cli.translation import TranslatedCommand, TranslatedGroup, use_language
 from sugo.ports.errors import (
@@ -876,6 +877,101 @@ def _print_verify_result(source: str, differences: list[dict[str, Any]]) -> None
                 kind=difference["kind"],
             )
         _stdout.print(Text(line))
+
+
+# --- cache --------------------------------------------------------------------
+
+
+cache_app = typer.Typer(
+    cls=TranslatedGroup,
+    help=N_("Manage the page cache, which keeps text of converted documents."),
+    no_args_is_help=True,
+)
+app.add_typer(cache_app, name="cache")
+
+
+@cache_app.command(
+    "clear",
+    cls=TranslatedCommand,
+    help=N_("Delete the page cache. Conversions are slower until it fills again (ADR-066)."),
+)
+def cache_clear_command() -> None:
+    """Delete the cache; the help text is in the decorator, for translation."""
+    with _failures(json_output=False):
+        found = uninstall.find()
+        uninstall.clear_cache()
+    if found.cache is None:
+        _stderr.print(_("The cache is already empty."))
+    else:
+        _stderr.print(_("Deleted the cache ({size}).").format(size=_megabytes(found.cache_bytes)))
+
+
+# --- uninstall ----------------------------------------------------------------
+
+
+@app.command(
+    "uninstall",
+    cls=TranslatedCommand,
+    help=N_(
+        "Delete Sugo's settings and page cache, then show how to remove the program. "
+        "Asks first; your documents and outputs are never touched (ADR-066)."
+    ),
+)
+def uninstall_command(
+    yes: Annotated[bool, typer.Option("--yes", help=N_("Delete without asking."))] = False,
+    keep_config: Annotated[
+        bool, typer.Option("--keep-config", help=N_("Keep the settings file."))
+    ] = False,
+) -> None:
+    """Delete Sugo's files; the help text is in the decorator, for translation."""
+    found = uninstall.find()
+    settings = None if keep_config else found.settings
+    if settings is None and found.cache is None:
+        _stderr.print(_("Sugo has no files to delete on this computer."))
+    else:
+        _list_deletions(settings, found)
+        if not yes and not _interactive():
+            # A script never deletes data without saying so.
+            _stderr.print(_("Not a terminal: add --yes to delete them."))
+            raise typer.Exit(ExitCode.USAGE)
+        with _failures(json_output=False):
+            if not yes and not _confirm(_("Delete them? [y/N] ")):
+                _stderr.print(_("Nothing was deleted."))
+                return
+            uninstall.clear_cache()
+            if not keep_config:
+                uninstall.delete_settings()
+        _stderr.print(_("Deleted."))
+    _stderr.print(
+        Text(_("To remove the program: {command}").format(command=uninstall.removal_command()))
+    )
+    _stderr.print(
+        _("If you added Sugo to an AI agent, remove it there too, e.g. claude mcp remove sugo.")
+    )
+
+
+def _list_deletions(settings: Path | None, found: uninstall.Found) -> None:
+    _stderr.print(_("Sugo will delete:"))
+    if settings is not None:
+        _stderr.print(Text("  " + _("settings: {path}").format(path=_shown(str(settings)))))
+    if found.cache is not None:
+        line = _("cache, with text of converted documents: {path} ({size})").format(
+            path=_shown(str(found.cache)), size=_megabytes(found.cache_bytes)
+        )
+        _stderr.print(Text("  " + line))
+    _stderr.print(_("Your documents, outputs, receipts and sugo.toml files are not touched."))
+
+
+def _confirm(question: str) -> bool:
+    """Ask a yes/no question on the terminal; anything but yes is no."""
+    _stderr.print(question, end="")
+    answer = sys.stdin.readline().strip().lower()
+    # English answers work in every language; "y,yes" lists the local ones.
+    return answer in {"y", "yes", *_("y,yes").split(",")}
+
+
+def _megabytes(size: int) -> str:
+    return f"{size / 1_000_000:.1f} MB"
 
 
 # --- shared -------------------------------------------------------------------

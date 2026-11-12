@@ -36,6 +36,7 @@ from pydantic import ValidationError
 import sugo
 from sugo.core.constants import (
     CACHE_BUSY_TIMEOUT_S,
+    CACHE_DELETE_WAIT_S,
     CACHE_EVICT_TO_SHARE,
     CACHE_MAX_BYTES,
     CACHE_MAX_RECORD_BYTES,
@@ -45,11 +46,19 @@ from sugo.core.constants import (
     CACHE_WAL_LIMIT_BYTES,
 )
 from sugo.core.models import Page
-from sugo.storage.paths import cache_dir, check_private_file, ensure_private_dir
+from sugo.storage.paths import (
+    cache_dir,
+    check_plain_dir,
+    check_private_file,
+    ensure_private_dir,
+)
 
 _log = logging.getLogger(__name__)
 
 CACHE_FILE_NAME = "cache.db"
+# The database and its journals, as ``delete_cache`` removes them; "-journal"
+# is left only by a crash before a new database switched to WAL.
+_DELETED_SUFFIXES = ("", "-wal", "-shm", "-journal")
 # Bumped when the table layout or the record format changes; an older cache
 # is then rebuilt, never migrated, because everything in it is regenerable.
 _SCHEMA_VERSION = 1
@@ -406,6 +415,68 @@ class PageCache:
     def _remove_files(self) -> None:
         for suffix in ("", "-wal", "-shm"):
             self._path.with_name(self._path.name + suffix).unlink(missing_ok=True)
+
+
+def cache_files(directory: Path) -> list[Path]:
+    """The files a cache in ``directory`` can have, the database first, present or not."""
+    database = directory / CACHE_FILE_NAME
+    return [database.with_name(database.name + suffix) for suffix in _DELETED_SUFFIXES]
+
+
+def delete_cache(directory: Path) -> bool:
+    """Delete the cache files in ``directory``, then the folder if nothing else is in it (ADR-066).
+
+    Never a recursive delete: ``SUGO_CACHE_DIR`` may name a folder that also
+    holds the user's own files. Nothing is deleted unless every file passes
+    the checks and no other process is writing to the cache.
+
+    Returns:
+        Whether the folder itself was removed: False if it was missing or
+        holds other files.
+
+    Raises:
+        StorageDirError: If the folder or one of the files is a link, not
+            plain, or (on Linux and macOS) belongs to another user.
+        CacheUnavailableError: If another process is writing to the cache.
+        OSError: If the system refuses to delete a file or the folder.
+    """
+    try:
+        check_plain_dir(directory)
+    except FileNotFoundError:
+        return False
+    files = cache_files(directory)
+    for path in files:
+        check_private_file(path)
+    database = files[0]
+    if database.exists():
+        _wait_until_unused(database)
+    for path in files:
+        path.unlink(missing_ok=True)
+    if any(directory.iterdir()):
+        return False
+    directory.rmdir()
+    return True
+
+
+def _wait_until_unused(database: Path) -> None:
+    """Take the write lock once and let it go; fail if another process keeps it."""
+    try:
+        db = sqlite3.connect(database, timeout=CACHE_DELETE_WAIT_S, isolation_level=None)
+    except sqlite3.DatabaseError:
+        return
+    try:
+        db.execute("PRAGMA trusted_schema = OFF")
+        db.execute("BEGIN EXCLUSIVE")
+        db.execute("ROLLBACK")
+    except sqlite3.OperationalError as error:
+        if error.sqlite_errorcode in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED):
+            raise CacheUnavailableError("page cache is in use") from None
+        # Read-only, say: deleting the files reports it if it matters.
+    except sqlite3.DatabaseError:
+        # Damaged: nothing can be using it as a cache.
+        pass
+    finally:
+        db.close()
 
 
 def _decode(record: object) -> Page | None:

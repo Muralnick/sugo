@@ -67,3 +67,4 @@
 | [063](ADR-063-handwriting-in-scans.md) | Handwriting in scanned pages (signatures) | Accepted |
 | [064](ADR-064-scanned-letterheads.md) | Repeated letterheads in scanned documents | Accepted |
 | [065](ADR-065-mcp-container-image.md) | A minimal container image for the MCP server | Accepted |
+| [066](ADR-066-uninstall-command.md) | `sugo uninstall` and `sugo cache clear` | Accepted |

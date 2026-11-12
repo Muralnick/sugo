@@ -27,6 +27,7 @@ from sugo.storage.page_cache import (
     CacheLevel,
     CacheUnavailableError,
     PageCache,
+    delete_cache,
     extraction_key,
     output_key,
 )
@@ -423,3 +424,82 @@ def test_size_queries_never_read_records(cache: PageCache) -> None:
         )
     ]
     assert all("COVERING INDEX entries_by_use" in plan for plan in plans), plans
+
+
+# --- delete_cache (ADR-066) ---------------------------------------------------
+
+
+def filled(folder: Path) -> None:
+    with PageCache(folder / "cache.db") as opened:
+        opened.put(EXTRACTION, key(), page())
+
+
+def test_delete_cache_removes_the_files_and_the_empty_folder(tmp_path: Path) -> None:
+    folder = tmp_path / "cache"
+    filled(folder)
+    assert delete_cache(folder) is True
+    assert not folder.exists()
+
+
+def test_delete_cache_keeps_a_folder_with_other_files(tmp_path: Path) -> None:
+    # SUGO_CACHE_DIR may name a folder the user also keeps files in.
+    folder = tmp_path / "shared"
+    filled(folder)
+    (folder / "mine.txt").write_text("keep me")
+    (folder / "sub").mkdir()
+    assert delete_cache(folder) is False
+    assert sorted(path.name for path in folder.iterdir()) == ["mine.txt", "sub"]
+
+
+def test_delete_cache_of_a_missing_folder_does_nothing(tmp_path: Path) -> None:
+    assert delete_cache(tmp_path / "absent") is False
+    assert not (tmp_path / "absent").exists()
+
+
+def test_delete_cache_removes_a_damaged_database(tmp_path: Path) -> None:
+    folder = tmp_path / "cache"
+    folder.mkdir()
+    (folder / "cache.db").write_bytes(b"not a database" * 100)
+    (folder / "cache.db-journal").write_bytes(b"left by a crash")
+    assert delete_cache(folder) is True
+
+
+def test_delete_cache_in_use_deletes_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(page_cache, "CACHE_DELETE_WAIT_S", 0.05)
+    folder = tmp_path / "cache"
+    filled(folder)
+    writer = sqlite3.connect(folder / "cache.db", isolation_level=None)
+    writer.execute("BEGIN IMMEDIATE")
+    try:
+        with pytest.raises(CacheUnavailableError):
+            delete_cache(folder)
+        assert (folder / "cache.db").exists()
+    finally:
+        writer.execute("ROLLBACK")
+        writer.close()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX symbolic links")
+def test_delete_cache_refuses_a_linked_folder(tmp_path: Path) -> None:
+    target = tmp_path / "elsewhere"
+    filled(target)
+    (tmp_path / "link").symlink_to(target)
+    with pytest.raises(StorageDirError):
+        delete_cache(tmp_path / "link")
+    assert (target / "cache.db").exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX symbolic links")
+def test_delete_cache_refuses_a_planted_link_and_deletes_nothing(tmp_path: Path) -> None:
+    folder = tmp_path / "cache"
+    filled(folder)
+    target = tmp_path / "victim"
+    target.write_text("someone else's file")
+    (folder / "cache.db-shm").unlink(missing_ok=True)
+    (folder / "cache.db-shm").symlink_to(target)
+    with pytest.raises(StorageDirError):
+        delete_cache(folder)
+    assert (folder / "cache.db").exists()
+    assert target.read_text() == "someone else's file"

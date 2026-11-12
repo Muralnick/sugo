@@ -49,6 +49,21 @@ def ensure_private_dir(path: Path) -> Path:
     return path
 
 
+def check_plain_dir(path: Path) -> None:
+    """Make sure an existing directory is safe to delete files from, changing nothing (ADR-066).
+
+    Raises:
+        FileNotFoundError: If the path does not exist.
+        StorageDirError: If the path is a symbolic link, not a directory, or
+            (on Linux and macOS) owned by another user.
+    """
+    info = path.lstat()
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+        raise StorageDirError("storage path is not a plain directory")
+    if os.name == "posix" and info.st_uid != os.getuid():
+        raise StorageDirError("storage directory belongs to another user")
+
+
 def check_private_file(path: Path) -> None:
     """Make sure an existing file in a private directory cannot leak to another user.
 
