@@ -1,5 +1,7 @@
 # Features
 
+This page describes the full design. What works today is in the README's Status section; when the rest comes is in [ROADMAP.md](ROADMAP.md).
+
 Levels change engine power, not available features: interfaces, cleaning, chunking and metrics exist at every level.
 
 ## Common to all levels

@@ -113,13 +113,13 @@ Limiti da tenere presenti: il corpus è piccolo e per lo più sintetico, ed è s
 
 | Funziona oggi | In arrivo |
 |---|---|
-| PDF nativi, DOCX, XLSX, PPTX, XML | Cleaner per libri scansionati, EPUB, email, pagine web |
-| Immagini e screenshot con OCR locale (PNG, JPEG, WEBP) | Tabelle più grandi, livelli di motore `normal` e `quality` |
-| Scansioni: scrittura a mano segnata, carta intestata ripetuta tolta | Giapponese, cinese, coreano |
-| Riconoscimento di screenshot di chat e di codice | Configurazione guidata |
-| Markdown, e chunk in JSON Lines per i database vettoriali | Servizio in background e controllo delle cartelle |
-| Ricevuta di conversione, controllata da `sugo verify` | Profili di lavoro e ricette |
-| Metriche dei token per provider (`sugo stats`) | Immagini Docker, loader per LangChain e LlamaIndex |
+| PDF nativi, DOCX, XLSX, PPTX, XML | v0.1.x: i PDF rifiutati oggi come "broken stream", con il motore PDF scelto da un test su file reali |
+| Immagini e screenshot con OCR locale (PNG, JPEG, WEBP) | v0.2: giapponese, cinese, coreano |
+| Scansioni: scrittura a mano segnata, carta intestata ripetuta tolta | v0.2: loader per LangChain e LlamaIndex, un'immagine container pubblicata |
+| Riconoscimento di screenshot di chat e di codice | v0.3: livello di motore `normal` (Docling): impaginazioni complesse, vecchi file Office |
+| Markdown, e chunk in JSON Lines per i database vettoriali | v0.4: cartelle, archivi ed email; configurazione guidata; profili di lavoro |
+| Ricevuta di conversione, controllata da `sugo verify` | v0.5: livello di motore `quality` (modello di visione, GPU) |
+| Metriche dei token per provider (`sugo stats`) | Più avanti: EPUB e pagine web, servizio in background, controllo delle cartelle |
 | Riga di comando, shell interattiva, server MCP per agenti, pagina web locale | |
 | Interfaccia e regole del testo in inglese, italiano, spagnolo, francese, tedesco | |
 
@@ -201,6 +201,8 @@ claude mcp add sugo -- sugo mcp --root ~/Documenti
 ```
 
 L'agente riceve due strumenti: `convert_document` ed `estimate_savings`. Sugo è anche nel registro MCP ufficiale come `io.github.Muralnick/sugo`, così i client che leggono il registro possono installarlo da lì.
+
+Il server gira sullo stesso computer dell'agente, che lo avvia e ci parla direttamente: i tuoi documenti non lasciano mai quel computer. Per tenerlo in un container, il repository ha un `Dockerfile` (ADR-065); nessuna immagine è ancora pubblicata.
 
 ### Disinstallare
 

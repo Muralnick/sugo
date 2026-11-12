@@ -19,7 +19,7 @@ Sugo is built with the assistance of Claude (Anthropic), openly and on purpose. 
 3. **One module at a time**, each with tests and token measurements.
 4. **Real numbers.** Every claim about token savings is backed by reproducible benchmarks, always paired with a content-preservation measure.
 5. **Tooling as a safety net.** Static analysis, invariant tests, mutation testing and security scans compensate for the risks of AI-generated code.
-6. **Isolated environment.** Development happens in GitHub Codespaces; the agent has no access to the author's personal machine.
+6. **Supervised environment.** Development happens on the author's own computers with Claude Code, which asks before running commands; pull requests are reviewed by the author and checked by CI.
 
 ## Corrections log
 

@@ -54,11 +54,11 @@
 | [050](ADR-050-text-edits.md) | Text edits, text normalisation and tracking URLs | Accepted |
 | [051](ADR-051-configuration-v0.1.md) | Basic TOML configuration for v0.1 | Accepted |
 | [052](ADR-052-italian-interface.md) | Italian interface for v0.1 | Accepted |
-| [053](ADR-053-mcp-secret-exclusions.md) | Wider secret exclusions for the MCP server | Proposed |
-| [054](ADR-054-office-xml-reader.md) | Light Office and XML reader | Proposed |
+| [053](ADR-053-mcp-secret-exclusions.md) | Wider secret exclusions for the MCP server | Accepted |
+| [054](ADR-054-office-xml-reader.md) | Light Office and XML reader | Accepted |
 | [055](ADR-055-web-ui-v0.1.md) | Local web interface for v0.1 (`sugo ui`) | Accepted |
 | [056](ADR-056-conversion-receipt.md) | Conversion receipt and `sugo verify` | Accepted |
-| [057](ADR-057-python-3.13-3.14.md) | Support Python 3.12 to 3.14 | Proposed |
+| [057](ADR-057-python-3.13-3.14.md) | Support Python 3.12 to 3.14 | Accepted |
 | [058](ADR-058-readable-receipt-file.md) | Write the receipt file indented | Accepted |
 | [059](ADR-059-web-ui-cli-parity.md) | Bring the web UI level with the command line | Accepted |
 | [060](ADR-060-mcp-registry-ready-package.md) | A package the official MCP Registry can run | Accepted |

@@ -1,6 +1,6 @@
 # ADR-053: Wider secret exclusions for the MCP server
 
-**Status:** Proposed  
+**Status:** Accepted (shipped in 0.1.0a1, 2026-11-03; status recorded 2026-11-12)  
 **Date:** 2026-10-31  
 **Deciders:** project author  
 **Implements:** THREAT_MODEL D, principle 7, ROADMAP v0.1 "light Office and XML reader" (prerequisite)  

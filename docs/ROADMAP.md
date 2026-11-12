@@ -10,7 +10,7 @@ v0.1 shipped on 2026-11-05 and reached v0.1.4 on 2026-11-09. The order of the ne
 
 | Release | Content |
 |---|---|
-| v0.1.x | Evaluate PDFium (`pypdfium2`) as the PDF engine in place of PyMuPDF, with a test on the real-PDF corpus; decision by ADR. Fix the PDFs refused as "broken stream" (with whichever engine wins). An uninstall command (needs an ADR). |
+| v0.1.x | Evaluate PDFium (`pypdfium2`) as the PDF engine in place of PyMuPDF, with a test on the real-PDF corpus; decision by ADR. Fix the PDFs refused as "broken stream" (with whichever engine wins). An uninstall command: done, `sugo uninstall` and `sugo cache clear` (ADR-066). |
 | v0.2 | Japanese, Chinese and Korean, as an optional extra for their OCR models. LangChain and LlamaIndex loaders (needs an ADR: package layout, dependencies, licence questions for users). The container image published to GitHub Container Registry and signed by the release pipeline (ADR-065 amendment). |
 | v0.3 | `normal` level with Docling (complex Office layouts, legacy formats), the shared engine, and the safe model download it needs (ADR-013); within the 2.5 GB memory budget. |
 | v0.4 | Containers (folders, archives, emails), plan-first, guided setup and work profiles. |
