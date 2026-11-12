@@ -1064,6 +1064,86 @@ msgstr ""
 "Sì: sugo FILE converte, sugo stats FILE mostra i token per provider, e "
 "sugo convert FILE --chunks crea i chunk."
 
+# --- Cache and uninstall (ADR-066) ---------------------------------------------
+
+msgid "Manage the page cache, which keeps text of converted documents."
+msgstr "Gestisci la cache delle pagine, che conserva il testo dei documenti convertiti."
+
+msgid "Delete the page cache. Conversions are slower until it fills again (ADR-066)."
+msgstr "Cancella la cache delle pagine. Le conversioni sono più lente finché non si riempie di nuovo (ADR-066)."
+
+msgid "Delete Sugo's settings and page cache, then show how to remove the program. Asks first; your documents and outputs are never touched (ADR-066)."
+msgstr "Cancella le impostazioni e la cache delle pagine di Sugo, poi mostra come togliere il programma. Chiede prima; i tuoi documenti e i file prodotti non vengono mai toccati (ADR-066)."
+
+msgid "Delete without asking."
+msgstr "Cancella senza chiedere."
+
+msgid "Keep the settings file."
+msgstr "Tieni il file delle impostazioni."
+
+msgid "The cache is already empty."
+msgstr "La cache è già vuota."
+
+msgid "Deleted the cache ({size})."
+msgstr "Cache cancellata ({size})."
+
+msgid "Sugo has no files to delete on this computer."
+msgstr "Sugo non ha file da cancellare su questo computer."
+
+msgid "Not a terminal: add --yes to delete them."
+msgstr "Non è un terminale: aggiungi --yes per cancellarli."
+
+msgid "Delete them? [y/N] "
+msgstr "Li cancello? [s/N] "
+
+msgid "Nothing was deleted."
+msgstr "Non è stato cancellato niente."
+
+msgid "Deleted."
+msgstr "Cancellati."
+
+msgid "To remove the program: {command}"
+msgstr "Per togliere il programma: {command}"
+
+msgid "If you added Sugo to an AI agent, remove it there too, e.g. claude mcp remove sugo."
+msgstr "Se hai aggiunto Sugo a un agente AI, toglilo anche da lì, ad esempio claude mcp remove sugo."
+
+msgid "Sugo will delete:"
+msgstr "Sugo cancellerà:"
+
+msgid "settings: {path}"
+msgstr "impostazioni: {path}"
+
+msgid "cache, with text of converted documents: {path} ({size})"
+msgstr "cache, con il testo dei documenti convertiti: {path} ({size})"
+
+msgid "Your documents, outputs, receipts and sugo.toml files are not touched."
+msgstr "I tuoi documenti, i file prodotti, le ricevute e i file sugo.toml non vengono toccati."
+
+msgid "y,yes"
+msgstr "s,sì,si"
+
+msgid "Not deleted: the cache folder or a file in it is a link, not plain, or belongs to another user."
+msgstr "Non cancellata: la cartella della cache, o un file al suo interno, è un collegamento, non è normale o appartiene a un altro utente."
+
+msgid "Not deleted: the settings file or its folder is not plain, or not yours."
+msgstr "Non cancellato: il file delle impostazioni o la sua cartella non è normale, o non è tuo."
+
+msgid "Kept the folder {path}: it holds other files."
+msgstr "Cartella {path} tenuta: contiene altri file."
+
+msgid "Check it by hand: Sugo deletes only plain files that are yours."
+msgstr "Controlla a mano: Sugo cancella solo file normali che sono tuoi."
+
+msgid "The cache is in use by another Sugo: nothing was deleted."
+msgstr "La cache è in uso da un altro Sugo: non è stato cancellato niente."
+
+msgid "Close Sugo in other windows and AI agents, then try again."
+msgstr "Chiudi Sugo nelle altre finestre e negli agenti AI, poi riprova."
+
+msgid "Could not delete {path}: {reason}"
+msgstr "Impossibile cancellare {path}: {reason}"
+
 # --- Interface language (ADR-052) -------------------------------------------------
 
 msgid "language"

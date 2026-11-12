@@ -19,7 +19,7 @@ from importlib.metadata import PackageNotFoundError, version
 from sugo.core.constants import DISTRIBUTION_NAME
 from sugo.i18n import N_
 from sugo.i18n import gettext as _
-from sugo.storage.page_cache import CACHE_FILE_NAME
+from sugo.storage.page_cache import cache_files
 from sugo.storage.paths import cache_dir
 
 # Import name -> distribution name of the packages the lite level needs (ADR-039).
@@ -196,10 +196,11 @@ def _config() -> Check:
 
 def _cache() -> Check:
     directory = cache_dir()
-    database = directory / CACHE_FILE_NAME
-    if not database.exists():
+    files = [path for path in cache_files(directory) if path.is_file()]
+    if not files:
         return Check(N_("cache"), Status.OK, _("{folder} (empty)").format(folder=directory))
-    size_mb = database.stat().st_size / 1_000_000
+    # The journals too, as sugo uninstall counts them (ADR-066).
+    size_mb = sum(path.stat().st_size for path in files) / 1_000_000
     return Check("cache", Status.OK, f"{directory} ({size_mb:.1f} MB)")
 
 

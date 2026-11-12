@@ -18,6 +18,14 @@ still change, with notice, before 1.0).
   `tools/list`, as the Glama directory does.
 - `glama.json`, naming the maintainer for the Glama directory listing
   (ADR-065 amendment).
+- `sugo uninstall` (ADR-066): deletes Sugo's settings file and page cache,
+  after listing them and asking (`--yes` for scripts, `--keep-config` to
+  keep the settings), then shows the command that removes the program. It
+  never deletes a folder holding other files, follows no links, and stops
+  if another Sugo is using the cache. New error codes `CACHE_IN_USE`,
+  `STORAGE_REFUSED` and `DELETE_FAILED`.
+- `sugo cache clear` (ADR-066): deletes the page cache, which holds text of
+  converted documents, without uninstalling.
 
 ### Changed
 

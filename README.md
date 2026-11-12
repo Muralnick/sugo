@@ -207,7 +207,15 @@ The agent gets two tools: `convert_document` and `estimate_savings`. Sugo is als
 
 ### Uninstall
 
-Remove the program the same way you installed it:
+First let Sugo delete its own files: the settings and the page cache, which holds text from the documents you converted. It lists them, asks before deleting, and then shows the command that removes the program (from Sugo 0.1.5):
+
+```bash
+sugo uninstall
+```
+
+To delete only the cache and keep using Sugo, run `sugo cache clear`.
+
+Then remove the program the same way you installed it:
 
 ```bash
 uv tool uninstall sugo-cli
@@ -221,7 +229,7 @@ pip uninstall sugo-cli
 
 If you added Sugo to an agent, remove it there too, for example `claude mcp remove sugo`.
 
-Uninstalling the program does not delete the files Sugo created. They are only on your computer, and you can delete them by hand:
+Uninstalling the program alone does not delete the files Sugo created. They are only on your computer; `sugo uninstall` deletes them, or you can delete them by hand:
 
 | What | Windows | macOS | Linux |
 |---|---|---|---|
