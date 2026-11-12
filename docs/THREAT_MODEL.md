@@ -113,7 +113,7 @@ v0.1 web UI (`sugo ui`, ADR-055):
 
 ### H. Data at rest
 
-Owner-only permissions, ephemeral cache mode, retention, optional encryption of anonymization maps, full-disk encryption recommended, encrypted swap recommended for sensitive use.
+Owner-only permissions, ephemeral cache mode, retention, `sugo cache clear` and `sugo uninstall` to delete the cache and settings (ADR-066), optional encryption of anonymization maps, full-disk encryption recommended, encrypted swap recommended for sensitive use.
 
 ### I. Anonymization failures
 

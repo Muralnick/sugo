@@ -4,10 +4,10 @@ Thank you for helping. Before contributing, read `PRINCIPLES.md` and `CODE_STYLE
 
 ## Ways to contribute
 
-- **Bug reports**: use the issue template and attach the output of `sugo doctor --report` (review it before sharing).
+- **Bug reports**: use the issue template and attach the output of `sugo doctor` (review it before sharing; a sanitised `--report` bundle is planned).
 - **Translations**: interface strings use gettext (`.po` files in `src/sugo/i18n/locales/`); Italian is maintained by the project, other languages are welcome. Mark new text with `_()` or `N_()` and translate it in the same pull request: a test fails otherwise. See ADR-052.
 - **Language packs**: new languages through the `sugo.languages` extension family, with mandatory test cases.
-- **Extensions**: see "Extension requirements" in `docs/ARCHITECTURE.md`. Run `sugo plugin check` before publishing.
+- **Extensions**: see "Extension requirements" in `docs/ARCHITECTURE.md`. `sugo plugin check`, which will test an extension before publishing, is planned.
 - **Data contributions**: work profiles, recipes, provider formulas.
 - **Code**: pick an issue labelled `good first issue`.
 
