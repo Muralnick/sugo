@@ -474,6 +474,7 @@ def test_delete_cache_open_elsewhere_deletes_nothing(tmp_path: Path) -> None:
     assert delete_cache(folder) is True
 
 
+@pytest.mark.skipif(os.name != "posix", reason="the lock file is for Linux and macOS")
 def test_cache_being_deleted_is_not_opened(tmp_path: Path) -> None:
     folder = tmp_path / "cache"
     filled(folder)
