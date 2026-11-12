@@ -550,11 +550,6 @@ CACHE_MAX_RECORD_BYTES: Final = 64 * 1024 * 1024
 # two CLI commands run at once, before giving up on that cache operation.
 CACHE_BUSY_TIMEOUT_S: Final = 5.0
 
-# Seconds ``sugo cache clear`` and ``sugo uninstall`` wait for a process
-# writing to the cache before reporting it in use (ADR-066): a person is
-# waiting, and a job holding the lock longer is still converting.
-CACHE_DELETE_WAIT_S: Final = 1.0
-
 # Pages used in the last day are never evicted, even past the size limit: a
 # running job, here or in another process, must find its own pages again in
 # its later passes (the page store, ADR-006). The limit is soft for them.

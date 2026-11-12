@@ -1126,8 +1126,11 @@ msgstr "s,sì,si"
 msgid "Not deleted: the cache folder or a file in it is a link, not plain, or belongs to another user."
 msgstr "Non cancellata: la cartella della cache, o un file al suo interno, è un collegamento, non è normale o appartiene a un altro utente."
 
-msgid "Not deleted: the settings file is not a plain file."
-msgstr "Non cancellato: il file delle impostazioni non è un file normale."
+msgid "Not deleted: the settings file or its folder is not plain, or not yours."
+msgstr "Non cancellato: il file delle impostazioni o la sua cartella non è normale, o non è tuo."
+
+msgid "Kept the folder {path}: it holds other files."
+msgstr "Cartella {path} tenuta: contiene altri file."
 
 msgid "Check it by hand: Sugo deletes only plain files that are yours."
 msgstr "Controlla a mano: Sugo cancella solo file normali che sono tuoi."

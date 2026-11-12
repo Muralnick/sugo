@@ -1,6 +1,6 @@
 """Tests for sugo uninstall and sugo cache clear: what they delete, when, and what they say."""
 
-import sqlite3
+import os
 from pathlib import Path
 
 import pytest
@@ -12,7 +12,6 @@ from sugo.ports.cli import app as cli
 from sugo.ports.cli import uninstall
 from sugo.ports.cli.translation import use_language
 from sugo.ports.errors import ExitCode
-from sugo.storage import page_cache
 from sugo.storage.page_cache import CacheLevel, PageCache, extraction_key
 from sugo.storage.paths import CACHE_DIR_ENV
 
@@ -71,18 +70,20 @@ def test_cache_clear_with_no_cache_says_so(cache_folder: Path) -> None:
     assert "already empty" in result.stderr
 
 
-def test_cache_clear_in_use_reports_it(filled: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(page_cache, "CACHE_DELETE_WAIT_S", 0.05)
-    writer = sqlite3.connect(filled / "cache.db", isolation_level=None)
-    writer.execute("BEGIN IMMEDIATE")
-    try:
+def test_cache_clear_in_use_reports_it(filled: Path) -> None:
+    with PageCache(filled / "cache.db"):
         result = run("cache", "clear")
-    finally:
-        writer.execute("ROLLBACK")
-        writer.close()
     assert result.exit_code == ExitCode.ERROR
     assert "CACHE_IN_USE" in result.stderr
     assert (filled / "cache.db").exists()
+
+
+def test_cache_clear_says_when_it_keeps_the_folder(filled: Path) -> None:
+    (filled / "mine.txt").write_text("the user's own file")
+    result = run("cache", "clear")
+    assert result.exit_code == 0
+    assert "Kept the folder" in result.stderr
+    assert sorted(path.name for path in filled.iterdir()) == ["mine.txt"]
 
 
 def test_uninstall_outside_a_terminal_needs_yes(filled: Path, config_file: Path) -> None:
@@ -172,3 +173,27 @@ def test_a_settings_folder_is_refused(monkeypatch: pytest.MonkeyPatch, tmp_path:
 )
 def test_removal_command_follows_the_installer(prefix: str, command: str) -> None:
     assert uninstall.removal_command(Path(prefix)) == command
+
+
+def test_an_empty_settings_folder_is_removed(cache_folder: Path) -> None:
+    folder = settings.user_config_path().parent
+    assert folder.is_dir()
+    result = run("uninstall")
+    assert result.exit_code == 0
+    assert not folder.exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX symbolic links")
+def test_a_linked_settings_folder_is_refused(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # Deleting through the link would delete the file in a dotfiles repository.
+    real = tmp_path / "dotfiles"
+    real.mkdir()
+    (real / "config.toml").write_text("[ui]\n")
+    (tmp_path / "linked").symlink_to(real)
+    monkeypatch.setattr(settings, "user_config_path", lambda: tmp_path / "linked" / "config.toml")
+    result = run("uninstall", "--yes")
+    assert result.exit_code == ExitCode.SECURITY
+    assert "STORAGE_REFUSED" in result.stderr
+    assert (real / "config.toml").exists()

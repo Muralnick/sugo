@@ -899,11 +899,12 @@ def cache_clear_command() -> None:
     """Delete the cache; the help text is in the decorator, for translation."""
     with _failures(json_output=False):
         found = uninstall.find()
-        uninstall.clear_cache()
+        kept = uninstall.clear_cache()
     if found.cache is None:
         _stderr.print(_("The cache is already empty."))
     else:
         _stderr.print(_("Deleted the cache ({size}).").format(size=_megabytes(found.cache_bytes)))
+    _say_kept(kept)
 
 
 # --- uninstall ----------------------------------------------------------------
@@ -924,10 +925,16 @@ def uninstall_command(
     ] = False,
 ) -> None:
     """Delete Sugo's files; the help text is in the decorator, for translation."""
-    found = uninstall.find()
+    with _failures(json_output=False):
+        found = uninstall.find()
     settings = None if keep_config else found.settings
     if settings is None and found.cache is None:
         _stderr.print(_("Sugo has no files to delete on this computer."))
+        with _failures(json_output=False):
+            # Only empty folders can be left; removing them needs no question.
+            uninstall.clear_cache()
+            if not keep_config:
+                uninstall.delete_settings()
     else:
         _list_deletions(settings, found)
         if not yes and not _interactive():
@@ -938,10 +945,11 @@ def uninstall_command(
             if not yes and not _confirm(_("Delete them? [y/N] ")):
                 _stderr.print(_("Nothing was deleted."))
                 return
-            uninstall.clear_cache()
+            kept = uninstall.clear_cache()
             if not keep_config:
                 uninstall.delete_settings()
         _stderr.print(_("Deleted."))
+        _say_kept(kept)
     _stderr.print(
         Text(_("To remove the program: {command}").format(command=uninstall.removal_command()))
     )
@@ -960,6 +968,15 @@ def _list_deletions(settings: Path | None, found: uninstall.Found) -> None:
         )
         _stderr.print(Text("  " + line))
     _stderr.print(_("Your documents, outputs, receipts and sugo.toml files are not touched."))
+
+
+def _say_kept(folder: Path | None) -> None:
+    if folder is not None:
+        _stderr.print(
+            Text(
+                _("Kept the folder {path}: it holds other files.").format(path=_shown(str(folder)))
+            )
+        )
 
 
 def _confirm(question: str) -> bool:

@@ -464,21 +464,25 @@ def test_delete_cache_removes_a_damaged_database(tmp_path: Path) -> None:
     assert delete_cache(folder) is True
 
 
-def test_delete_cache_in_use_deletes_nothing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(page_cache, "CACHE_DELETE_WAIT_S", 0.05)
+def test_delete_cache_open_elsewhere_deletes_nothing(tmp_path: Path) -> None:
+    # An MCP server keeps the cache open, idle, for its whole life.
     folder = tmp_path / "cache"
-    filled(folder)
-    writer = sqlite3.connect(folder / "cache.db", isolation_level=None)
-    writer.execute("BEGIN IMMEDIATE")
-    try:
+    with PageCache(folder / "cache.db"):
         with pytest.raises(CacheUnavailableError):
             delete_cache(folder)
         assert (folder / "cache.db").exists()
+    assert delete_cache(folder) is True
+
+
+def test_cache_being_deleted_is_not_opened(tmp_path: Path) -> None:
+    folder = tmp_path / "cache"
+    filled(folder)
+    deleting = page_cache._lock(folder, exclusive=True)
+    try:
+        with pytest.raises(CacheUnavailableError):
+            PageCache(folder / "cache.db")
     finally:
-        writer.execute("ROLLBACK")
-        writer.close()
+        page_cache._unlock(deleting)
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX symbolic links")

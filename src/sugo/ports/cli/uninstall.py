@@ -21,7 +21,7 @@ from sugo.core.constants import DISTRIBUTION_NAME
 from sugo.i18n import gettext as _
 from sugo.ports.errors import ExitCode, PortError
 from sugo.storage.page_cache import CacheUnavailableError, cache_files, delete_cache
-from sugo.storage.paths import StorageDirError, cache_dir
+from sugo.storage.paths import StorageDirError, cache_dir, check_plain_dir
 
 
 @dataclass(frozen=True)
@@ -39,16 +39,19 @@ def find() -> Found:
 
     settings = user_config_path()
     folder = cache_dir()
-    sizes = [path.lstat().st_size for path in cache_files(folder) if _exists(path)]
+    sizes = [size for size in map(_size, cache_files(folder)) if size is not None]
     return Found(
-        settings=settings if _exists(settings) else None,
+        settings=settings if _size(settings) is not None else None,
         cache=folder if sizes else None,
         cache_bytes=sum(sizes),
     )
 
 
-def clear_cache() -> None:
+def clear_cache() -> Path | None:
     """Delete the page cache, and its folder if nothing else is in it.
+
+    Returns:
+        The folder, if it was kept because it holds other files.
 
     Raises:
         PortError: CACHE_IN_USE, STORAGE_REFUSED or DELETE_FAILED; then
@@ -60,29 +63,38 @@ def clear_cache() -> None:
         "or belongs to another user."
     )
     with _deleting(folder, refused=refused):
-        delete_cache(folder)
+        removed = delete_cache(folder)
+    return folder if not removed and folder.is_dir() else None
 
 
 def delete_settings() -> None:
     """Delete the settings file, and its folder if nothing else is in it.
 
-    A link is removed, never the file it points to.
+    A file that is a link is removed, never the file it points to; a folder
+    that is a link, or not the user's, is refused, since deleting through it
+    would delete a file somewhere else.
 
     Raises:
-        PortError: STORAGE_REFUSED if it is a folder or another special
-            file, DELETE_FAILED if the system refuses.
+        PortError: STORAGE_REFUSED if the file or its folder is not plain,
+            DELETE_FAILED if the system refuses.
     """
     from sugo.config.settings import user_config_path
 
     path = user_config_path()
-    with _deleting(path, refused=_("Not deleted: the settings file is not a plain file.")):
+    refused = _("Not deleted: the settings file or its folder is not plain, or not yours.")
+    with _deleting(path, refused=refused):
         try:
-            mode = path.lstat().st_mode
+            check_plain_dir(path.parent)
         except FileNotFoundError:
             return
-        if not (stat.S_ISREG(mode) or stat.S_ISLNK(mode)):
-            raise StorageDirError("settings path is not a plain file")
-        path.unlink()
+        try:
+            mode: int | None = path.lstat().st_mode
+        except FileNotFoundError:
+            mode = None
+        if mode is not None:
+            if not (stat.S_ISREG(mode) or stat.S_ISLNK(mode)):
+                raise StorageDirError("settings path is not a plain file")
+            path.unlink()
         # On Windows the cache folder is inside this one; it is gone by now.
         if not any(path.parent.iterdir()):
             path.parent.rmdir()
@@ -105,13 +117,12 @@ def removal_command(prefix: Path | None = None) -> str:
     return f"pip uninstall {DISTRIBUTION_NAME}"
 
 
-def _exists(path: Path) -> bool:
-    """Whether ``path`` exists, as itself: a broken link exists too."""
+def _size(path: Path) -> int | None:
+    """The size of ``path`` itself, a link not followed; None if it is not there."""
     try:
-        path.lstat()
+        return path.lstat().st_size
     except OSError:
-        return False
-    return True
+        return None
 
 
 @contextmanager

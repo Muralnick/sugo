@@ -18,8 +18,10 @@ Log messages never contain document text, keys or file names (principle 11).
 import hashlib
 import json
 import logging
+import os
 import shutil
 import sqlite3
+import sys
 import tempfile
 import time
 import zlib
@@ -33,10 +35,12 @@ from typing import Self
 
 from pydantic import ValidationError
 
+if sys.platform != "win32":
+    import fcntl
+
 import sugo
 from sugo.core.constants import (
     CACHE_BUSY_TIMEOUT_S,
-    CACHE_DELETE_WAIT_S,
     CACHE_EVICT_TO_SHARE,
     CACHE_MAX_BYTES,
     CACHE_MAX_RECORD_BYTES,
@@ -56,9 +60,12 @@ from sugo.storage.paths import (
 _log = logging.getLogger(__name__)
 
 CACHE_FILE_NAME = "cache.db"
-# The database and its journals, as ``delete_cache`` removes them; "-journal"
-# is left only by a crash before a new database switched to WAL.
-_DELETED_SUFFIXES = ("", "-wal", "-shm", "-journal")
+# Held shared by every process that has the cache open, exclusive by the one
+# deleting it (ADR-066). Linux and macOS only; see ``_lock``.
+LOCK_FILE_NAME = "cache.lock"
+# The database and its journals; "-journal" is left only by a crash before a
+# new database switched to WAL.
+_DATABASE_SUFFIXES = ("", "-wal", "-shm", "-journal")
 # Bumped when the table layout or the record format changes; an older cache
 # is then rebuilt, never migrated, because everything in it is regenerable.
 _SCHEMA_VERSION = 1
@@ -167,7 +174,12 @@ class PageCache:
         self._clock = clock
         self._temp_dir: tempfile.TemporaryDirectory[str] | None = None
         ensure_private_dir(path.parent)
-        self._db = self._open()
+        self._lock_fd = _lock(path.parent, exclusive=False)
+        try:
+            self._db = self._open()
+        except BaseException:
+            _unlock(self._lock_fd)
+            raise
         # Summing every record on each write would slow writes as the cache
         # grows, so this process keeps a running total and sums only when it
         # passes the limit. Writes by other processes are seen at that point.
@@ -330,8 +342,10 @@ class PageCache:
         self._estimated_bytes = 0
 
     def close(self) -> None:
-        """Close the database; an ephemeral cache is deleted."""
+        """Close the database and let the cache go; an ephemeral cache is deleted."""
         self._db.close()
+        _unlock(self._lock_fd)
+        self._lock_fd = None
         if self._temp_dir is not None:
             self._temp_dir.cleanup()
             self._temp_dir = None
@@ -349,8 +363,8 @@ class PageCache:
 
     def _open(self) -> sqlite3.Connection:
         # The database and its journal files, before SQLite follows any link.
-        for suffix in ("", "-wal", "-shm"):
-            check_private_file(self._path.with_name(self._path.name + suffix))
+        for path in _database_files(self._path):
+            check_private_file(path)
         try:
             return self._connect()
         except sqlite3.OperationalError:
@@ -413,14 +427,13 @@ class PageCache:
             _log.warning("page cache busy; space not given back yet")
 
     def _remove_files(self) -> None:
-        for suffix in ("", "-wal", "-shm"):
-            self._path.with_name(self._path.name + suffix).unlink(missing_ok=True)
+        for path in _database_files(self._path):
+            path.unlink(missing_ok=True)
 
 
 def cache_files(directory: Path) -> list[Path]:
-    """The files a cache in ``directory`` can have, the database first, present or not."""
-    database = directory / CACHE_FILE_NAME
-    return [database.with_name(database.name + suffix) for suffix in _DELETED_SUFFIXES]
+    """The files of the cache in ``directory``, the database first, present or not."""
+    return [*_database_files(directory / CACHE_FILE_NAME), directory / LOCK_FILE_NAME]
 
 
 def delete_cache(directory: Path) -> bool:
@@ -428,7 +441,7 @@ def delete_cache(directory: Path) -> bool:
 
     Never a recursive delete: ``SUGO_CACHE_DIR`` may name a folder that also
     holds the user's own files. Nothing is deleted unless every file passes
-    the checks and no other process is writing to the cache.
+    the checks and no other process has the cache open.
 
     Returns:
         Whether the folder itself was removed: False if it was missing or
@@ -437,7 +450,7 @@ def delete_cache(directory: Path) -> bool:
     Raises:
         StorageDirError: If the folder or one of the files is a link, not
             plain, or (on Linux and macOS) belongs to another user.
-        CacheUnavailableError: If another process is writing to the cache.
+        CacheUnavailableError: If another process has the cache open.
         OSError: If the system refuses to delete a file or the folder.
     """
     try:
@@ -447,36 +460,62 @@ def delete_cache(directory: Path) -> bool:
     files = cache_files(directory)
     for path in files:
         check_private_file(path)
-    database = files[0]
-    if database.exists():
-        _wait_until_unused(database)
-    for path in files:
-        path.unlink(missing_ok=True)
+    lock = _lock(directory, exclusive=True)
+    try:
+        try:
+            files[0].unlink(missing_ok=True)
+        except PermissionError:
+            if sys.platform == "win32":
+                # Windows refuses to delete a file another process has open.
+                raise CacheUnavailableError("page cache is in use") from None
+            raise
+        for path in files[1:]:
+            path.unlink(missing_ok=True)
+    finally:
+        _unlock(lock)
     if any(directory.iterdir()):
         return False
     directory.rmdir()
     return True
 
 
-def _wait_until_unused(database: Path) -> None:
-    """Take the write lock once and let it go; fail if another process keeps it."""
+def _database_files(database: Path) -> list[Path]:
+    return [database.with_name(database.name + suffix) for suffix in _DATABASE_SUFFIXES]
+
+
+def _lock(directory: Path, *, exclusive: bool) -> int | None:
+    """Lock the cache in ``directory``: shared to use it, exclusive to delete it.
+
+    A process holds the shared lock for as long as it has the cache open,
+    idle or not; SQLite's own locks show only a transaction in progress.
+    Windows needs no lock file: it refuses to delete a file that is open.
+
+    Returns:
+        The locked file descriptor, for ``_unlock``; None on Windows.
+
+    Raises:
+        StorageDirError: If the lock file is a link or not the user's.
+        CacheUnavailableError: If another process holds the other kind of lock.
+    """
+    if sys.platform == "win32":
+        return None
+    path = directory / LOCK_FILE_NAME
+    check_private_file(path)
+    descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
     try:
-        db = sqlite3.connect(database, timeout=CACHE_DELETE_WAIT_S, isolation_level=None)
-    except sqlite3.DatabaseError:
-        return
-    try:
-        db.execute("PRAGMA trusted_schema = OFF")
-        db.execute("BEGIN EXCLUSIVE")
-        db.execute("ROLLBACK")
-    except sqlite3.OperationalError as error:
-        if error.sqlite_errorcode in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED):
-            raise CacheUnavailableError("page cache is in use") from None
-        # Read-only, say: deleting the files reports it if it matters.
-    except sqlite3.DatabaseError:
-        # Damaged: nothing can be using it as a cache.
-        pass
-    finally:
-        db.close()
+        fcntl.flock(descriptor, (fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH) | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(descriptor)
+        raise CacheUnavailableError("page cache is in use") from None
+    except BaseException:
+        os.close(descriptor)
+        raise
+    return descriptor
+
+
+def _unlock(descriptor: int | None) -> None:
+    if descriptor is not None:
+        os.close(descriptor)
 
 
 def _decode(record: object) -> Page | None:

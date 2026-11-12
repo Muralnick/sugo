@@ -5,6 +5,7 @@
 **Deciders:** project author
 **Implements:** ROADMAP v0.1.x "an uninstall command"; the `clear` part of ARCHITECTURE §10's `sugo cache stats|clean|clear|verify`
 **Builds on:** ADR-019 and ADR-045 (storage, page cache), ADR-048 (CLI), ADR-051 (configuration)
+**Amends:** ADR-045 (the cache holds a lock file while open, Linux and macOS)
 **Adds:** two commands, three error codes
 **Adds dependencies:** none
 
@@ -15,7 +16,7 @@ Removing the program (`uv tool uninstall sugo-cli`, `pip uninstall sugo-cli`) le
 | What | Where (platformdirs) | Files Sugo writes there |
 |---|---|---|
 | Settings | user config folder, e.g. `~/.config/sugo` | `config.toml`, only if the user wrote it |
-| Page cache | user cache folder, e.g. `~/.cache/sugo`, or `SUGO_CACHE_DIR` | `cache.db`, `cache.db-wal`, `cache.db-shm` |
+| Page cache | user cache folder, e.g. `~/.cache/sugo`, or `SUGO_CACHE_DIR` | `cache.db`, `cache.db-wal`, `cache.db-shm`, `cache.lock` (section 4) |
 
 Nothing else persists: the shell keeps its history in memory (ADR-062), the ephemeral cache and the web UI's launcher page live in temporary folders deleted on close. The cache holds the text of converted documents, so leaving it behind is a privacy problem for exactly the users who care most. On Windows both folders share `%LOCALAPPDATA%\sugo`, the cache in its `Cache` subfolder.
 
@@ -48,9 +49,9 @@ Deletes the page cache, as step 1 does for the cache, with no question: the cach
 The cache folder can be anything `SUGO_CACHE_DIR` names, such as the home folder. So:
 
 - **Never a recursive delete.** Only the named files above are removed; then the folder is removed only if empty (`rmdir`). A folder holding other files is kept, and the output says so.
-- **No links followed.** As ADR-045 for opening: a cache folder or file that is a symbolic link, not a plain directory or file, has other hard links, or belongs to another user is refused, and nothing in it is deleted. A settings file that is a link has the link removed, never its target.
-- **Not while in use.** Before deleting, the cache is opened with SQLite and locked exclusively, with a short wait. If another Sugo is converting (a shell, `sugo ui`, an agent's MCP server), the command stops, deletes nothing, and asks the user to close the others and try again. A damaged database is deleted anyway; nothing can be using it as a cache.
-- Order: cache first, then settings, then the settings folder if empty, which on Windows is the cache folder's parent.
+- **No links followed.** As ADR-045 for opening: a cache folder or file that is a symbolic link, not a plain directory or file, has other hard links, or belongs to another user is refused, and nothing in it is deleted. A settings file that is a link has the link removed, never its target; a settings folder that is a link is refused, since deleting through it would delete a file somewhere else.
+- **Not while in use.** SQLite's locks show only a transaction in progress, not a process that keeps the cache open and idle, as an agent's MCP server does for its whole life. So, on Linux and macOS, every process that opens the cache holds a shared lock (`flock`) on `cache.lock` next to it until it closes it; deleting takes the exclusive lock without waiting. If another Sugo has the cache open (a shell, `sugo ui`, an MCP server), the command stops, deletes nothing, and asks the user to close the others and try again. A process that finds the cache being deleted runs without it, as for a busy cache (ADR-045). Windows needs no lock file: it refuses to delete a file another process has open, and that refusal on the database is reported the same way. The database is never opened to delete it, so a damaged or planted one is just removed.
+- Order: cache first, then settings, then the settings folder if empty, which on Windows is the cache folder's parent. Empty folders left from earlier are removed even when there is nothing else to delete.
 - File names and paths are shown only on the user's terminal, escaped as in ADR-048, never logged (principle 11).
 
 ### 5. Public contract
@@ -76,4 +77,5 @@ A file named `cache` or `uninstall` can still be converted with `sugo convert ca
 
 - One command removes every trace Sugo leaves, and the README's manual table becomes the fallback.
 - Three new error codes and two commands join the CLI contract.
+- Opening the cache costs one more small file and a lock call; `sugo doctor` now counts the journal files in the cache size, as `sugo uninstall` does.
 - The installer guess may be wrong for unusual layouts; the advice then is the generic `pip uninstall sugo-cli`, which the README also gives.

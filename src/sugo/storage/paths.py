@@ -35,17 +35,12 @@ def ensure_private_dir(path: Path) -> Path:
             (on Linux and macOS) owned by another user.
     """
     path.mkdir(mode=0o700, parents=True, exist_ok=True)
-    info = path.lstat()
     # A link could point the cache, and so document text, anywhere.
-    if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
-        raise StorageDirError("storage path is not a plain directory")
+    check_plain_dir(path)
     # Windows has no POSIX owners or modes; a profile folder is private by
     # default there, and this is documented in ADR-045.
-    if os.name == "posix":
-        if info.st_uid != os.getuid():
-            raise StorageDirError("storage directory belongs to another user")
-        if stat.S_IMODE(info.st_mode) & 0o077:
-            path.chmod(0o700)
+    if os.name == "posix" and stat.S_IMODE(path.lstat().st_mode) & 0o077:
+        path.chmod(0o700)
     return path
 
 
