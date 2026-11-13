@@ -109,7 +109,7 @@ Limiti da tenere presenti: il corpus è piccolo e per lo più sintetico, ed è s
 ## Stato
 
 > [!NOTE]
-> **La v0.1.5 è uscita**, su [PyPI](https://pypi.org/project/sugo-cli/) con il nome `sugo-cli` e nel [registro MCP](https://registry.modelcontextprotocol.io/) ufficiale come `io.github.Muralnick/sugo`. Le novità sono nel [changelog](CHANGELOG.md) (in inglese). È ancora 0.x: i contratti possono cambiare, con preavviso, prima della 1.0. Le release sono costruite in modo riproducibile, con SBOM, attestazioni Sigstore e PyPI Trusted Publishing.
+> **La v0.2.0 è uscita**, su [PyPI](https://pypi.org/project/sugo-cli/) con il nome `sugo-cli` e nel [registro MCP](https://registry.modelcontextprotocol.io/) ufficiale come `io.github.Muralnick/sugo`. Le novità sono nel [changelog](CHANGELOG.md) (in inglese). È ancora 0.x: i contratti possono cambiare, con preavviso, prima della 1.0. Le release sono costruite in modo riproducibile, con SBOM, attestazioni Sigstore e PyPI Trusted Publishing.
 
 | Funziona oggi | In arrivo |
 |---|---|
@@ -204,6 +204,13 @@ for chunk in result.chunks:
 ```
 
 Di default, dopo la chiamata non resta niente sul disco. La [guida all'API Python](docs/python-api.md) (in inglese) spiega errori, impostazioni e cache.
+
+Per LangChain e LlamaIndex ci sono loader pronti, che danno un documento per ogni chunk di Sugo, con pagine e titoli nei metadati:
+
+```bash
+pip install langchain-sugo            # from langchain_sugo import SugoLoader
+pip install llama-index-readers-sugo  # from llama_index.readers.sugo import SugoReader
+```
 
 ### Usarlo da un agente AI (MCP)
 

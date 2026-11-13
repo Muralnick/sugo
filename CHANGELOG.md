@@ -7,6 +7,8 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-13
+
 ### Added
 
 - A public Python API (ADR-067): `sugo.convert(path_or_bytes, chunks=...,
@@ -17,15 +19,21 @@ still change, with notice, before 1.0).
   document text stays on disk (`cache="user"` for the persistent one).
   `import sugo` stays fast, and the API prints nothing. `Result.document_id`
   is the id every chunk carries. Guide: `docs/python-api.md`.
-- `langchain-sugo` (ADR-068), a LangChain document loader in
-  `integrations/langchain-sugo`, with its own lock and CI job; not published
-  yet. One document per Sugo chunk with the chunk id as document id, scalar
-  metadata (pages, headings, provenance), files with credentials skipped by
-  default, tests run with network access blocked.
-- `llama-index-readers-sugo` (ADR-068), the same for LlamaIndex in
+- `langchain-sugo` 0.1.0 (ADR-068), a LangChain document loader in
+  `integrations/langchain-sugo`, with its own lock and CI job, published as
+  its own package. One document per Sugo chunk with the chunk id as
+  document id, scalar metadata (pages, headings, provenance), files with
+  credentials skipped by default, tests run with network access blocked.
+- `llama-index-readers-sugo` 0.1.0 (ADR-068), the same for LlamaIndex in
   `integrations/llama-index-readers-sugo`: `SugoReader`, usable directly or
   as a `file_extractor` of `SimpleDirectoryReader`. Ids, digests and counts
-  are kept out of the embedded and LLM text. Not published yet.
+  are kept out of the embedded and LLM text. Published as its own package.
+
+### Changed
+
+- The release workflow also publishes the two loaders, each from its own
+  tag (`langchain-sugo-vX.Y.Z`, `llama-index-readers-sugo-vX.Y.Z`), after
+  checking that the tag matches the project's version (ADR-033 amendment).
 
 ## [0.1.5] - 2026-11-13
 
