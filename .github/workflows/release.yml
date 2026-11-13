@@ -148,14 +148,16 @@ jobs:
           path: dist
 
       # A loader's dependencies, sugo-cli included, come from PyPI: release
-      # sugo-cli first. The lite extra is empty since ADR-060.
+      # sugo-cli first. The lite extra is empty since ADR-060. The 14-day
+      # rule (ADR-035) applies to every dependency but sugo-cli itself: a
+      # loader ships right after the sugo-cli release it needs.
       - name: Install the package into a release environment
         env:
           PROJECT_NAME: ${{ needs.target.outputs.name }}
         run: |
           uv venv .venv-release
           whl=$(ls dist/*.whl)
-          uv pip install --python .venv-release "${PROJECT_NAME} @ ${whl}"
+          uv pip install --python .venv-release "${PROJECT_NAME} @ ${whl}" --exclude-newer-package sugo-cli=false
 
       - name: Generate the CycloneDX SBOM
         run: |
