@@ -1,6 +1,6 @@
 [project]
 name = "sugo-cli"
-version = "0.2.0"
+version = "0.2.1"
 description = "Documents, reduced: local conversion of documents and screenshots into compact Markdown for LLMs and RAG."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
