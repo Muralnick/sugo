@@ -7,6 +7,8 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-11-13
+
 ### Added
 
 - A `Dockerfile` for the MCP server (ADR-065): `docker run -i --rm

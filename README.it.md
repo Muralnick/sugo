@@ -109,7 +109,7 @@ Limiti da tenere presenti: il corpus è piccolo e per lo più sintetico, ed è s
 ## Stato
 
 > [!NOTE]
-> **La v0.1.4 è uscita**, su [PyPI](https://pypi.org/project/sugo-cli/) con il nome `sugo-cli` e nel [registro MCP](https://registry.modelcontextprotocol.io/) ufficiale come `io.github.Muralnick/sugo`. Le novità sono nel [changelog](CHANGELOG.md) (in inglese). È ancora 0.x: i contratti possono cambiare, con preavviso, prima della 1.0. Le release sono costruite in modo riproducibile, con SBOM, attestazioni Sigstore e PyPI Trusted Publishing.
+> **La v0.1.5 è uscita**, su [PyPI](https://pypi.org/project/sugo-cli/) con il nome `sugo-cli` e nel [registro MCP](https://registry.modelcontextprotocol.io/) ufficiale come `io.github.Muralnick/sugo`. Le novità sono nel [changelog](CHANGELOG.md) (in inglese). È ancora 0.x: i contratti possono cambiare, con preavviso, prima della 1.0. Le release sono costruite in modo riproducibile, con SBOM, attestazioni Sigstore e PyPI Trusted Publishing.
 
 | Funziona oggi | In arrivo |
 |---|---|
