@@ -7,6 +7,8 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-13
+
 ### Security
 
 - The LangChain and LlamaIndex loaders now also skip a file whose text
@@ -18,6 +20,8 @@ still change, with notice, before 1.0).
 ### Added
 
 - `Result.holds_private_key` and `Result.has_credentials` in the Python API.
+- `langchain-sugo` 0.1.1 and `llama-index-readers-sugo` 0.1.1, with the fix
+  above; they require `sugo-cli` 0.2.1.
 
 ## [0.2.0] - 2026-11-13
 

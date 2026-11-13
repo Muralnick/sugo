@@ -848,7 +848,7 @@ wheels = [
 
 [[package]]
 name = "llama-index-readers-sugo"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "llama-index-core" },
@@ -2025,7 +2025,7 @@ asyncio = [
 
 [[package]]
 name = "sugo-cli"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "../../" }
 dependencies = [
     { name = "defusedxml" },

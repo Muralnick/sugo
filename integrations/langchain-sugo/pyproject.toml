@@ -1,14 +1,15 @@
 [project]
 name = "langchain-sugo"
-version = "0.1.0"
+version = "0.1.1"
 description = "LangChain document loader for Sugo: local, compact Markdown chunks from PDF, Office files and images."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.12,<3.15"
 dependencies = [
-    # The public API (ADR-067) first ships in sugo-cli 0.2.
-    "sugo-cli>=0.2,<0.3",
+    # The public API (ADR-067) first ships in sugo-cli 0.2; 0.2.1 adds
+    # Result.has_credentials, which the loader skips on.
+    "sugo-cli>=0.2.1,<0.3",
     "langchain-core>=1.7.3,<2",
 ]
 classifiers = [
