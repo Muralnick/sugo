@@ -41,6 +41,7 @@ jobs:
     outputs:
       directory: ${{ steps.pick.outputs.directory }}
       name: ${{ steps.pick.outputs.name }}
+      environment: ${{ steps.pick.outputs.environment }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -197,14 +198,15 @@ jobs:
   publish:
     name: publish to PyPI
     if: github.event_name == 'push'
-    needs: attest
+    needs: [target, attest]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    # Requires a one-time, by-hand step on pypi.org for each project
-    # (sugo-cli, langchain-sugo, llama-index-readers-sugo): add this
-    # repository, this workflow and the release environment as its Trusted
-    # Publisher (ADR-033, ADR-068).
-    environment: release
+    # Each project has its own environment (release, release-langchain-sugo,
+    # release-llama-index-readers-sugo), each with the maintainer as required
+    # reviewer, and on pypi.org its own Trusted Publisher: this repository,
+    # this workflow and that environment (ADR-033, ADR-068). With one shared
+    # environment, PyPI took every run for sugo-cli's publisher.
+    environment: ${{ needs.target.outputs.environment }}
     permissions:
       id-token: write
       contents: read
