@@ -393,6 +393,24 @@ def test_stream_run_as_content_is_refused_for_any_brotli_name(
     assert refusal.message == BROTLI_REFUSAL
 
 
+@pytest.mark.parametrize(
+    "extra",
+    [b"<< /X 1 >>", b"<< /AP << /N 5 0 R >> >>"],
+    ids=["gap", "reference-to-the-gap"],
+)
+def test_gap_in_the_object_numbers_is_read(raw_pdf: RawPdf, extra: bytes) -> None:
+    # PDF reads a number the file never defines as null; it holds nothing to check.
+    data = raw_pdf(extra=extra, gap=True)
+    assert isinstance(messages(data)[0], Opened)
+
+
+def test_gap_does_not_hide_a_brotli_name_elsewhere(raw_pdf: RawPdf) -> None:
+    # The object after the gap is still read and checked.
+    (refusal,) = messages(raw_pdf(extra=b"<< /X /Br >>", gap=True))
+    assert isinstance(refusal, Refused)
+    assert refusal.message == BROTLI_REFUSAL
+
+
 def test_brotli_name_by_chance_in_image_pixels_is_not_refused() -> None:
     image = (
         "<< /Type /XObject /Subtype /Image /Width 4 /Height 1"

@@ -10,13 +10,17 @@ from PIL import Image, ImageDraw, ImageFont
 RawPdf = Callable[..., bytes]
 
 
-def _raw_pdf(stream_dict: bytes = b"", content: bytes = b"BT ET", extra: bytes = b"") -> bytes:
+def _raw_pdf(
+    stream_dict: bytes = b"", content: bytes = b"BT ET", extra: bytes = b"", gap: bool = False
+) -> bytes:
     """A minimal hand-written PDF, so tests control every byte MuPDF would see.
 
     Args:
         stream_dict: Extra entries for the content stream's dictionary.
         content: The content stream's bytes, stored as is.
         extra: One more object, numbered 5, e.g. a filter name.
+        gap: Number ``extra`` 6 instead and list no object 5, a gap in the
+            numbering that cairo and Microsoft Print to PDF write.
     """
     objects = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
@@ -26,16 +30,19 @@ def _raw_pdf(stream_dict: bytes = b"", content: bytes = b"BT ET", extra: bytes =
     ]
     if extra:
         objects.append(extra)
+    numbers = [1, 2, 3, 4, 6 if gap else 5][: len(objects)]
     out = b"%PDF-1.7\n"
     offsets = []
-    for number, body in enumerate(objects, 1):
+    for number, body in zip(numbers, objects, strict=True):
         offsets.append(len(out))
         out += b"%d 0 obj\n%s\nendobj\n" % (number, body)
     xref = len(out)
-    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)
-    out += b"".join(b"%010d 00000 n \n" % offset for offset in offsets)
+    entries = [b"%010d 00000 n \n" % offset for offset in offsets]
+    out += b"xref\n0 5\n0000000000 65535 f \n" + b"".join(entries[:4])
+    if len(entries) > 4:
+        out += b"%d 1\n%s" % (numbers[4], entries[4])
     out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (
-        len(objects) + 1,
+        numbers[-1] + 1,
         xref,
     )
     return out
