@@ -163,3 +163,11 @@ def test_the_reader_uses_only_the_public_sugo_api() -> None:
                 and node.value.id == "sugo"
             ):
                 assert node.attr in PUBLIC_SUGO, (path.name, node.attr)
+
+
+def test_a_private_key_in_a_pdf_is_skipped_by_default(write: Write) -> None:
+    key = write("setup.pdf", make_pdf("Server notes", "-----BEGIN RSA PRIVATE KEY-----", "MIIEow"))
+    reader = SugoReader()
+    assert reader.load_data(key) == []
+    assert reader.skipped == [Skipped(path=key.as_posix(), code="CONTENT_EXCLUDED")]
+    assert SugoReader(on_secret="include").load_data(key)

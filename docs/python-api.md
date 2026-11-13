@@ -47,6 +47,8 @@ Each `sugo.Chunk` has the fields of the published JSON Schema (`schemas/chunk-v1
 | `failed_pages`, `partial` | Pages that could not be read; `partial` is true if there are any |
 | `removed`, `edited` | Blocks removed and texts edited, per cleaner, each with a reason in the receipt |
 | `secret_blocks` | Blocks flagged as holding credentials, such as passwords in an XML file |
+| `holds_private_key` | True when the text holds a PEM or OpenPGP private key, such as one pasted into a PDF |
+| `has_credentials` | True when either of the two above applies: the files Sugo's MCP server never sends to an agent |
 | `tokens` | Tokens of the Markdown (o200k_base) |
 | `sugo_version`, `config_hash` | What produced the output, for reproducibility |
 | `receipt` | The receipt as JSON, only with `receipt=True` (see `sugo verify`) |

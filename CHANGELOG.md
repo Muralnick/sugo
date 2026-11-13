@@ -7,6 +7,18 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+### Security
+
+- The LangChain and LlamaIndex loaders now also skip a file whose text
+  holds a private key (a PEM or OpenPGP key header, for example pasted into
+  a PDF), as the MCP server already refuses it. Before, `on_secret="skip"`
+  covered only credentials flagged in XML. The check moved from the MCP
+  server to `sugo.core.credentials`; the server's behaviour is unchanged.
+
+### Added
+
+- `Result.holds_private_key` and `Result.has_credentials` in the Python API.
+
 ## [0.2.0] - 2026-11-13
 
 ### Added

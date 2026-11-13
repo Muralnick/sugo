@@ -43,6 +43,8 @@ Public means a name in `sugo.__all__`. Everything else, `sugo.api` included, is 
 
 `Result` holds the same facts as the CLI's JSON output: `markdown`, `chunks` (empty unless asked for), `source`, `source_sha256`, `document_id` (added 2026-11-13 for ADR-068, before any release), `kind`, `pages`, `failed_pages`, `removed`, `edited`, `secret_blocks`, `tokens`, `sugo_version`, `config_hash` and `receipt` (None unless asked for). `partial` is true when some pages could not be read, which is exit code 3 in the CLI. The fields are plain Python types and read-only mappings, so a caller cannot change a result by accident.
 
+`holds_private_key` and the property `has_credentials` (`secret_blocks > 0` or a private key) were added on 2026-11-13, after v0.2.0: the MCP server's private-key check (ADR-053) moved to `sugo.core.credentials` so the API reports it too. A field added to `Result` breaks no caller.
+
 A document flagged as holding credentials (`secret_blocks > 0`) is returned, as the CLI returns it: the caller is the user, not an agent. Only the MCP server refuses such documents (ADR-053). What the loaders do with them is ADR-068's decision.
 
 ### 4. Errors
