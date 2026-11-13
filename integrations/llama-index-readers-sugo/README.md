@@ -2,7 +2,7 @@
 
 A LlamaIndex reader for [Sugo](https://github.com/Muralnick/sugo). Sugo converts PDF, Word, Excel, PowerPoint, images and XML into compact Markdown on your own computer, and splits it into chunks along headings and pages.
 
-> Not published yet: it needs the Python API that ships in `sugo-cli` 0.2.
+It needs `sugo-cli` 0.2 or later, which `pip` installs with it.
 
 ```bash
 pip install llama-index-readers-sugo

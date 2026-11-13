@@ -65,3 +65,21 @@ proven, rather than building all of them at once.
 - All third-party GitHub Actions are pinned by commit SHA, not by tag
   (ADR-033's "hardened workflows" decision), with the human-readable
   version in a trailing comment.
+
+## Amendment (2026-11-13): three distributions from one workflow (ADR-068)
+
+- The release workflow publishes `sugo-cli` and the two loaders,
+  `langchain-sugo` and `llama-index-readers-sugo`. The tag says which:
+  `vX.Y.Z` is `sugo-cli`, `langchain-sugo-vX.Y.Z` and
+  `llama-index-readers-sugo-vX.Y.Z` are the loaders.
+- A first job, `release target` (`scripts/release/release_target.py`),
+  maps the tag to the project's folder and stops the run when the tag's
+  version differs from the version in that project's `pyproject.toml`.
+- Every project goes through the same steps: two builds compared byte for
+  byte, SBOM of a fresh install, Sigstore attestation, manual approval in
+  the `release` environment, PyPI Trusted Publishing. Builds use
+  `--no-sources`, so a loader is built against `sugo-cli` from PyPI.
+- Order: a loader's SBOM installs its dependencies from PyPI, so the
+  `sugo-cli` version it needs is released first.
+- Each PyPI project gets its own Trusted Publisher, added once by hand by
+  the maintainer: this repository, `release.yml`, environment `release`.

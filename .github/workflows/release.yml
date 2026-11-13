@@ -2,17 +2,28 @@
 # PyPI only for v0.1 — see ADR-033's 2026-11-04 amendment for what is
 # deferred (Docker/GHCR, other channels, the mirror) and why.
 #
-# Triggered by pushing a stable version tag (vX.Y.Z); a pre-release tag
-# such as v0.1.0a1 is excluded on purpose, since that one is published by
-# hand (ADR-033, 2026-11-03 amendment). workflow_dispatch exists only to
-# dry-run build, SBOM and attestation on a branch; it cannot publish, since
-# that step requires a tag push.
+# Triggered by pushing a stable version tag: vX.Y.Z for sugo-cli,
+# langchain-sugo-vX.Y.Z and llama-index-readers-sugo-vX.Y.Z for the loaders
+# (ADR-068). The target job checks that the tag's version is the project's.
+# A pre-release tag such as v0.1.0a1 is excluded on purpose, since that one
+# is published by hand (ADR-033, 2026-11-03 amendment). workflow_dispatch
+# exists only to dry-run build, SBOM and attestation on a branch; it cannot
+# publish, since that step requires a tag push.
 name: Release
 
 on:
   push:
-    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "langchain-sugo-v[0-9]+.[0-9]+.[0-9]+"
+      - "llama-index-readers-sugo-v[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
+    inputs:
+      project:
+        description: Project to dry-run
+        type: choice
+        options: [sugo-cli, langchain-sugo, llama-index-readers-sugo]
+        default: sugo-cli
 
 permissions:
   contents: read
@@ -22,10 +33,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Which project this run releases, from the tag (or the dry-run input).
+  target:
+    name: release target
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      directory: ${{ steps.pick.outputs.directory }}
+      name: ${{ steps.pick.outputs.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - id: pick
+        name: Check the tag against the project
+        env:
+          REF: ${{ github.event_name == 'push' && github.ref_name || inputs.project }}
+        run: python3 scripts/release/release_target.py "$REF" >> "$GITHUB_OUTPUT"
+
   # Built twice, independently, so the reproducibility job below can catch
   # a build that isn't actually deterministic before it ships.
   build-a:
     name: build (a)
+    needs: target
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -38,8 +69,12 @@ jobs:
           version: "0.13.0"
           enable-cache: true
 
+      # --no-sources: the loaders build against sugo-cli from PyPI, never
+      # the copy in this repository.
       - name: Build sdist and wheel
-        run: uv build --out-dir dist
+        env:
+          PROJECT_DIR: ${{ needs.target.outputs.directory }}
+        run: uv build "$PROJECT_DIR" --no-sources --out-dir dist
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -48,6 +83,7 @@ jobs:
 
   build-b:
     name: build (b)
+    needs: target
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -60,8 +96,12 @@ jobs:
           version: "0.13.0"
           enable-cache: true
 
+      # --no-sources: the loaders build against sugo-cli from PyPI, never
+      # the copy in this repository.
       - name: Build sdist and wheel
-        run: uv build --out-dir dist
+        env:
+          PROJECT_DIR: ${{ needs.target.outputs.directory }}
+        run: uv build "$PROJECT_DIR" --no-sources --out-dir dist
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -89,7 +129,7 @@ jobs:
 
   sbom:
     name: generate SBOM
-    needs: build-a
+    needs: [target, build-a]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -107,11 +147,15 @@ jobs:
           name: dist-a
           path: dist
 
-      - name: Install the lite extra into a release environment
+      # A loader's dependencies, sugo-cli included, come from PyPI: release
+      # sugo-cli first. The lite extra is empty since ADR-060.
+      - name: Install the package into a release environment
+        env:
+          PROJECT_NAME: ${{ needs.target.outputs.name }}
         run: |
           uv venv .venv-release
           whl=$(ls dist/*.whl)
-          uv pip install --python .venv-release "sugo-cli[lite] @ ${whl}"
+          uv pip install --python .venv-release "${PROJECT_NAME} @ ${whl}"
 
       - name: Generate the CycloneDX SBOM
         run: |
@@ -154,8 +198,10 @@ jobs:
     needs: attest
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    # Requires a one-time, by-hand step on pypi.org: add this repository and
-    # workflow as a Trusted Publisher for the sugo-cli project (ADR-033).
+    # Requires a one-time, by-hand step on pypi.org for each project
+    # (sugo-cli, langchain-sugo, llama-index-readers-sugo): add this
+    # repository, this workflow and the release environment as its Trusted
+    # Publisher (ADR-033, ADR-068).
     environment: release
     permissions:
       id-token: write

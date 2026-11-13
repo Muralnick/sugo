@@ -7,10 +7,8 @@ license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.12,<3.15"
 dependencies = [
-    # The public API (ADR-067) first ships in sugo-cli 0.2. Until that release
-    # the floor allows the development version; raise it to >=0.2 before the
-    # first release of this package (ADR-068).
-    "sugo-cli>=0.1.5,<0.3",
+    # The public API (ADR-067) first ships in sugo-cli 0.2.
+    "sugo-cli>=0.2,<0.3",
     "langchain-core>=1.7.3,<2",
 ]
 classifiers = [
