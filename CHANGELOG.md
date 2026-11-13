@@ -22,6 +22,10 @@ still change, with notice, before 1.0).
   yet. One document per Sugo chunk with the chunk id as document id, scalar
   metadata (pages, headings, provenance), files with credentials skipped by
   default, tests run with network access blocked.
+- `llama-index-readers-sugo` (ADR-068), the same for LlamaIndex in
+  `integrations/llama-index-readers-sugo`: `SugoReader`, usable directly or
+  as a `file_extractor` of `SimpleDirectoryReader`. Ids, digests and counts
+  are kept out of the embedded and LLM text. Not published yet.
 
 ## [0.1.5] - 2026-11-13
 
