@@ -197,12 +197,19 @@ def _convert(
 
 
 def _settings() -> "Settings":
-    """The settings the CLI would use here (ADR-051); warnings go to the log."""
+    """The settings the CLI would use here (ADR-051); warnings go to the log.
+
+    The warnings name configuration files, whose paths show the user's
+    folders: only their number is logged by default (principle 11), the
+    text at DEBUG, and ``sugo doctor`` shows them in full.
+    """
     from sugo.config.settings import load
 
     loaded = load()
+    if loaded.warnings:
+        _log.warning("%d settings warnings; run: sugo doctor", len(loaded.warnings))
     for warning in loaded.warnings:
-        _log.warning("%s", warning)
+        _log.debug("settings warning: %s", warning)
     return loaded.settings
 
 

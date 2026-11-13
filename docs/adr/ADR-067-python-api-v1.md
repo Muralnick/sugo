@@ -56,7 +56,7 @@ A document flagged as holding credentials (`secret_blocks > 0`) is returned, as 
 
 ### 6. Behaviour as a library
 
-- **No output.** It never prints and adds no logging handler: the `sugo` logger gets a `NullHandler`, and logs stay without content (principle 11).
+- **No output.** It never prints and adds no logging handler: the `sugo` logger gets a `NullHandler`, and logs stay without content or file names (principle 11). Settings warnings name configuration files, so only their count is logged by default; their text goes to DEBUG, and `sugo doctor` shows them.
 - **Fast import.** `import sugo` stays cheap: the pipeline, the OCR engine and the workers are imported on the first call, so the CLI's start-up does not slow down.
 - **Concurrency.** The first version supports one call at a time per process. Calls from several threads are not guaranteed until the shared engine (ADR-018) defines how its workers are shared; the documentation says so.
 - **Types.** The API is fully typed (the package already ships `py.typed`) and checked with mypy in strict mode.

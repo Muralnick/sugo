@@ -2,6 +2,7 @@
 
 import dataclasses
 import inspect
+import logging
 import subprocess
 import sys
 from importlib.metadata import version
@@ -182,3 +183,19 @@ def test_convert_prints_nothing(report: Path, capfd: pytest.CaptureFixture[str])
 def test_result_type_is_exported_unchanged() -> None:
     assert sugo.Result is Result
     assert sugo.SugoError is SugoError
+
+
+def test_settings_warnings_log_no_paths_by_default(
+    report: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    project = tmp_path / "private-project"
+    project.mkdir()
+    (project / "pyproject.toml").write_text("not = [valid toml", encoding="utf-8")
+    monkeypatch.chdir(project)
+    with caplog.at_level(logging.WARNING, logger="sugo"):
+        sugo.convert(report)
+    assert caplog.messages == ["1 settings warnings; run: sugo doctor"]
+    caplog.clear()
+    with caplog.at_level(logging.DEBUG, logger="sugo.api"):
+        sugo.convert(report)
+    assert any("private-project" in message for message in caplog.messages)
