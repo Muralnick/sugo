@@ -73,6 +73,9 @@ exclude-newer = "14 days"
 [tool.uv.workspace]
 # Official packs, each a separate distribution (ADR-032).
 members = ["packs/*"]
+# Framework loaders are separate projects with their own lock, so sugo-cli's
+# lock never carries LangChain or LlamaIndex (ADR-068).
+exclude = ["integrations/*"]
 
 [tool.uv.build-backend]
 # The distribution is "sugo-cli" (ADR-033 amendment: "sugo" is squatted on

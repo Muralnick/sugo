@@ -43,6 +43,7 @@ Each `sugo.Chunk` has the fields of the published JSON Schema (`schemas/chunk-v1
 | `markdown` | The converted document |
 | `chunks` | Chunks, only with `chunks=True` |
 | `source`, `source_sha256`, `kind`, `pages` | What was converted |
+| `document_id` | The document's stable id, the same one every chunk carries |
 | `failed_pages`, `partial` | Pages that could not be read; `partial` is true if there are any |
 | `removed`, `edited` | Blocks removed and texts edited, per cleaner, each with a reason in the receipt |
 | `secret_blocks` | Blocks flagged as holding credentials, such as passwords in an XML file |

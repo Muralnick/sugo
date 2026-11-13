@@ -61,6 +61,8 @@ class Result:
     # The name as given, or the path as given; None for bytes without a name.
     source: str | None
     source_sha256: str
+    # "d_" and 32 hex digits, the id every chunk of this document carries (ADR-047).
+    document_id: str
     # "pdf", "image", "docx", "xlsx", "pptx" or "xml".
     kind: str
     pages: int
@@ -156,6 +158,7 @@ def _convert(
     receipt: bool,
     cache: CacheMode,
 ) -> Result:
+    from sugo.chunkers.sections import document_id
     from sugo.core import pipeline
     from sugo.metrics.tokenizer import count_tokens
 
@@ -181,6 +184,7 @@ def _convert(
         chunks=conversion.chunks,
         source=conversion.source,
         source_sha256=conversion.source_sha256,
+        document_id=document_id(conversion.source, conversion.source_sha256),
         kind=conversion.kind.value,
         pages=conversion.pages,
         failed_pages=conversion.failed_pages,
