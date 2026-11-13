@@ -52,7 +52,7 @@ A document flagged as holding credentials (`secret_blocks > 0`) is returned, as 
 ### 5. Settings and cache
 
 - `convert` loads the settings as the CLI does (ADR-051): user file, project file in the current folder, then environment variables. So the same machine gives the same output from the CLI and the API, and the system layer with locked keys, when it comes, applies to both (principle 8). The arguments override the settings as the CLI flags do. `config_hash` records the result in every output (principle 6).
-- `cache="ephemeral"` (the default) uses a private temporary page cache for the call, deleted at the end. A library call therefore leaves no document text on disk unless asked. `cache="user"` uses the user's persistent page cache, like the CLI, and is faster for repeated loads. `cache=None` keeps no cache at all.
+- `cache="ephemeral"` (the default) uses a private temporary page cache for the call, deleted at the end. A library call therefore leaves no document text on disk unless asked. `cache="user"` uses the user's persistent page cache, like the CLI, and is faster for repeated loads. The pipeline always needs a page cache, so there is no third mode: the ephemeral one is the "no cache" of the CLI's `--no-cache`.
 
 ### 6. Behaviour as a library
 
@@ -63,7 +63,7 @@ A document flagged as holding credentials (`secret_blocks > 0`) is returned, as 
 
 ### 7. Boundaries and tests
 
-- A new import-linter contract: `sugo.api` may import the core, configuration and storage, never another port. The other ports keep calling the pipeline directly for now. Moving them onto the API is optional and can come later.
+- A new import-linter contract: `sugo.api` may import the core, configuration and storage, never another port. The one exception is the shared error model `sugo.ports.errors` (ADR-049), so the codes, messages and hints stay identical. The other ports keep calling the pipeline directly for now. Moving them onto the API is optional and can come later.
 - Tests check that `sugo.__all__` holds exactly the names above, with the signature above. Changing either is a contract change, released under the 0.x caveat of ARCHITECTURE until 1.0.
 - `docs/python-api.md` documents the API with one example per use, and the READMEs link it.
 

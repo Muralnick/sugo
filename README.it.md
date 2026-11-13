@@ -192,6 +192,19 @@ sugo verify report.pdf report.receipt.json
 
 La ricevuta dimostra che la *conversione* è fedele al file: niente tolto senza un motivo registrato, niente inventato. Non dice nulla sull'autenticità del documento stesso.
 
+### Usarlo da Python
+
+```python
+import sugo
+
+result = sugo.convert("manuale.pdf", chunks=True)
+print(result.markdown)
+for chunk in result.chunks:
+    print(chunk.pages, chunk.text)
+```
+
+Di default, dopo la chiamata non resta niente sul disco. La [guida all'API Python](docs/python-api.md) (in inglese) spiega errori, impostazioni e cache.
+
 ### Usarlo da un agente AI (MCP)
 
 Sugo può servire agenti come Claude Code o Codex tramite MCP. Legge solo dentro le cartelle che indichi:
@@ -292,6 +305,7 @@ La documentazione tecnica è in inglese.
 | Documento | Contenuto |
 |---|---|
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | Progetto completo del sistema |
+| [PYTHON API](docs/python-api.md) | Usare Sugo dal proprio codice Python |
 | [FEATURES](docs/FEATURES.md) | Funzioni per livello di motore, profili di lavoro, formati supportati |
 | [THREAT_MODEL](docs/THREAT_MODEL.md) | Analisi di sicurezza |
 | [TESTING](docs/TESTING.md) | Test, benchmark, obiettivi di prestazione |

@@ -38,7 +38,6 @@ from pydantic import ValidationError
 if sys.platform != "win32":
     import fcntl
 
-import sugo
 from sugo.core.constants import (
     CACHE_BUSY_TIMEOUT_S,
     CACHE_EVICT_TO_SHARE,
@@ -127,7 +126,9 @@ def _code_fingerprint() -> str:
     The package version alone would not show it: it changes only on a
     release, and never in a development checkout.
     """
-    root = Path(sugo.__file__).parent
+    # The sugo package folder, found from this file: importing the package
+    # itself would make storage depend on the public API (ADR-067).
+    root = Path(__file__).parents[1]
     digest = hashlib.sha256()
     for path in sorted(root.rglob("*.py")):
         digest.update(path.relative_to(root).as_posix().encode() + b"\0")
