@@ -7,6 +7,7 @@
 **Builds on:** ADR-010 (licence), ADR-023 (output schema), ADR-033 (release pipeline), ADR-035 (dependencies), ADR-053 (secret exclusions), ADR-067 (Python API)
 **Amends:** ADR-033 (the pipeline publishes two more distributions)
 **Adds:** two distributions, `langchain-sugo` and `llama-index-readers-sugo`
+**Notes:** 2026-11-13, while implementing `langchain-sugo`: the import rule is a source test, not import-linter; CI runs on every pull request; the temporary `sugo-cli` floor (section 1).
 **Adds dependencies:** `langchain-core` and `llama-index-core`, only in those two distributions; none in `sugo-cli`
 
 ## Context
@@ -35,7 +36,7 @@ integrations/
 - The names follow each ecosystem's convention, so users find them where they look (LangChain integrations, LlamaHub).
 - Each package has its own `pyproject.toml` and its own `uv.lock` with hashes. `sugo-cli`'s lock, its install and its attack surface do not change: someone who installs only Sugo gets neither framework.
 - Each package depends on `sugo-cli` within one minor series (e.g. `sugo-cli>=0.2,<0.3`) and on its framework within one major series (`langchain-core>=1.7,<2`, `llama-index-core>=0.14,<0.15`).
-- They import only the public `sugo` names of ADR-067, enforced by an import-linter contract in each package.
+- They import only the public `sugo` names of ADR-067, enforced by a test that reads each package's source (import-linter sees an outside package only as a whole, so it cannot tell `sugo` from `sugo.core`). Until `sugo-cli` 0.2 is released, the floor is `sugo-cli>=0.1.5` so the package can be developed against this repository; it is raised to `>=0.2` before the package's first release.
 
 ### 2. Licence: AGPL-3.0-or-later, like Sugo (maintainer decision)
 
@@ -77,7 +78,7 @@ The loaders open no connection. The frameworks may: LangSmith tracing turns on o
 ### 6. Tests and CI
 
 - Unit tests with the framework installed, on the synthetic corpus: ids are stable between two loads, metadata types are accepted by the in-memory vector stores of both frameworks, the default secret handling and the error options behave as described.
-- A CI job per package: `ruff`, `mypy`, `import-linter`, tests, `uv lock --check`. The jobs run when `integrations/` or `src/sugo/` changes.
+- A CI job per package: `ruff`, `mypy` (strict), tests, and `uv sync --locked`, which fails when the lock is out of date. The jobs run on every pull request, like the others, and are not required by the ruleset at first.
 
 ### 7. Release (amends ADR-033)
 

@@ -7,8 +7,6 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
-## [0.1.5] - 2026-11-13
-
 ### Added
 
 - A public Python API (ADR-067): `sugo.convert(path_or_bytes, chunks=...,
@@ -17,8 +15,15 @@ still change, with notice, before 1.0).
   JSON output. Failures raise `sugo.SugoError` with the CLI's stable codes.
   It uses the CLI's settings; by default a temporary page cache, so no
   document text stays on disk (`cache="user"` for the persistent one).
-  `import sugo` stays fast, and the API prints nothing. Guide:
-  `docs/python-api.md`.
+  `import sugo` stays fast, and the API prints nothing. `Result.document_id`
+  is the id every chunk carries. Guide: `docs/python-api.md`.
+- `langchain-sugo` (ADR-068), a LangChain document loader in
+  `integrations/langchain-sugo`, with its own lock and CI job; not published
+  yet. One document per Sugo chunk with the chunk id as document id, scalar
+  metadata (pages, headings, provenance), files with credentials skipped by
+  default, tests run with network access blocked.
+
+## [0.1.5] - 2026-11-13
 
 ### Added
 

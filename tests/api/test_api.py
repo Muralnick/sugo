@@ -76,6 +76,7 @@ def test_a_path_gives_markdown_chunks_and_facts(report: Path) -> None:
     assert result.chunks
     assert all(isinstance(c, sugo.Chunk) for c in result.chunks)
     assert result.source == report.as_posix() == result.chunks[0].source
+    assert result.document_id == result.chunks[0].document_id
     assert (result.kind, result.pages, result.failed_pages, result.partial) == ("pdf", 1, (), False)
     assert result.tokens > 0
     assert result.secret_blocks == 0
@@ -93,7 +94,9 @@ def test_no_chunks_unless_asked(report: Path) -> None:
 
 def test_bytes_take_their_name_and_identity_from_name() -> None:
     data = pdf("A note.")
-    assert sugo.convert(data).source is None
+    unnamed = sugo.convert(data)
+    assert unnamed.source is None
+    assert unnamed.document_id.startswith("d_")
     named = sugo.convert(data, name="notes/a.pdf", chunks=True)
     again = sugo.convert(pdf("A note."), name="notes/a.pdf", chunks=True)
     assert named.source == "notes/a.pdf"
