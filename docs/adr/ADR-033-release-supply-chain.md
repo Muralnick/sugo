@@ -80,6 +80,9 @@ proven, rather than building all of them at once.
   the `release` environment, PyPI Trusted Publishing. Builds use
   `--no-sources`, so a loader is built against `sugo-cli` from PyPI.
 - Order: a loader's SBOM installs its dependencies from PyPI, so the
-  `sugo-cli` version it needs is released first.
+  `sugo-cli` version it needs is released first. That install exempts
+  `sugo-cli` alone from the 14-day rule (ADR-035), which still holds for
+  every other dependency: the first loader release failed there, minutes
+  after `sugo-cli` 0.2.0 was published.
 - Each PyPI project gets its own Trusted Publisher, added once by hand by
   the maintainer: this repository, `release.yml`, environment `release`.
