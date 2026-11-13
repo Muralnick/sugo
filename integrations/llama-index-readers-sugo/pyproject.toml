@@ -1,0 +1,76 @@
+[project]
+name = "llama-index-readers-sugo"
+version = "0.1.0"
+description = "LlamaIndex reader for Sugo: local, compact Markdown chunks from PDF, Office files and images."
+readme = "README.md"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+requires-python = ">=3.12,<3.15"
+dependencies = [
+    # The public API (ADR-067) first ships in sugo-cli 0.2. Until that release
+    # the floor allows the development version; raise it to >=0.2 before the
+    # first release of this package (ADR-068).
+    "sugo-cli>=0.1.5,<0.3",
+    "llama-index-core>=0.14.25,<0.15",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
+    "ruff>=0.17.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.0,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv]
+required-version = ">=0.13.0"
+# The 14-day minimum age for every dependency (CLAUDE.md, ADR-035).
+exclude-newer = "14 days"
+
+[tool.uv.sources]
+# Developed against the Sugo in this repository; the published package
+# depends on sugo-cli from PyPI.
+sugo-cli = { path = "../..", editable = true }
+
+[tool.ruff]
+extend = "../../pyproject.toml"
+src = ["src", "tests"]
+
+[tool.ruff.lint.per-file-ignores]
+# "on_secret" names what to do with a file holding credentials, not a password.
+"src/llama_index/readers/sugo/_reader.py" = ["S105", "S107"]
+# Tests assert and compare against literal expected values by design.
+"tests/**" = ["S101", "S106", "PLR2004"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src", "tests"]
+mypy_path = ["src", "tests"]
+explicit_package_bases = true
+strict = true
+warn_unused_configs = true
+# PyMuPDF builds the test PDFs; its API is partly unannotated.
+untyped_calls_exclude = ["pymupdf"]
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+# The tests import their shared helpers (loader_helpers) by name.
+pythonpath = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
+xfail_strict = true
+filterwarnings = ["error"]
+
+[tool.uv.build-backend]
+# A namespace package, as every LlamaIndex reader: llama_index.readers.sugo.
+module-name = "llama_index.readers.sugo"
