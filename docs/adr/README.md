@@ -68,3 +68,5 @@
 | [064](ADR-064-scanned-letterheads.md) | Repeated letterheads in scanned documents | Accepted |
 | [065](ADR-065-mcp-container-image.md) | A minimal container image for the MCP server | Accepted |
 | [066](ADR-066-uninstall-command.md) | `sugo uninstall` and `sugo cache clear` | Accepted |
+| [067](ADR-067-python-api-v1.md) | Public Python API, first version | Proposed |
+| [068](ADR-068-langchain-llamaindex-loaders.md) | LangChain and LlamaIndex loaders | Proposed |
