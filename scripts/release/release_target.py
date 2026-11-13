@@ -9,8 +9,14 @@ the release before anything is built.
 Usage (inside the release workflow):
     python3 scripts/release/release_target.py <tag-or-project-name>
 
-Prints ``directory=...`` and ``name=...`` lines for ``$GITHUB_OUTPUT``. A
-plain project name (a manual dry run on a branch) skips the version check.
+Prints ``directory=...``, ``name=...`` and ``environment=...`` lines for
+``$GITHUB_OUTPUT``. A plain project name (a manual dry run on a branch)
+skips the version check.
+
+Each project publishes from its own GitHub environment. PyPI's Trusted
+Publishing knows a publisher by repository, workflow and environment: with
+one environment for all three, PyPI took every run for sugo-cli's publisher
+and refused to create the loaders' projects.
 """
 
 import re
@@ -25,6 +31,12 @@ PROJECTS = {
     "sugo-cli": ".",
     "langchain-sugo": "integrations/langchain-sugo",
     "llama-index-readers-sugo": "integrations/llama-index-readers-sugo",
+}
+# Distribution name -> the GitHub environment its publish job runs in.
+ENVIRONMENTS = {
+    "sugo-cli": "release",
+    "langchain-sugo": "release-langchain-sugo",
+    "llama-index-readers-sugo": "release-llama-index-readers-sugo",
 }
 _TAG = re.compile(r"(?:(?P<prefix>[a-z][a-z-]*)-)?v(?P<version>\d+\.\d+\.\d+)")
 
@@ -62,7 +74,7 @@ def main() -> None:
         directory, name = target(sys.argv[1])
     except ReleaseTargetError as error:
         sys.exit(f"release_target: {error}")
-    sys.stdout.write(f"directory={directory}\nname={name}\n")
+    sys.stdout.write(f"directory={directory}\nname={name}\nenvironment={ENVIRONMENTS[name]}\n")
 
 
 if __name__ == "__main__":

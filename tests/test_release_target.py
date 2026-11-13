@@ -72,3 +72,11 @@ def test_every_project_folder_names_its_distribution() -> None:
     for name, directory in release_target.PROJECTS.items():
         text = (ROOT / directory / "pyproject.toml").read_text(encoding="utf-8")
         assert tomllib.loads(text)["project"]["name"] == name
+
+
+def test_each_project_publishes_from_its_own_environment() -> None:
+    environments = release_target.ENVIRONMENTS
+    assert set(environments) == set(release_target.PROJECTS)
+    assert len(set(environments.values())) == len(environments)
+    # sugo-cli's Trusted Publisher on PyPI already names this one.
+    assert environments["sugo-cli"] == "release"

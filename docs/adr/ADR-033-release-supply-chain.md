@@ -86,3 +86,9 @@ proven, rather than building all of them at once.
   after `sugo-cli` 0.2.0 was published.
 - Each PyPI project gets its own Trusted Publisher, added once by hand by
   the maintainer: this repository, `release.yml`, environment `release`.
+- One GitHub environment per project (`release` for `sugo-cli`,
+  `release-langchain-sugo`, `release-llama-index-readers-sugo`), each with
+  the maintainer as required reviewer. PyPI knows a Trusted Publisher by
+  repository, workflow and environment: with one shared environment, the
+  first loader uploads were matched to `sugo-cli`'s publisher and refused
+  ("Non-user identities cannot create new projects"). Nothing was published.
