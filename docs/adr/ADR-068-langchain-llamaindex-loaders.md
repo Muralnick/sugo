@@ -1,6 +1,6 @@
 # ADR-068: LangChain and LlamaIndex loaders
 
-**Status:** Proposed (maintainer decisions of 2026-11-13: separate packages, AGPL)
+**Status:** Accepted (maintainer decisions of 2026-11-13: separate packages, AGPL; ADR approved the same day)
 **Date:** 2026-11-13
 **Deciders:** project author
 **Implements:** ROADMAP v0.2 "LangChain and LlamaIndex loaders (needs an ADR: package layout, dependencies, licence questions for users)"

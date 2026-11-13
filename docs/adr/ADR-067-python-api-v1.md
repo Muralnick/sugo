@@ -1,6 +1,6 @@
 # ADR-067: Public Python API, first version
 
-**Status:** Proposed (maintainer decision of 2026-11-13: the API comes before the loaders)
+**Status:** Accepted (maintainer decision of 2026-11-13: the API comes before the loaders; ADR approved the same day)
 **Date:** 2026-11-13
 **Deciders:** project author
 **Implements:** ARCHITECTURE §"Python API" (first part); the prerequisite of the ROADMAP v0.2 LangChain and LlamaIndex loaders (ADR-068)
