@@ -101,6 +101,10 @@ _STREAM_LIST_ATTEMPTS = 4
 _CONTENT_KEYS = ("CharProcs", "AP", "G", "SMask/G")
 # A reference as MuPDF prints objects: always "12 0 R".
 _PRINTED_REFERENCE = re.compile(r"(\d+) \d+ R")
+# MuPDF's error for a number below /Size that no cross-reference section lists:
+# a gap in the numbering (cairo, Microsoft Print to PDF). PDF reads it as null.
+# Any other error still leaves the file unchecked.
+_MISSING_OBJECT = "cannot find object in xref"
 
 # MuPDF character flags (fz_stext_char flags) and font flags (span "flags").
 _FILLED = 16
@@ -181,7 +185,7 @@ def _stream_problem(document: pymupdf.Document) -> Refused | None:
     try:
         streams = _streams(document)
         for xref in range(1, document.xref_length()):
-            if names_brotli(document.xref_object(xref, compressed=True).encode()):
+            if names_brotli(_object(document, xref).encode()):
                 return Refused(code="PDF_UNSUPPORTED", message=BROTLI_REFUSAL)
         contents = _page_contents(document)
         run = _run_as_content(document, streams, contents)
@@ -255,7 +259,7 @@ def _run_as_content(
             run.add(xref)
     for xref in range(1, document.xref_length()):
         for key in _CONTENT_KEYS:
-            kind, value = document.xref_get_key(xref, key)
+            kind, value = _key(document, xref, key)
             if kind != "null":
                 run |= _referenced(document, value)
     return run
@@ -272,8 +276,30 @@ def _referenced(document: pymupdf.Document, value: str) -> set[int]:
                 continue
             found.add(xref)
             if not document.xref_is_stream(xref):
-                pending.append(document.xref_object(xref, compressed=True))
+                pending.append(_object(document, xref))
     return found
+
+
+def _object(document: pymupdf.Document, xref: int) -> str:
+    """The object as MuPDF prints it; ``null`` for a gap in the numbering."""
+    try:
+        printed: str = document.xref_object(xref, compressed=True)
+    except Exception as error:
+        if _MISSING_OBJECT in str(error):
+            return "null"
+        raise
+    return printed
+
+
+def _key(document: pymupdf.Document, xref: int, key: str) -> tuple[str, str]:
+    """One entry of the object, as ``xref_get_key`` gives it; null in a gap."""
+    try:
+        entry: tuple[str, str] = document.xref_get_key(xref, key)
+    except Exception as error:
+        if _MISSING_OBJECT in str(error):
+            return ("null", "null")
+        raise
+    return entry
 
 
 def _boxes(document: pymupdf.Document) -> tuple[PageBox, ...]:

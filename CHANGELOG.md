@@ -43,6 +43,15 @@ still change, with notice, before 1.0).
   Japanese, Chinese and Korean, LangChain and LlamaIndex loaders and a
   published container image; the Docling `normal` level moves to v0.3.
 
+### Fixed
+
+- PDFs with a gap in their object numbering (common from cairo and
+  Microsoft Print to PDF) are read instead of refused with "the PDF's
+  compression filters cannot be checked". The Brotli check now reads a
+  number the file never defines as the null object, as PDF does; any other
+  error still refuses the file. All 6 such refusals among 73 real PDFs on
+  the reference machine now convert.
+
 ## [0.1.4] - 2026-11-09
 
 ### Security
