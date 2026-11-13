@@ -202,3 +202,22 @@ def test_settings_warnings_log_no_paths_by_default(
     with caplog.at_level(logging.DEBUG, logger="sugo.api"):
         sugo.convert(report)
     assert any("private-project" in message for message in caplog.messages)
+
+
+def test_a_private_key_in_the_text_is_reported(tmp_path: Path) -> None:
+    path = tmp_path / "setup.pdf"
+    path.write_bytes(pdf("Server setup notes", "-----BEGIN OPENSSH PRIVATE KEY-----", "b3BlbnNz"))
+    result = sugo.convert(path, chunks=True)
+    assert result.holds_private_key
+    assert result.has_credentials
+    assert result.secret_blocks == 0
+
+
+def test_an_ordinary_document_holds_no_credentials(report: Path) -> None:
+    result = sugo.convert(report)
+    assert not result.holds_private_key
+    assert not result.has_credentials
+
+
+def test_credentials_in_xml_count_too() -> None:
+    assert sugo.convert(SECRET_XML).has_credentials

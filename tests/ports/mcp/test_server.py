@@ -156,23 +156,6 @@ def test_refusals_are_tool_errors_the_agent_can_read(server: Server, root: Path)
     assert json.loads(unsupported["content"][0]["text"])["error"]["code"] == "INPUT_UNSUPPORTED"
 
 
-@pytest.mark.parametrize(
-    ("text", "refused"),
-    [
-        ("-----BEGIN RSA PRIVATE KEY-----", True),
-        ("-----BEGIN PGP PRIVATE KEY BLOCK-----", True),
-        ("\\-----END ENCRYPTED PRIVATE KEY-----", True),
-        ("BEGIN Private Key ———", True),
-        ("BEGIN PRIVATE\nKEY\n\\-----", True),
-        ("-----BEGIN PUBLIC KEY-----", False),
-        ("Keep the private key -- never share it.", False),
-        ("The private key is stored in a vault.", False),
-    ],
-)
-def test_private_key_headers_are_recognised(text: str, refused: bool) -> None:
-    assert (tools._PRIVATE_KEY.search(text) is not None) is refused
-
-
 def test_xml_is_converted_unless_it_holds_credentials(server: Server, root: Path) -> None:
     (root / "data.xml").write_bytes(b"<order><id>5</id></order>")
     result = call(server, "convert_document", path="data.xml")["result"]

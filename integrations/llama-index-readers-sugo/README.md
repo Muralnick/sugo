@@ -56,10 +56,10 @@ Ids, digests, versions and counts are excluded from the text sent to the embeddi
 | `mode` | `"chunks"` | `"chunks"` or `"document"` |
 | `max_tokens` | your Sugo chunk size | Chunk size in tokens |
 | `on_error` | `"raise"` | `"skip"` leaves out files Sugo refuses and lists them in `reader.skipped` |
-| `on_secret` | `"skip"` | Files with credentials (passwords, keys in XML): `"skip"`, `"include"` or `"raise"` |
+| `on_secret` | `"skip"` | Files with credentials (passwords or keys in XML, a private key written in the text): `"skip"`, `"include"` or `"raise"` |
 | `cache` | `"ephemeral"` | `"user"` keeps Sugo's page cache, much faster when you reload files |
 
-Files that hold credentials are skipped by default: a RAG pipeline usually sends text to an embedding service and stores it where other people and agents can read it. `reader.skipped` lists every file left out, with a code such as `CONTENT_EXCLUDED`.
+Files that hold credentials are skipped by default, the same files the Sugo MCP server never sends to an agent: a RAG pipeline usually sends text to an embedding service and stores it where other people and agents can read it. `reader.skipped` lists every file left out, with a code such as `CONTENT_EXCLUDED`.
 
 Sugo reads local files only: passing a remote `fs` raises an error.
 

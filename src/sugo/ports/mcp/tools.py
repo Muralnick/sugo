@@ -7,7 +7,6 @@ read: they never write, install, download or delete (principle 10).
 
 import hashlib
 import json
-import re
 from collections.abc import Callable
 from typing import Annotated, Any, Literal
 
@@ -20,9 +19,9 @@ from sugo.core.constants import (
     MCP_MAX_PATH_CHARS,
     MCP_MAX_TOKENS,
     MCP_MIN_TOKENS,
-    MCP_PRIVATE_KEY_PATTERN,
     MCP_WRAPPER_TOKENS,
 )
+from sugo.core.credentials import holds_private_key
 from sugo.core.pipeline import convert, read_input
 from sugo.metrics.providers import list_providers
 from sugo.metrics.tokenizer import count_tokens
@@ -92,11 +91,6 @@ class EstimateSavings(_Arguments):
 class InvalidArgumentsError(ValueError):
     """Arguments that pass the schema but name something that does not exist."""
 
-
-_PRIVATE_KEY = re.compile(MCP_PRIVATE_KEY_PATTERN, re.IGNORECASE)
-# Table cells join their lines with "<br>", which would split a wrapped key
-# header where the pattern expects white space.
-_LINE_BREAK_TAG = re.compile(r"<br\s*/?>", re.IGNORECASE)
 
 _READ_ONLY = {
     "readOnlyHint": True,
@@ -248,9 +242,8 @@ def _refuse_private_keys(*texts: str) -> None:
     Raises:
         PortError: CONTENT_EXCLUDED.
     """
-    for text in texts:
-        if _PRIVATE_KEY.search(_LINE_BREAK_TAG.sub(" ", text)):
-            raise _content_excluded("This file holds a private key; Sugo never sends it to agents.")
+    if holds_private_key(*texts):
+        raise _content_excluded("This file holds a private key; Sugo never sends it to agents.")
 
 
 def _content_excluded(message: str) -> PortError:

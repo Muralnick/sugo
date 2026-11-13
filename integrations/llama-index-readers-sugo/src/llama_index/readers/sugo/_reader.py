@@ -64,7 +64,8 @@ class SugoReader(BaseReader):
             leaves it out and records it in ``skipped``.
         on_secret: What to do with a file Sugo flags as holding credentials:
             "skip" (default) leaves it out and records it in ``skipped``,
-            "include" loads it (the credential blocks are already removed),
+            "include" loads it as converted (credential blocks Sugo finds in
+            XML are removed; a private key written in the text stays),
             "raise" stops with ``sugo.SugoError`` code CONTENT_EXCLUDED.
         cache: "ephemeral" (default) leaves no document text on disk;
             "user" uses Sugo's persistent page cache, faster on reloads.
@@ -120,12 +121,12 @@ class SugoReader(BaseReader):
             result = self._convert(file_path)
             if result is None:
                 continue
-            if result.secret_blocks and self.on_secret != "include":
+            if result.has_credentials and self.on_secret != "include":
                 if self.on_secret == "raise":
                     raise sugo.SugoError(
                         _CONTENT_EXCLUDED,
                         "This file holds credentials; Sugo does not load it.",
-                        'Pass on_secret="include" to load it without the credential blocks.',
+                        'Pass on_secret="include" to load it anyway.',
                     )
                 self._skip(file_path, _CONTENT_EXCLUDED)
                 continue

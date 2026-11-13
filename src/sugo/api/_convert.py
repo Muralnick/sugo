@@ -73,6 +73,8 @@ class Result:
     edited: Mapping[str, int]
     # Blocks flagged as holding credentials, removed or not (ADR-053).
     secret_blocks: int
+    # True when the text holds a PEM or OpenPGP private key header (ADR-053).
+    holds_private_key: bool
     # o200k_base tokens of ``markdown`` (ADR-003).
     tokens: int
     sugo_version: str
@@ -84,6 +86,11 @@ class Result:
     def partial(self) -> bool:
         """True when some pages could not be read (exit code 3 in the CLI)."""
         return bool(self.failed_pages)
+
+    @property
+    def has_credentials(self) -> bool:
+        """True when the file holds credentials: what the MCP server never sends."""
+        return self.secret_blocks > 0 or self.holds_private_key
 
 
 def convert(
@@ -160,6 +167,7 @@ def _convert(
 ) -> Result:
     from sugo.chunkers.sections import document_id
     from sugo.core import pipeline
+    from sugo.core.credentials import holds_private_key
     from sugo.metrics.tokenizer import count_tokens
 
     settings = _settings()
@@ -191,6 +199,12 @@ def _convert(
         removed=MappingProxyType(dict(conversion.removed)),
         edited=MappingProxyType(dict(conversion.edited)),
         secret_blocks=conversion.secret_blocks,
+        # Headings too: a chunk repeats them, and the Markdown may write
+        # them differently.
+        holds_private_key=holds_private_key(
+            conversion.markdown,
+            *(text for chunk in conversion.chunks for text in (chunk.text, *chunk.heading_path)),
+        ),
         tokens=count_tokens(conversion.markdown),
         sugo_version=conversion.sugo_version,
         config_hash=conversion.config_hash,

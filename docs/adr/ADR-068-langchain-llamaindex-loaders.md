@@ -68,7 +68,7 @@ Folders and archives are not handled by the loaders: the frameworks' own directo
 ### 4. Failures and documents with credentials
 
 - A file Sugo refuses raises `SugoError` (`on_error="raise"`, the default), so nothing goes missing without the user noticing. `on_error="skip"` skips it and counts it in the loader's `skipped` attribute, with the error code.
-- A document flagged as holding credentials (`secret_blocks > 0`, ADR-053) is **skipped by default** (`on_secret="skip"`) and counted in `skipped`. A RAG pipeline usually sends text on to an embedding service and stores it in a database shared with other people and agents: that is the MCP server's situation, not a user reading the file. `on_secret="include"` loads it anyway (the credential blocks are already removed from the Markdown), and `on_secret="raise"` stops.
+- A document flagged as holding credentials (`Result.has_credentials`: blocks flagged `secret`, or a private key written in the text, the two checks of ADR-053; the private key was added on 2026-11-13, after the loaders' 0.1.0) is **skipped by default** (`on_secret="skip"`) and counted in `skipped`. A RAG pipeline usually sends text on to an embedding service and stores it in a database shared with other people and agents: that is the MCP server's situation, not a user reading the file. `on_secret="include"` loads it anyway (the credential blocks are already removed from the Markdown), and `on_secret="raise"` stops.
 - Warnings use the `sugo` logger and never include file names or text at the default level (principle 11). The `skipped` list holds the paths, for the caller's own code.
 
 ### 5. Network and telemetry
