@@ -195,6 +195,19 @@ sugo verify report.pdf report.receipt.json
 
 The receipt shows that the *conversion* is faithful to the file: nothing dropped without a recorded reason, nothing invented. It says nothing about whether the document itself is genuine.
 
+### Use it from Python
+
+```python
+import sugo
+
+result = sugo.convert("handbook.pdf", chunks=True)
+print(result.markdown)
+for chunk in result.chunks:
+    print(chunk.pages, chunk.text)
+```
+
+By default nothing stays on disk after the call. See the [Python API guide](https://github.com/Muralnick/sugo/blob/main/docs/python-api.md) for errors, settings and the cache.
+
 ### Use it from an AI agent (MCP)
 
 Sugo can serve agents such as Claude Code or Codex over MCP. It reads only inside the folders you name:
@@ -293,6 +306,7 @@ These are written down in [PRINCIPLES](https://github.com/Muralnick/sugo/blob/ma
 | Document | Content |
 |---|---|
 | [ARCHITECTURE](https://github.com/Muralnick/sugo/blob/main/docs/ARCHITECTURE.md) | Complete system design |
+| [PYTHON API](https://github.com/Muralnick/sugo/blob/main/docs/python-api.md) | Using Sugo from your own Python code |
 | [FEATURES](https://github.com/Muralnick/sugo/blob/main/docs/FEATURES.md) | Features by engine level, work profiles, supported formats |
 | [THREAT_MODEL](https://github.com/Muralnick/sugo/blob/main/docs/THREAT_MODEL.md) | Security analysis |
 | [TESTING](https://github.com/Muralnick/sugo/blob/main/docs/TESTING.md) | Testing, benchmarks, performance targets |

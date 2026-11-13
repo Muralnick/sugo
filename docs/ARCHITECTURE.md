@@ -285,23 +285,27 @@ Operations are defined once with typed pydantic models; MCP tool schemas and the
   "details": { "model": "ppocr-korean-rec", "size_mb": 12 } }
 ```
 
-Stable English codes; translated messages; a suggested action. Python: `SugoError` subclasses. CLI: stderr + exit code. MCP: structured error. Web: HTTP status + same JSON.
+Stable English codes; translated messages; a suggested action. Python: `SugoError` with the code (ADR-067). CLI: stderr + exit code. MCP: structured error. Web: HTTP status + same JSON.
 
 ### Python API
+
+Public = what `sugo` exports (ADR-067). Available since v0.2: `convert`, `Result`, `Chunk`, `SugoError`, `__version__`; see `docs/python-api.md`.
 
 ```python
 import sugo
 
-result = sugo.convert("manual.pdf", level="normal", recipe="book")
-print(result.markdown, result.metrics.saved_percent)
+result = sugo.convert("manual.pdf", chunks=True)
+print(result.markdown, len(result.chunks))
+```
 
+Planned, by amendment of ADR-067: `level="normal"`/`"quality"` (v0.3, v0.5), recipes and profiles, and the shared engine with streaming and an async variant:
+
+```python
+result = sugo.convert("manual.pdf", level="normal", recipe="book")
 with sugo.Engine() as engine:
     for event in engine.convert_stream("archive/", profile="rag"):
         ...
-    chunks = engine.chunks("archive/contract.pdf", heading="Art. 5")
 ```
-
-Async variant available. Public = what `sugo` exports.
 
 ### CLI and shell
 

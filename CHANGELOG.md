@@ -11,6 +11,17 @@ still change, with notice, before 1.0).
 
 ### Added
 
+- A public Python API (ADR-067): `sugo.convert(path_or_bytes, chunks=...,
+  max_tokens=..., receipt=..., cache=...)` returns a read-only `Result` with
+  the Markdown, chunks (`sugo.Chunk`, schema 1.0) and the facts of the CLI's
+  JSON output. Failures raise `sugo.SugoError` with the CLI's stable codes.
+  It uses the CLI's settings; by default a temporary page cache, so no
+  document text stays on disk (`cache="user"` for the persistent one).
+  `import sugo` stays fast, and the API prints nothing. Guide:
+  `docs/python-api.md`.
+
+### Added
+
 - A `Dockerfile` for the MCP server (ADR-065): `docker run -i --rm
   --network none --user "$(id -u):$(id -g)" -v ~/Documents:/data:ro sugo`
   serves the folder mounted at `/data` and nothing else, with an ephemeral

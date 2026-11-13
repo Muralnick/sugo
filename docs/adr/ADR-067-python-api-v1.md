@@ -52,18 +52,18 @@ A document flagged as holding credentials (`secret_blocks > 0`) is returned, as 
 ### 5. Settings and cache
 
 - `convert` loads the settings as the CLI does (ADR-051): user file, project file in the current folder, then environment variables. So the same machine gives the same output from the CLI and the API, and the system layer with locked keys, when it comes, applies to both (principle 8). The arguments override the settings as the CLI flags do. `config_hash` records the result in every output (principle 6).
-- `cache="ephemeral"` (the default) uses a private temporary page cache for the call, deleted at the end. A library call therefore leaves no document text on disk unless asked. `cache="user"` uses the user's persistent page cache, like the CLI, and is faster for repeated loads. `cache=None` keeps no cache at all.
+- `cache="ephemeral"` (the default) uses a private temporary page cache for the call, deleted at the end. A library call therefore leaves no document text on disk unless asked. `cache="user"` uses the user's persistent page cache, like the CLI, and is faster for repeated loads. The pipeline always needs a page cache, so there is no third mode: the ephemeral one is the "no cache" of the CLI's `--no-cache`.
 
 ### 6. Behaviour as a library
 
-- **No output.** It never prints and adds no logging handler: the `sugo` logger gets a `NullHandler`, and logs stay without content (principle 11).
+- **No output.** It never prints and adds no logging handler: the `sugo` logger gets a `NullHandler`, and logs stay without content or file names (principle 11). Settings warnings name configuration files, so only their count is logged by default; their text goes to DEBUG, and `sugo doctor` shows them.
 - **Fast import.** `import sugo` stays cheap: the pipeline, the OCR engine and the workers are imported on the first call, so the CLI's start-up does not slow down.
 - **Concurrency.** The first version supports one call at a time per process. Calls from several threads are not guaranteed until the shared engine (ADR-018) defines how its workers are shared; the documentation says so.
 - **Types.** The API is fully typed (the package already ships `py.typed`) and checked with mypy in strict mode.
 
 ### 7. Boundaries and tests
 
-- A new import-linter contract: `sugo.api` may import the core, configuration and storage, never another port. The other ports keep calling the pipeline directly for now. Moving them onto the API is optional and can come later.
+- A new import-linter contract: `sugo.api` may import the core, configuration and storage, never another port. The one exception is the shared error model `sugo.ports.errors` (ADR-049), so the codes, messages and hints stay identical. The other ports keep calling the pipeline directly for now. Moving them onto the API is optional and can come later.
 - Tests check that `sugo.__all__` holds exactly the names above, with the signature above. Changing either is a contract change, released under the 0.x caveat of ARCHITECTURE until 1.0.
 - `docs/python-api.md` documents the API with one example per use, and the READMEs link it.
 

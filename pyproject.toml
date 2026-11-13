@@ -489,3 +489,12 @@ name = "MCP server never switches the interface language"
 type = "forbidden"
 source_modules = ["sugo.ports.mcp"]
 forbidden_modules = ["sugo.ports.cli"]
+
+# The public Python API is a port (ADR-067): it calls the pipeline, never the
+# other ports, except the shared error model, and opens no connection.
+[[tool.importlinter.contracts]]
+name = "Python API uses no other port"
+type = "forbidden"
+source_modules = ["sugo.api"]
+forbidden_modules = ["sugo.ports.cli", "sugo.ports.mcp", "sugo.ports.web", "sugo.ports.cache", "sugo._internal.net"]
+
