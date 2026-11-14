@@ -7,6 +7,18 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+### Added
+
+- `sugo models list`, `sugo models pull MODEL` and `sugo models remove MODEL`
+  (ADR-070). `pull` shows size, sources and licence and asks first (`--yes`
+  for scripts); the file is downloaded over HTTPS from a fixed list of hosts,
+  resumed after an interruption and used only once its SHA-256 matches. The
+  first downloadable model is `ocr-korean`; Korean itself follows.
+- Offline mode: `offline = true` in `[privacy]`, or `SUGO_OFFLINE=1`, refuses
+  every download before any connection.
+- New error codes: `MODEL_UNKNOWN`, `DOWNLOAD_FAILED`, `OFFLINE`,
+  `MODEL_INVALID`, `MODEL_BUSY`.
+
 ## [0.2.2] - 2026-11-14
 
 ### Added

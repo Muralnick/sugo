@@ -153,11 +153,24 @@ def test_invalid_variables_are_named(
 
 
 def test_reserved_keys_only_warn(isolated: Path) -> None:
-    write(isolated, '[general]\nlevel = "normal"\n[privacy]\noffline = true\n')
+    write(isolated, '[general]\nlevel = "normal"\n[privacy]\nanonymize = true\n[hardware]\n')
     loaded = load()
     assert loaded.settings.cleaning == Settings().cleaning
-    assert len(loaded.warnings) == 2
+    assert len(loaded.warnings) == 3
     assert all("not used in this version" in warning for warning in loaded.warnings)
+
+
+def test_offline_mode_from_the_file_and_the_environment(
+    isolated: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert load().settings.privacy.offline is False
+    write(isolated, "[privacy]\noffline = true\n")
+    assert load().settings.privacy.offline is True
+    monkeypatch.setenv("SUGO_OFFLINE", "no")
+    assert load().settings.privacy.offline is False
+    monkeypatch.setenv("SUGO_OFFLINE", "maybe")
+    with pytest.raises(ConfigError, match="SUGO_OFFLINE: expected true or false"):
+        load()
 
 
 def test_oversized_file_is_refused(isolated: Path) -> None:
