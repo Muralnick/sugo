@@ -1,6 +1,6 @@
 # ADR-069: Japanese and Chinese
 
-**Status:** Proposed (maintainer decisions of 2026-11-14: Japanese and Chinese first, Korean waits for v0.3; the OCR model is chosen from the configured languages)
+**Status:** Accepted (maintainer decisions of 2026-11-14: Japanese and Chinese first, Korean waits for v0.3; the OCR model is chosen from the configured languages; ADR approved the same day)
 **Date:** 2026-11-14
 **Deciders:** project author
 **Implements:** ROADMAP v0.2.x "Japanese, Chinese and Korean" (Japanese and Chinese only), ADR-025 for `ja` and `zh`, ARCHITECTURE §"Language packs" rows Japanese and Chinese
