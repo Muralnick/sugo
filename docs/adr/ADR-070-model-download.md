@@ -1,6 +1,6 @@
 # ADR-070: Safe model download, first version, and Korean
 
-**Status:** Proposed (maintainer decisions of 2026-11-14: a copy on GitHub with ModelScope as fallback; Python's standard library for HTTP; `pull`, `list`, `remove`, `bundle` and `install` in the first version; a missing model is an error with a hint)
+**Status:** Accepted (ADR approved 2026-11-14; maintainer decisions of 2026-11-14: a copy on GitHub with ModelScope as fallback; Python's standard library for HTTP; `pull`, `list`, `remove`, `bundle` and `install` in the first version; a missing model is an error with a hint)
 **Date:** 2026-11-14
 **Deciders:** project author
 **Implements:** ADR-013 (first version), ARCHITECTURE §18 "Model management", ROADMAP v0.3 "the safe model download" and Korean (ADR-069 §6)

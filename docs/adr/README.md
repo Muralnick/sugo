@@ -71,4 +71,4 @@
 | [067](ADR-067-python-api-v1.md) | Public Python API, first version | Accepted |
 | [068](ADR-068-langchain-llamaindex-loaders.md) | LangChain and LlamaIndex loaders | Accepted |
 | [069](ADR-069-japanese-chinese.md) | Japanese and Chinese | Accepted |
-| [070](ADR-070-model-download.md) | Safe model download, first version, and Korean | Proposed |
+| [070](ADR-070-model-download.md) | Safe model download, first version, and Korean | Accepted |
