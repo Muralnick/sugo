@@ -12,8 +12,8 @@ v0.1 shipped on 2026-11-05 and reached v0.1.5 on 2026-11-13; v0.2.0 followed the
 |---|---|
 | v0.1.x | Evaluate PDFium (`pypdfium2`) as the PDF engine in place of PyMuPDF, with a test on the real-PDF corpus: tested on 73 real PDFs on 2026-11-13, decision by ADR still to write. The PDFs refused as "broken stream": done in v0.1.5, they were gaps in the object numbering, not broken streams. An uninstall command: done, `sugo uninstall` and `sugo cache clear` (ADR-066). |
 | v0.2 | The public Python API (ADR-067) and the LangChain and LlamaIndex loaders, `langchain-sugo` and `llama-index-readers-sugo` (ADR-068): released as v0.2.0 on 2026-11-13 (maintainer decision: the API is a new feature, so a minor release). |
-| v0.2.x | Japanese, Chinese and Korean, as an optional extra for their OCR models. The container image published to GitHub Container Registry and signed by the release pipeline (ADR-065 amendment). |
-| v0.3 | `normal` level with Docling (complex Office layouts, legacy formats), the shared engine, and the safe model download it needs (ADR-013); within the 2.5 GB memory budget. |
+| v0.2.x | Japanese and Chinese (ADR-069): the bundled OCR model already reads them, so no extra is needed. Korean moves to v0.3, with the safe model download its OCR model needs (maintainer decision 2026-11-14). The container image published to GitHub Container Registry and signed by the release pipeline (ADR-065 amendment). |
+| v0.3 | `normal` level with Docling (complex Office layouts, legacy formats), the shared engine, and the safe model download it needs (ADR-013), which also brings the Korean OCR model (ADR-069); within the 2.5 GB memory budget. |
 | v0.4 | Containers (folders, archives, emails), plan-first, guided setup and work profiles. |
 | v0.5 | `quality` level with VLM and cross-check; GPU benchmarks. |
 | v0.6 | Legal features (anonymization, audit, policies), `sugo-pack-italy`. |
