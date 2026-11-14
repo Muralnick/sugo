@@ -7,6 +7,8 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-14
+
 ### Added
 
 - Japanese and Chinese (ADR-069): `languages` accepts `ja` and `zh`, and a
