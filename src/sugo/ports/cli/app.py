@@ -1147,7 +1147,8 @@ def _model_failures(model: str) -> Iterator[None]:
     "uninstall",
     cls=TranslatedCommand,
     help=N_(
-        "Delete Sugo's settings and page cache, then show how to remove the program. "
+        "Delete Sugo's settings, page cache and downloaded models, then show how to remove the "
+        "program. "
         "Asks first; your documents and outputs are never touched (ADR-066)."
     ),
 )
@@ -1161,10 +1162,11 @@ def uninstall_command(
     with _failures(json_output=False):
         found = uninstall.find()
     settings = None if keep_config else found.settings
-    if settings is None and found.cache is None:
+    if settings is None and found.cache is None and not found.models:
         _stderr.print(_("Sugo has no files to delete on this computer."))
         with _failures(json_output=False):
             # Only empty folders can be left; removing them needs no question.
+            uninstall.delete_models()
             uninstall.clear_cache()
             if not keep_config:
                 uninstall.delete_settings()
@@ -1178,6 +1180,8 @@ def uninstall_command(
             if not yes and not _confirm(_("Delete them? [y/N] ")):
                 _stderr.print(_("Nothing was deleted."))
                 return
+            # First: the models folder is inside the cache folder.
+            uninstall.delete_models()
             kept = uninstall.clear_cache()
             if not keep_config:
                 uninstall.delete_settings()
@@ -1199,6 +1203,9 @@ def _list_deletions(settings: Path | None, found: uninstall.Found) -> None:
         line = _("cache, with text of converted documents: {path} ({size})").format(
             path=_shown(str(found.cache)), size=_megabytes(found.cache_bytes)
         )
+        _stderr.print(Text("  " + line))
+    for model, size in found.models:
+        line = _("downloaded model: {model} ({size})").format(model=model, size=_megabytes(size))
         _stderr.print(Text("  " + line))
     _stderr.print(_("Your documents, outputs, receipts and sugo.toml files are not touched."))
 

@@ -10,7 +10,7 @@ from sugo.extractors.image.classifier import ImageKind, classify
 from sugo.extractors.image.handwriting import mark_handwriting
 from sugo.extractors.image.layout import build_page
 from sugo.extractors.image.loader import LoadedImage, decode_image
-from sugo.extractors.image.ocr_engine import ENGINE_NAME, OcrEngine
+from sugo.extractors.image.ocr_engine import OcrEngine
 from sugo.extractors.image.preprocess import preprocess
 
 
@@ -45,7 +45,7 @@ def extract_image(
         lines,
         width=image.width,
         height=image.height,
-        origin_engine=ENGINE_NAME,
+        origin_engine=engine.name,
         screenshot=screenshot,
         index=index,
     )

@@ -174,6 +174,7 @@ def system_language() -> str | None:
         "english": "en",
         "japanese": "ja",
         "chinese": "zh",
+        "korean": "ko",
     }
     language = name.split("_")[0].split(" (")[0].lower()
     return names.get(language, name[:2].lower())

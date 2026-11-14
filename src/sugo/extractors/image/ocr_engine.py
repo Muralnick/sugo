@@ -35,6 +35,8 @@ from sugo.extractors.image.preprocess import PreparedImage
 from sugo.i18n import gettext as _
 
 ENGINE_NAME = "rapidocr-ppocrv6-small"
+# Bundled detection with the downloaded Korean recognition model (ADR-070).
+KOREAN_ENGINE_NAME = "rapidocr-ppocrv5-korean"
 _HASH_CHUNK_BYTES = 1024 * 1024
 
 
@@ -96,13 +98,16 @@ def bundled_models() -> tuple[OcrModel, OcrModel]:
 class OcrEngine:
     """A loaded OCR engine; create once and reuse, loading takes time and memory."""
 
-    def __init__(self, detection: OcrModel, recognition: OcrModel) -> None:
-        """Verify both models, then load them.
+    def __init__(
+        self, detection: OcrModel, recognition: OcrModel, *, name: str = ENGINE_NAME
+    ) -> None:
+        """Verify both models, then load them; ``name`` is recorded on every block.
 
         Raises:
             ModelIntegrityError: If a model does not match its hash.
             OSError: If a model file cannot be read.
         """
+        self.name = name
         detection.verify()
         recognition.verify()
         params: dict[str, Any] = {

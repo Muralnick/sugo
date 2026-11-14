@@ -9,6 +9,15 @@ still change, with notice, before 1.0).
 
 ### Added
 
+- Korean (ADR-070): `languages` accepts `ko`, and a Korean system locale
+  selects it. Images and scanned pages are then read with the Korean OCR
+  model, downloaded once with `sugo models pull ocr-korean` (13.5 MB). If it
+  is not installed, OCR stops with `MODEL_MISSING` (exit code 5) and the
+  command to run; native PDFs and Office files without pictures convert as
+  before. A page mixing Korean with Japanese or Chinese is a known limit.
+- `sugo uninstall` also lists and deletes downloaded models; `sugo cache
+  clear` keeps them.
+
 - `sugo models list`, `sugo models pull MODEL` and `sugo models remove MODEL`
   (ADR-070). `pull` shows size, sources and licence and asks first (`--yes`
   for scripts); the file is downloaded over HTTPS from a fixed list of hosts,
