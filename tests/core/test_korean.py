@@ -73,7 +73,7 @@ def test_native_pdfs_need_no_model() -> None:
 
 def test_a_damaged_model_is_refused() -> None:
     store.prepare(KOREAN)
-    with store.model_path(KOREAN).open("wb") as file:
+    with store.file_path(KOREAN, KOREAN.files[0]).open("wb") as file:
         file.truncate(KOREAN.size)
     with pytest.raises(ModelInvalidError):
         korean_ocr_engine()
@@ -109,7 +109,7 @@ def test_the_api_and_the_cli_report_it(tmp_path: Path, monkeypatch: pytest.Monke
 
 def test_uninstall_deletes_models_and_cache_clear_keeps_them() -> None:
     store.prepare(KOREAN)
-    with store.model_path(KOREAN).open("wb") as file:
+    with store.file_path(KOREAN, KOREAN.files[0]).open("wb") as file:
         file.truncate(KOREAN.size)
     assert uninstall.find().models == (("ocr-korean", KOREAN.size),)
     result = CliRunner().invoke(cli.app, ["cache", "clear"])
@@ -127,9 +127,9 @@ def test_a_real_korean_screenshot(tmp_path: Path) -> None:
     from PIL import ImageFont
 
     source = Path(str(REAL_MODEL))
-    assert hashlib.sha256(source.read_bytes()).hexdigest() == KOREAN.sha256
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == KOREAN.files[0].sha256
     store.prepare(KOREAN)
-    shutil.copyfile(source, store.model_path(KOREAN))
+    shutil.copyfile(source, store.file_path(KOREAN, KOREAN.files[0]))
     font_path = Path("C:/Windows/Fonts/malgun.ttf")
     if not font_path.exists():
         pytest.skip("no Korean font")

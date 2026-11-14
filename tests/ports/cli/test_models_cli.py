@@ -6,7 +6,7 @@ from types import MappingProxyType
 
 import pytest
 from tests.internal.test_net import FakeServer
-from tests.models.test_models import BODY, CARD, ByHost
+from tests.models.test_models import BODY, CARD, ByHost, model_file
 from typer.testing import CliRunner, Result
 
 from sugo._internal import net
@@ -74,7 +74,7 @@ def test_pull_asks_and_downloads(monkeypatch: pytest.MonkeyPatch, terminal: None
 
 def store_body() -> None:
     store.prepare(CARD)
-    store.model_path(CARD).write_bytes(BODY)
+    model_file().write_bytes(BODY)
 
 
 def test_pull_answer_no_downloads_nothing(monkeypatch: pytest.MonkeyPatch, terminal: None) -> None:
@@ -89,7 +89,7 @@ def test_pull_with_yes_downloads_and_verifies(monkeypatch: pytest.MonkeyPatch) -
     serve(monkeypatch, ByHost(github=FakeServer(status=404), modelscope=FakeServer(BODY)))
     result = run("models", "pull", "ocr-test", "--yes")
     assert result.exit_code == 0, result.stderr
-    assert store.model_path(CARD).read_bytes() == BODY
+    assert model_file().read_bytes() == BODY
     again = run("models", "pull", "ocr-test", "--yes")
     assert "already installed" in again.stderr
 
@@ -118,11 +118,11 @@ def test_unknown_model_is_a_usage_error() -> None:
 def test_a_damaged_model_is_downloaded_again(monkeypatch: pytest.MonkeyPatch) -> None:
     serve(monkeypatch, ByHost(github=FakeServer(BODY)))
     store.prepare(CARD)
-    store.model_path(CARD).write_bytes(b"z" * len(BODY))
+    model_file().write_bytes(b"z" * len(BODY))
     result = run("models", "pull", "ocr-test", "--yes")
     assert result.exit_code == 0, result.stderr
     assert "damaged" in result.stderr
-    assert store.model_path(CARD).read_bytes() == BODY
+    assert model_file().read_bytes() == BODY
 
 
 def test_remove(monkeypatch: pytest.MonkeyPatch) -> None:

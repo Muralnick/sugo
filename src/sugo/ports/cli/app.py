@@ -974,48 +974,59 @@ def models_list_command(
     ),
 )
 def models_pull_command(
-    model: Annotated[str, typer.Argument(help=N_("The model, e.g. ocr-korean."))],
+    model: Annotated[
+        str,
+        typer.Argument(help=N_("The model, e.g. ocr-korean, or normal for both Docling models.")),
+    ],
     yes: Annotated[bool, typer.Option("--yes", help=N_("Download without asking."))] = False,
 ) -> None:
-    """Download a model; the help text is in the decorator, for translation."""
+    """Download models; the help text is in the decorator, for translation."""
     from sugo.models.download import is_offline
     from sugo.models.errors import ModelInvalidError, OfflineModeError
-    from sugo.models.registry import card as find_card
+    from sugo.models.registry import cards as find_cards
     from sugo.models.store import find, verify
 
+    wanted = []
     with _model_failures(model):
-        card = find_card(model)
         settings = _settings(quiet=False)
-        installed = find(card)
-        if installed is not None:
-            try:
-                verify(installed)
-            except ModelInvalidError:
-                # pull() replaces it; saying so explains the download.
-                _stderr.print(_("The installed copy of {model} is damaged.").format(model=card.id))
-            else:
-                _stderr.print(_("{model} is already installed.").format(model=card.id))
-                return
+        for card in find_cards(model):
+            installed = find(card)
+            if installed is not None:
+                try:
+                    verify(installed)
+                except ModelInvalidError:
+                    # pull() replaces it; saying so explains the download.
+                    _stderr.print(
+                        _("The installed copy of {model} is damaged.").format(model=card.id)
+                    )
+                else:
+                    _stderr.print(_("{model} is already installed.").format(model=card.id))
+                    continue
+            wanted.append(card)
+        if not wanted:
+            return
         if is_offline(settings.privacy.offline):
             # Said before asking: the answer could not change anything.
             raise OfflineModeError("offline mode is on")
-    _stderr.print(
-        _("Sugo will download {model}: {size}, licence {licence}.").format(
-            model=card.id, size=_megabytes(card.size), licence=card.licence
+    for card in wanted:
+        _stderr.print(
+            _("Sugo will download {model}: {size}, licence {licence}.").format(
+                model=card.id, size=_megabytes(card.size), licence=card.licence
+            )
         )
-    )
-    _stderr.print(Text("  " + card.notice))
-    sources = ", ".join(source.name for source in card.sources)
-    _stderr.print(Text("  " + _("From: {sources}, in this order.").format(sources=sources)))
+        _stderr.print(Text("  " + card.notice))
+        sources = ", ".join(card.sources)
+        _stderr.print(Text("  " + _("From: {sources}, in this order.").format(sources=sources)))
     if not yes and not _interactive():
         _stderr.print(_("Not a terminal: add --yes to download it."))
         raise typer.Exit(ExitCode.USAGE)
     if not yes and not _confirm(_("Download? [y/N] ")):
         _stderr.print(_("Nothing was downloaded."))
         return
-    with _model_failures(model):
-        _download(card, offline=settings.privacy.offline)
-    _stderr.print(_("Downloaded and verified {model}.").format(model=card.id))
+    for card in wanted:
+        with _model_failures(card.id):
+            _download(card, offline=settings.privacy.offline)
+        _stderr.print(_("Downloaded and verified {model}.").format(model=card.id))
 
 
 @models_app.command(
@@ -1027,16 +1038,20 @@ def models_remove_command(
     model: Annotated[str, typer.Argument(help=N_("The model, e.g. ocr-korean."))],
 ) -> None:
     """Delete a model; the help text is in the decorator, for translation."""
-    from sugo.models.registry import card as find_card
+    from sugo.models.registry import cards as find_cards
     from sugo.models.store import remove
 
     with _model_failures(model):
-        card = find_card(model)
-        freed = remove(card)
-    if freed:
-        _stderr.print(_("Deleted {model} ({size}).").format(model=card.id, size=_megabytes(freed)))
-    else:
-        _stderr.print(_("{model} is not installed.").format(model=card.id))
+        chosen = find_cards(model)
+    for card in chosen:
+        with _model_failures(card.id):
+            freed = remove(card)
+        if freed:
+            _stderr.print(
+                _("Deleted {model} ({size}).").format(model=card.id, size=_megabytes(freed))
+            )
+        else:
+            _stderr.print(_("{model} is not installed.").format(model=card.id))
 
 
 @models_app.command(
@@ -1055,12 +1070,12 @@ def models_bundle_command(
 ) -> None:
     """Write a bundle; the help text is in the decorator, for translation."""
     from sugo.models.bundle import write_bundle
-    from sugo.models.registry import card as find_card
+    from sugo.models.registry import cards as find_cards
 
-    cards = []
+    cards: list[ModelCard] = []
     for model in models:
         with _model_failures(model):
-            cards.append(find_card(model))
+            cards += find_cards(model)
     with _model_failures(""):
         try:
             size = write_bundle(cards, output, sugo_version=version(DISTRIBUTION_NAME))

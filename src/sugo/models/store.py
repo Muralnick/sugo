@@ -1,11 +1,12 @@
-"""Where downloaded models live, how they are checked and removed (ADR-070).
+"""Where downloaded models live, how they are checked and removed (ADR-070, ADR-071).
 
-A model is kept as ``<cache dir>/models/<id>/<sha256><suffix>``, in the
-private cache folder (ADR-045). Its name is its hash, so a new version never
-overwrites the old one. It is checked against the registry's SHA-256 every
-time it is loaded, like the bundled models (ADR-039): a file changed on disk
-is refused. Removing deletes only the files this module knows by name, never
-a folder with anything else in it, and follows no links (ADR-066 §4).
+A model's files are kept in ``<cache dir>/models/<folder>/<path>``, inside
+the private cache folder (ADR-045), with the paths the registry gives. Every
+file is checked against the registry's SHA-256 each time the model is loaded,
+like the bundled models (ADR-039): a file changed on disk is refused.
+Removing deletes only the files this module knows by name, then empty
+folders, never a folder with anything else in it, and follows no links
+(ADR-066 §4).
 
 Nothing here touches the network, so every port may ask what is installed.
 """
@@ -18,10 +19,10 @@ import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from sugo.models.errors import ModelBusyError, ModelInvalidError
-from sugo.models.registry import ModelCard
+from sugo.models.registry import ModelCard, ModelFile
 from sugo.storage.paths import (
     StorageDirError,
     cache_dir,
@@ -36,7 +37,6 @@ else:
     import fcntl
 
 MODELS_DIR_NAME = "models"
-LOCK_FILE_NAME = "download.lock"
 PART_SUFFIX = ".part"
 _HASH_CHUNK_BYTES = 1024 * 1024
 # How long a second download of the same model waits for the first.
@@ -46,10 +46,14 @@ _LOCK_POLL_S = 0.5
 
 @dataclass(frozen=True)
 class Installed:
-    """A model file found on disk; its hash is checked when it is loaded."""
+    """A model whose files are all on disk; their hashes are checked when it is loaded."""
 
     card: ModelCard
-    path: Path
+    root: Path
+
+    def path(self, file: ModelFile | None = None) -> Path:
+        """Where one of its files is; the first one by default."""
+        return file_path(self.card, file or self.card.files[0])
 
 
 def models_dir() -> Path:
@@ -58,81 +62,112 @@ def models_dir() -> Path:
 
 
 def model_dir(card: ModelCard) -> Path:
-    """The folder of one model, without creating it."""
-    return models_dir() / card.id
+    """The folder of a model, shared with others of the same ``folder``; not created."""
+    return models_dir() / card.folder
 
 
-def model_path(card: ModelCard) -> Path:
-    """Where the model's file is, once installed."""
-    return model_dir(card) / (card.sha256 + card.suffix)
+def file_path(card: ModelCard, file: ModelFile) -> Path:
+    """Where one file of a model goes."""
+    return model_dir(card).joinpath(*PurePosixPath(file.path).parts)
+
+
+def lock_path(card: ModelCard) -> Path:
+    """The lock file of a model's downloads."""
+    return model_dir(card) / f".{card.id}.lock"
 
 
 def find(card: ModelCard) -> Installed | None:
-    """The installed file, if a plain file of the right size is there.
+    """The installed model, if every file is a plain file of the right size.
 
-    The size check is cheap; the hash is checked by ``verify`` before loading.
+    The size check is cheap; the hashes are checked by ``verify`` before loading.
     """
-    path = model_path(card)
-    try:
-        info = path.lstat()
-    except OSError:
-        return None
-    if not stat.S_ISREG(info.st_mode) or info.st_size != card.size:
-        return None
-    return Installed(card, path)
+    for file in card.files:
+        if not _present(card, file):
+            return None
+    return Installed(card, model_dir(card))
 
 
 def verify(installed: Installed) -> Path:
-    """Check the file against the registry's SHA-256 and return its path.
+    """Check every file against the registry's SHA-256 and return the model's folder.
 
     Raises:
-        ModelInvalidError: If it does not match, or cannot be read.
+        ModelInvalidError: If one does not match, or cannot be read.
     """
+    for file in installed.card.files:
+        if not file_valid(installed.card, file):
+            raise ModelInvalidError(installed.card.id)
+    return installed.root
+
+
+def file_valid(card: ModelCard, file: ModelFile) -> bool:
+    """Whether one file is on disk, plain, of the right size and hash."""
+    path = file_path(card, file)
+    if not _present(card, file):
+        return False
     digest = hashlib.sha256()
     try:
-        check_private_file(installed.path)
-        with installed.path.open("rb") as file:
-            while chunk := file.read(_HASH_CHUNK_BYTES):
+        check_private_file(path)
+        with path.open("rb") as handle:
+            while chunk := handle.read(_HASH_CHUNK_BYTES):
                 digest.update(chunk)
     except (OSError, StorageDirError):
-        raise ModelInvalidError(installed.card.id) from None
-    if digest.hexdigest() != installed.card.sha256:
-        raise ModelInvalidError(installed.card.id)
-    return installed.path
+        return False
+    return digest.hexdigest() == file.sha256
+
+
+def _present(card: ModelCard, file: ModelFile) -> bool:
+    try:
+        info = file_path(card, file).lstat()
+    except OSError:
+        return False
+    return stat.S_ISREG(info.st_mode) and info.st_size == file.size
 
 
 def prepare(card: ModelCard) -> Path:
-    """Create the model's folder, private to the user, and return it.
+    """Create the model's folders, private to the user, and return its folder.
 
     Raises:
-        StorageDirError: If the cache, models or model folder is not safe.
+        StorageDirError: If the cache, models or a model folder is not safe.
     """
     ensure_private_dir(cache_dir())
     ensure_private_dir(models_dir())
-    return ensure_private_dir(model_dir(card))
+    root = ensure_private_dir(model_dir(card))
+    for file in card.files:
+        folder = root
+        for part in PurePosixPath(file.path).parts[:-1]:
+            folder = ensure_private_dir(folder / part)
+    return root
 
 
 def remove(card: ModelCard) -> int:
-    """Delete the model's files and, if then empty, its folder.
+    """Delete the model's files and the folders they leave empty.
 
     Returns:
         The bytes freed; 0 if nothing was installed.
 
     Raises:
-        StorageDirError: If the folder or a file in it is a link, not plain,
+        StorageDirError: If a folder or file on the way is a link, not plain,
             or not the user's; nothing is deleted then.
         OSError: If the system refuses to delete a file.
     """
-    folder = model_dir(card)
+    root = model_dir(card)
     try:
-        check_plain_dir(folder)
+        check_plain_dir(root)
     except FileNotFoundError:
         return 0
-    known = [
-        model_path(card),
-        folder / (card.sha256 + card.suffix + PART_SUFFIX),
-        folder / LOCK_FILE_NAME,
-    ]
+    known: list[Path] = [lock_path(card)]
+    folders: set[Path] = set()
+    for file in card.files:
+        path = file_path(card, file)
+        folder = path.parent
+        while folder != root:
+            try:
+                check_plain_dir(folder)
+            except FileNotFoundError:
+                break
+            folders.add(folder)
+            folder = folder.parent
+        known += [path, path.with_name(path.name + PART_SUFFIX)]
     for path in known:
         check_private_file(path)
     freed = 0
@@ -142,10 +177,14 @@ def remove(card: ModelCard) -> int:
         except FileNotFoundError:
             continue
         path.unlink()
-        if path.name != LOCK_FILE_NAME:
+        if path != lock_path(card):
             freed += size
-    if not any(folder.iterdir()):
-        folder.rmdir()
+    # Deepest first, so a parent is empty once its children are gone.
+    for folder in sorted(folders, key=lambda f: len(f.parts), reverse=True):
+        if folder.is_dir() and not any(folder.iterdir()):
+            folder.rmdir()
+    if not any(root.iterdir()):
+        root.rmdir()
     return freed
 
 
@@ -157,7 +196,8 @@ def download_lock(card: ModelCard) -> Iterator[None]:
         ModelBusyError: If the lock is not free within ``LOCK_TIMEOUT_S``.
         StorageDirError: If the lock file is a link or not the user's.
     """
-    path = prepare(card) / LOCK_FILE_NAME
+    prepare(card)
+    path = lock_path(card)
     check_private_file(path)
     flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
     descriptor = os.open(path, flags, 0o600)

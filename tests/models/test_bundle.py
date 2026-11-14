@@ -6,7 +6,7 @@ from pathlib import Path
 from types import MappingProxyType
 
 import pytest
-from tests.models.test_models import BODY, CARD
+from tests.models.test_models import BODY, CARD, CONFIG, TWO, model_file
 from typer.testing import CliRunner
 
 from sugo.models import bundle as bundle_module
@@ -17,26 +17,26 @@ from sugo.ports.cli import app as cli
 from sugo.ports.errors import ExitCode
 from sugo.storage.paths import CACHE_DIR_ENV
 
+ENTRY = entry_name(CARD, CARD.files[0])
+
 
 @pytest.fixture(autouse=True)
 def test_registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(CACHE_DIR_ENV, str(tmp_path / "cache"))
-    monkeypatch.setattr(registry, "REGISTRY", MappingProxyType({CARD.id: CARD}))
+    monkeypatch.setattr(registry, "REGISTRY", MappingProxyType({CARD.id: CARD, TWO.id: TWO}))
     monkeypatch.setattr(bundle_module, "REGISTRY", registry.REGISTRY)
 
 
 def install_model() -> None:
     store.prepare(CARD)
-    store.model_path(CARD).write_bytes(BODY)
+    model_file().write_bytes(BODY)
 
 
 def manifest(**changes: object) -> str:
     value: dict[str, object] = {
         "format": 1,
         "sugo_version": "0.0.0",
-        "models": [
-            {"id": CARD.id, "sha256": CARD.sha256, "size": CARD.size, "file": entry_name(CARD)}
-        ],
+        "models": [{"id": CARD.id, "files": [{"name": ENTRY, "size": CARD.size}]}],
     }
     value.update(changes)
     return json.dumps(value)
@@ -56,10 +56,10 @@ def test_a_written_bundle_installs_on_another_machine(tmp_path: Path) -> None:
     target = tmp_path / "models.zip"
     assert write_bundle([CARD, CARD], target, sugo_version="0.0.0") == target.stat().st_size
     with zipfile.ZipFile(target) as archive:
-        assert sorted(archive.namelist()) == sorted([MANIFEST_NAME, entry_name(CARD)])
+        assert sorted(archive.namelist()) == sorted([MANIFEST_NAME, ENTRY])
     store.remove(CARD)
     assert install_bundle(target) == [CARD]
-    assert store.verify(store.find(CARD)) == store.model_path(CARD)  # type: ignore[arg-type]
+    assert store.verify(store.find(CARD)) == store.model_dir(CARD)  # type: ignore[arg-type]
     assert install_bundle(target) == [CARD]  # already installed: nothing to do
 
 
@@ -73,14 +73,14 @@ def test_a_model_that_is_not_installed_cannot_be_bundled(tmp_path: Path) -> None
 @pytest.mark.parametrize(
     ("entries", "reason"),
     [
-        ({MANIFEST_NAME: manifest(), entry_name(CARD): BODY[:-1] + b"!"}, "SHA-256"),
-        ({MANIFEST_NAME: manifest(), entry_name(CARD): BODY + b"!"}, "wrong size"),
-        ({MANIFEST_NAME: manifest(), entry_name(CARD): BODY, "../../evil.py": b"x"}, "not a model"),
+        ({MANIFEST_NAME: manifest(), ENTRY: BODY[:-1] + b"!"}, "SHA-256"),
+        ({MANIFEST_NAME: manifest(), ENTRY: BODY + b"!"}, "wrong size"),
+        ({MANIFEST_NAME: manifest(), ENTRY: BODY, "../../evil.py": b"x"}, "not a model"),
         ({MANIFEST_NAME: manifest(), "ocr-test/other.onnx": BODY}, "not a model"),
-        ({entry_name(CARD): BODY}, "manifest is missing"),
-        ({MANIFEST_NAME: manifest(format=2), entry_name(CARD): BODY}, "unknown format"),
-        ({MANIFEST_NAME: manifest(models=[]), entry_name(CARD): BODY}, "does not match"),
-        ({MANIFEST_NAME: "not json", entry_name(CARD): BODY}, "not JSON"),
+        ({ENTRY: BODY}, "manifest is missing"),
+        ({MANIFEST_NAME: manifest(format=2), ENTRY: BODY}, "unknown format"),
+        ({MANIFEST_NAME: manifest(models=[]), ENTRY: BODY}, "does not match"),
+        ({MANIFEST_NAME: "not json", ENTRY: BODY}, "not JSON"),
         ({MANIFEST_NAME: manifest(models=[])}, "no model"),
     ],
 )
@@ -99,7 +99,7 @@ def test_a_compressed_bomb_is_refused_by_its_declared_size(tmp_path: Path) -> No
     bomb = b"\0" * (len(BODY) * 50)
     path = hand_made(
         tmp_path / "bomb.zip",
-        {MANIFEST_NAME: manifest(), entry_name(CARD): bomb},
+        {MANIFEST_NAME: manifest(), ENTRY: bomb},
         compression=zipfile.ZIP_DEFLATED,
     )
     with pytest.raises(BundleInvalidError, match="wrong size"):
@@ -110,13 +110,13 @@ def test_an_entry_lying_about_its_size_is_cut_off(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # The central directory says the right size; the data is longer.
-    path = hand_made(tmp_path / "liar.zip", {MANIFEST_NAME: manifest(), entry_name(CARD): BODY * 2})
+    path = hand_made(tmp_path / "liar.zip", {MANIFEST_NAME: manifest(), ENTRY: BODY * 2})
     real = zipfile.ZipFile.infolist
 
     def lying(self: zipfile.ZipFile) -> list[zipfile.ZipInfo]:
         infos = real(self)
         for info in infos:
-            if info.filename == entry_name(CARD):
+            if info.filename == ENTRY:
                 info.file_size = CARD.size
         return infos
 
@@ -137,7 +137,7 @@ def test_files_that_are_not_zips_or_too_large(tmp_path: Path) -> None:
 
 
 def test_encrypted_entries_are_refused(tmp_path: Path) -> None:
-    path = hand_made(tmp_path / "enc.zip", {MANIFEST_NAME: manifest(), entry_name(CARD): BODY})
+    path = hand_made(tmp_path / "enc.zip", {MANIFEST_NAME: manifest(), ENTRY: BODY})
     data = bytearray(path.read_bytes())
     # Set the "encrypted" flag in the central directory entry of the model.
     central = data.rfind(b"PK\x01\x02")
@@ -177,3 +177,32 @@ class TestCommands:
         result = CliRunner().invoke(cli.app, ["models", "install", str(tmp_path / "none.zip")])
         assert result.exit_code == ExitCode.ERROR
         assert "FILE_UNREADABLE" in result.stderr
+
+
+def test_a_model_of_several_files_travels_whole(tmp_path: Path) -> None:
+    store.prepare(TWO)
+    model_file(TWO, 0).write_bytes(BODY)
+    model_file(TWO, 1).write_bytes(CONFIG)
+    target = tmp_path / "two.zip"
+    write_bundle([TWO], target, sugo_version="0.0.0")
+    with zipfile.ZipFile(target) as archive:
+        assert sorted(archive.namelist()) == sorted(
+            [
+                MANIFEST_NAME,
+                "docling/org--layout/model.safetensors",
+                "docling/org--layout/config.json",
+            ]
+        )
+    store.remove(TWO)
+    assert install_bundle(target) == [TWO]
+    assert model_file(TWO, 1).read_bytes() == CONFIG
+
+
+def test_a_model_missing_one_of_its_files_is_refused(tmp_path: Path) -> None:
+    two = json.dumps({"format": 1, "models": [{"id": TWO.id}]})
+    path = hand_made(
+        tmp_path / "half.zip", {MANIFEST_NAME: two, "docling/org--layout/model.safetensors": BODY}
+    )
+    with pytest.raises(BundleInvalidError, match="incomplete"):
+        install_bundle(path)
+    assert store.find(TWO) is None

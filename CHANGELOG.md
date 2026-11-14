@@ -9,6 +9,11 @@ still change, with notice, before 1.0).
 
 ### Added
 
+- The models of the coming `normal` level (ADR-071): `sugo models pull normal`
+  downloads Docling's layout model and table model (384 MB, from Hugging Face,
+  pinned to a commit and checked by SHA-256). A model can now have several
+  files; they are kept in the folder layout Docling reads.
+
 - Korean (ADR-070): `languages` accepts `ko`, and a Korean system locale
   selects it. Images and scanned pages are then read with the Korean OCR
   model, downloaded once with `sugo models pull ocr-korean` (13.5 MB). If it
