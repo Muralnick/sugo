@@ -513,3 +513,73 @@ def test_japanese_and_chinese_pdfs_lose_their_line_breaks(
     assert "\n" in before.markdown.strip()
     assert after.markdown.strip() == text * 3
     assert count_tokens(after.markdown) < count_tokens(before.markdown)
+
+
+class TestNormalLevel:
+    """ADR-071 §5: at normal, PDF text pages are Docling's, scanned pages lite's."""
+
+    def docling_pages(self, data: bytes, count: int) -> list[Page]:
+        from sugo.core.models import Block, BlockType, PageOrigin
+
+        return [
+            Page(
+                index=n,
+                width=595,
+                height=842,
+                origin=PageOrigin.NATIVE,
+                blocks=(
+                    Block(
+                        id=f"p{n}-d0",
+                        type=BlockType.PARAGRAPH,
+                        text=f"Docling page {n}",
+                        origin_engine="docling",
+                    ),
+                ),
+            )
+            for n in range(count)
+        ]
+
+    def test_text_pages_come_from_docling(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(pipeline, "_docling_reader", lambda: self.docling_pages)
+        result = convert(report(2), level="normal")
+        assert "Docling page 0" in result.markdown
+        assert "Docling page 1" in result.markdown
+        assert "Section" not in result.markdown
+
+    def test_lite_stays_the_default_and_its_hash(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(pipeline, "_docling_reader", lambda: self.docling_pages)
+        lite = convert(report(1))
+        normal = convert(report(1), level="normal")
+        assert "Docling" not in lite.markdown
+        assert lite.config_hash == convert(report(1), level="lite").config_hash
+        assert normal.config_hash != lite.config_hash
+
+    def test_unknown_level_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="level must be one of"):
+            convert(report(1), level="quality")
+
+    def test_without_the_extra_it_says_so(self) -> None:
+        from sugo.extractors.docling.extract import NormalLevelMissingError
+
+        with pytest.raises(NormalLevelMissingError):
+            convert(report(1), level="normal")
+
+    def test_without_the_models_it_says_so(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        from sugo.models.errors import ModelMissingError
+        from sugo.storage.paths import CACHE_DIR_ENV
+
+        monkeypatch.setenv(CACHE_DIR_ENV, str(tmp_path / "cache"))
+        monkeypatch.setattr(pipeline, "docling_installed", lambda: True)
+        with pytest.raises(ModelMissingError):
+            convert(report(1), level="normal")
+
+    def test_images_and_office_files_are_read_as_in_lite(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def never() -> None:
+            raise AssertionError("Docling only reads PDFs for now")
+
+        monkeypatch.setattr(pipeline, "_docling_reader", never)
+        assert convert(b"<?xml version='1.0'?><a>text</a>", level="normal").markdown

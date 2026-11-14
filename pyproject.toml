@@ -44,6 +44,13 @@ sugo-cli = "sugo.ports.cli.app:main"
 # Kept empty so "sugo-cli[lite]" still installs: the lite level is now in the
 # base dependencies (ADR-060). Later levels come as extras (ADR-007).
 lite = []
+# The normal level (ADR-071): Docling with only what reading PDFs needs, and
+# PyTorch for its models, CPU only. Its models come through `sugo models pull
+# normal`, never through Docling.
+normal = [
+    "docling-slim[convert-core,format-pdf,models-local]==2.145.0",
+    "torch>=2.15,<2.16",
+]
 
 [dependency-groups]
 # Development tools only; see ADR-035. Exact versions and hashes live in uv.lock.
@@ -69,6 +76,17 @@ build-backend = "uv_build"
 required-version = ">=0.13.0"
 # Enforces the 14-day minimum age for every dependency (CLAUDE.md, ADR-035).
 exclude-newer = "14 days"
+
+# PyTorch's CPU build: PyPI's Linux wheel is the CUDA one, with gigabytes of
+# NVIDIA libraries the normal level never uses (ADR-071).
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+torchvision = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 
 [tool.uv.workspace]
 # Official packs, each a separate distribution (ADR-032).
@@ -174,6 +192,12 @@ disallow_subclassing_any = true
 warn_return_any = true
 no_implicit_reexport = true
 extra_checks = true
+
+[[tool.mypy.overrides]]
+# The `normal` extra (ADR-071) is not in the development environment: only
+# its worker imports it, and checks the result it gets.
+module = ["docling.*", "torch"]
+ignore_missing_imports = true
 
 # --- pytest ---------------------------------------------------------------
 
@@ -342,6 +366,16 @@ type = "forbidden"
 source_modules = ["sugo"]
 forbidden_modules = ["pymupdf", "fitz"]
 ignore_imports = ["sugo.extractors.pymupdf.worker -> pymupdf"]
+
+# Docling and PyTorch parse untrusted files and load models: only in the
+# Docling worker's process (ADR-071).
+[[tool.importlinter.contracts]]
+name = "Docling only in its worker process"
+type = "forbidden"
+source_modules = ["sugo"]
+forbidden_modules = ["docling", "docling_core", "docling_parse", "torch", "transformers"]
+ignore_imports = ["sugo.extractors.docling.worker -> docling", "sugo.extractors.docling.worker -> torch"]
+unmatched_ignore_imports_alerting = "none"
 
 # The Office worker parses untrusted XML only: pictures are read with OCR in
 # Sugo's process, so the worker never loads the image stack (ADR-054).

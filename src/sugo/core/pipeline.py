@@ -44,8 +44,13 @@ from sugo.core.constants import (
     MAX_INPUT_BYTES,
 )
 from sugo.core.decisions import InvalidDecisionError, Proposal, apply_decisions
-from sugo.core.models import BlockFlag, Page
+from sugo.core.models import BlockFlag, Page, PageOrigin
 from sugo.core.receipt import EditRecord, FlaggedBlock, Receipt, RemovalRecord
+from sugo.extractors.docling.extract import (
+    NormalLevelMissingError,
+    docling_installed,
+    extract_docling,
+)
 from sugo.extractors.image.extract import extract_page
 from sugo.extractors.image.loader import UnsupportedImageError, detect_format
 from sugo.extractors.image.ocr_engine import (
@@ -66,6 +71,7 @@ from sugo.i18n import gettext as _
 from sugo.metrics.tokenizer import count_tokens
 from sugo.models.errors import ModelMissingError
 from sugo.models.registry import card as model_card
+from sugo.models.registry import cards as model_cards
 from sugo.models.store import find as find_model
 from sugo.models.store import verify as verify_model
 from sugo.serializers.markdown import render
@@ -106,6 +112,10 @@ CLEANERS: tuple[Cleaner[EdgeStats], ...] = (
 
 # For callers that pass no languages; the ports pass the configured ones (ADR-051).
 DEFAULT_LANGUAGES = ("en",)
+# Engine levels (ADR-007); `normal` reads PDF text pages with Docling (ADR-071).
+LITE = "lite"
+NORMAL = "normal"
+LEVELS = (LITE, NORMAL)
 # The downloaded model that reads Korean (ADR-070).
 KOREAN_OCR_MODEL = "ocr-korean"
 
@@ -125,6 +135,38 @@ def korean_ocr_engine() -> OcrEngine:
     verify_model(installed)
     recognition = OcrModel(installed.path(), card.files[0].sha256)
     return OcrEngine(detection, recognition, name=KOREAN_ENGINE_NAME)
+
+
+def _docling_reader() -> Callable[[bytes, int], list[Page]]:
+    """Docling, run in its worker on Sugo's copy of its models (ADR-071).
+
+    Raises:
+        NormalLevelMissingError: If the ``normal`` extra is not installed.
+        sugo.models.errors.ModelMissingError: If its models are not installed.
+        sugo.models.errors.ModelInvalidError: If one fails its SHA-256.
+    """
+    if not docling_installed():
+        raise NormalLevelMissingError(_("The normal level is not installed."))
+    folder = None
+    for card in model_cards(NORMAL):
+        installed = find_model(card)
+        if installed is None:
+            raise ModelMissingError(NORMAL)
+        folder = verify_model(installed)
+    if folder is None:
+        raise ModelMissingError(NORMAL)
+    artifacts = folder
+
+    def read(data: bytes, page_count: int) -> list[Page]:
+        return extract_docling(data, kind="pdf", page_count=page_count, artifacts=artifacts)
+
+    return read
+
+
+def _docling_identity() -> str:
+    # Docling's version and its models change the pages it makes.
+    hashes = ",".join(file.sha256[:16] for card in model_cards(NORMAL) for file in card.files)
+    return f";level=normal;docling={_version('docling-slim')}/{_version('docling')};models={hashes}"
 
 
 def ocr_for(languages: tuple[str, ...]) -> Callable[[], OcrEngine]:
@@ -221,6 +263,7 @@ def convert_file(
     strip_tracking_urls: bool = True,
     receipt: bool = False,
     on_page: Callable[[int], None] | None = None,
+    level: str = LITE,
 ) -> Conversion:
     """Read a file and convert it; ``source`` defaults to the path as given.
 
@@ -243,6 +286,7 @@ def convert_file(
         strip_tracking_urls=strip_tracking_urls,
         receipt=receipt,
         on_page=on_page,
+        level=level,
     )
 
 
@@ -269,6 +313,7 @@ def convert(
     strip_tracking_urls: bool = True,
     receipt: bool = False,
     on_page: Callable[[int], None] | None = None,
+    level: str = LITE,
 ) -> Conversion:
     """Convert a document's bytes into Markdown, and into chunks if asked.
 
@@ -290,9 +335,16 @@ def convert(
         on_page: Called with the page number (from 1) each time a page has
             been read, for progress; pages taken from the cache are not
             reported. It must not raise.
+        level: ``lite``, or ``normal`` to read PDF text pages with Docling
+            (ADR-071); needs the ``normal`` extra and its models.
 
     Raises:
-        ValueError: If a language has no pack, or ``max_chunk_tokens`` is too small.
+        ValueError: If a language has no pack, the level is unknown, or
+            ``max_chunk_tokens`` is too small.
+        sugo.extractors.docling.extract.NormalLevelMissingError: If ``normal``
+            is asked for without the extra.
+        sugo.models.errors.ModelMissingError: If ``normal`` is asked for
+            without its models.
         InputUnsupportedError: If the data is none of PDF, DOCX, XLSX, PPTX, a supported image
             or XML.
         sugo.extractors.pymupdf.extract.PdfError: If a PDF is refused.
@@ -300,6 +352,9 @@ def convert(
         sugo.extractors.office.extract.OfficeError: If a DOCX, XLSX or XML file is refused.
     """
     kind = detect_kind(data)
+    if level not in LEVELS:
+        raise ValueError(f"level must be one of: {', '.join(LEVELS)}")
+    docling = _docling_reader() if level == NORMAL and kind is InputKind.PDF else None
     if ocr is None:
         ocr = ocr_for(languages)
     if max_chunk_tokens is not None and max_chunk_tokens < CHUNK_MIN_TOKENS:
@@ -312,18 +367,19 @@ def convert(
         languages=tuple(sorted(set(languages))),
         strip_tracking_urls=strip_tracking_urls,
         receipt=receipt,
+        level=level,
     )
     if cache is not None:
-        return _Job(data, kind, cache, ocr, options, on_page).run()
+        return _Job(data, kind, cache, ocr, options, on_page, docling).run()
     try:
         job_cache = PageCache.ephemeral()
     except (CacheUnavailableError, StorageDirError, OSError):
         # No room even for a temporary store: the job still runs, with its
         # pages in memory.
         _log.warning("no temporary page store; pages kept in memory")
-        return _Job(data, kind, None, ocr, options, on_page).run()
+        return _Job(data, kind, None, ocr, options, on_page, docling).run()
     with job_cache:
-        return _Job(data, kind, job_cache, ocr, options, on_page).run()
+        return _Job(data, kind, job_cache, ocr, options, on_page, docling).run()
 
 
 def detect_kind(data: bytes) -> InputKind:
@@ -377,6 +433,7 @@ class _Options:
     strip_tracking_urls: bool
     # Not part of the config hash: it measures the conversion, never changes it.
     receipt: bool
+    level: str = "lite"
 
     def cleaning(self) -> str:
         """The settings that change cleaned pages, part of their cache key."""
@@ -385,7 +442,13 @@ class _Options:
         return f"{','.join(names)};languages={','.join(self.languages)}"
 
     def config_hash(self) -> str:
-        settings = {"cleaners": self.cleaning(), "max_chunk_tokens": self.max_chunk_tokens}
+        settings: dict[str, object] = {
+            "cleaners": self.cleaning(),
+            "max_chunk_tokens": self.max_chunk_tokens,
+        }
+        if self.level != LITE:
+            # Only when not lite, so the hashes of lite conversions do not change.
+            settings["level"] = self.level
         return hashlib.sha256(json.dumps(settings, sort_keys=True).encode()).hexdigest()
 
 
@@ -400,15 +463,19 @@ class _Job:
         ocr: Callable[[], OcrEngine],
         options: _Options,
         on_page: Callable[[int], None] | None = None,
+        docling: "Callable[[bytes, int], list[Page]] | None" = None,
     ) -> None:
         self._data = data
+        self._docling = docling
         self._on_page = on_page
         self._options = options
         self._kind = kind
         self._cache = cache
         self._ocr = _OnceOcr(ocr)
         self._sha256 = hashlib.sha256(data).hexdigest()
-        self._engine = _engine_identity(kind, korean="ko" in options.languages)
+        self._engine = _engine_identity(kind, korean="ko" in options.languages) + (
+            _docling_identity() if docling is not None else ""
+        )
         # Extracted pages the cache could not or must not store, by index.
         self._spilled: dict[int, Page] = {}
         # Pages the PDF worker could not read in this run.
@@ -583,9 +650,22 @@ class _Job:
             count = max(count, index + 1)
             return self._get(CacheLevel.EXTRACTION, self._key(index)) is not None
 
-        for page in extract_pdf(self._data, ocr=self._ocr, start=start, skip=cached):
-            self._keep(page)
+        fresh = extract_pdf(self._data, ocr=self._ocr, start=start, skip=cached)
+        if self._docling is None:
+            for page in fresh:
+                self._keep(page)
+                count = max(count, page.index + 1)
+            return count
+        # The normal level (ADR-071 §5): text pages as Docling reads them,
+        # scanned and failed pages as lite reads them.
+        lite = list(fresh)
+        for page in lite:
             count = max(count, page.index + 1)
+        read = {page.index: page for page in self._docling(self._data, count)} if lite else {}
+        for page in lite:
+            better = read.get(page.index)
+            text_page = page.origin is PageOrigin.NATIVE and not self._is_failed(page)
+            self._keep(better if text_page and better is not None and better.blocks else page)
         return count
 
     def _keep(self, page: Page) -> None:

@@ -81,6 +81,12 @@ _KNOWN: dict[str, tuple[ExitCode, str | None]] = {
         ExitCode.ERROR,
         N_("Try again; if it fails again, run: sugo doctor"),
     ),
+    # The normal level (ADR-071): the extra is missing, or Docling failed.
+    "LEVEL_MISSING": (ExitCode.MISSING, 'pip install "sugo-cli[normal]"'),
+    "NORMAL_FAILED": (
+        ExitCode.ERROR,
+        N_("Convert it at the lite level, or run: sugo doctor"),
+    ),
     "CONFIG_INVALID": (
         ExitCode.USAGE,
         N_("Fix the file or variable named above; run: sugo doctor"),
