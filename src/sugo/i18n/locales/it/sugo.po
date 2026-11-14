@@ -1475,3 +1475,12 @@ msgstr "Non cancellati: la cartella dei modelli, o un file al suo interno, è un
 
 msgid "The model, e.g. ocr-korean, or normal for both Docling models."
 msgstr "Il modello, per esempio ocr-korean, oppure normal per i due modelli di Docling."
+
+msgid "The normal level is not installed."
+msgstr "Il livello normal non è installato."
+
+msgid "Docling could not read this document."
+msgstr "Docling non è riuscito a leggere questo documento."
+
+msgid "Convert it at the lite level, or run: sugo doctor"
+msgstr "Convertilo al livello lite, oppure lancia: sugo doctor"

@@ -458,6 +458,17 @@ OFFICE_WORKER_MEMORY_BYTES: Final = 1536 * 1024 * 1024
 OFFICE_OPEN_TIMEOUT_S: Final = 60.0
 OFFICE_PAGE_TIMEOUT_S: Final = 30.0
 OFFICE_MAX_WORKER_RESTARTS: Final = 3
+
+# The Docling worker of the `normal` level (ADR-071). Its address-space cap is
+# not its memory use: PyTorch reserves far more address space than it fills,
+# so the cap only stops a runaway; the measured peak is about 1.7 GB.
+DOCLING_WORKER_MEMORY_BYTES: Final = 16 * 1024 * 1024 * 1024
+DOCLING_THREADS: Final = 4
+# Importing PyTorch and Docling and loading both models: about 25 s measured.
+DOCLING_LOAD_TIMEOUT_S: Final = 180.0
+# Docling reads the whole file before the first page comes back: the wait for
+# it grows with the page count. Measured: 3.4 s per text page, 8.4 with tables.
+DOCLING_PAGE_TIMEOUT_S: Final = 60.0
 OFFICE_MAX_MESSAGE_BYTES: Final = 64 * 1024 * 1024
 
 # --- Headers, footers and page numbers (roadmap step 5b, ADR-044) ------------
