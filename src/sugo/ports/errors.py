@@ -133,6 +133,11 @@ def model_error(error: Exception, model: str) -> PortError | None:
     """
     from sugo.models import errors
 
+    if isinstance(
+        error, errors.UnknownModelError | errors.ModelMissingError | errors.ModelInvalidError
+    ):
+        # These carry the model's id: a bundle names several models.
+        model = str(error) or model
     if isinstance(error, errors.UnknownModelError):
         return PortError(
             code="MODEL_UNKNOWN",
@@ -164,6 +169,22 @@ def model_error(error: Exception, model: str) -> PortError | None:
             ).format(model=model),
             exit_code=ExitCode.MISSING,
             hint=f"sugo models pull {model}",
+        )
+    if isinstance(error, errors.ModelMissingError):
+        return PortError(
+            code="MODEL_MISSING",
+            message=_("The model {model} is not installed.").format(model=model),
+            exit_code=ExitCode.MISSING,
+            hint=f"sugo models pull {model}",
+        )
+    if isinstance(error, errors.BundleInvalidError):
+        return PortError(
+            code="BUNDLE_INVALID",
+            message=_("This is not a bundle Sugo can trust: nothing was installed."),
+            exit_code=ExitCode.SECURITY,
+            hint=_("Write the bundle again with: sugo models bundle"),
+            # English, naming the check that failed, never a name from the archive.
+            details={"reason": str(error)},
         )
     if isinstance(error, errors.ModelBusyError):
         return PortError(
