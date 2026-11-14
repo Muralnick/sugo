@@ -60,6 +60,14 @@ Chunks already break after `。！？`. They may also break after `、` and `，
 - Unit and property tests for both edits, including the invariant tests of ADR-050 (the original text is always recoverable; no visible character changes except the two width mappings).
 - Fixtures are generated in the tests from PyMuPDF's built-in CJK fonts, and screenshots are rendered from those PDFs, so CI needs no font files.
 - A small real corpus outside the repository (TESTING.md): Japanese laws from e-Gov and Chinese laws from the National People's Congress site, both outside copyright as official legislative texts (Japan Copyright Act art. 13, PRC Copyright Law art. 5), with a manifest and checksums. Token savings and content loss are measured there before release.
+- Measured on 2026-11-14 (`../sugo-corpus/cjk`, manifest and `measure.py` there). Neither site serves these laws as PDF, only DOCX: 労働契約法 from e-Gov (22 KB) and 中华人民共和国劳动合同法 from the national law database (35 KB). Each DOCX is converted as it is, then its text is typeset into a PDF with PyMuPDF's CJK fonts, as for EUR-Lex. On o200k_base tokens:
+
+  | Document | DOCX | PDF, `en` only | PDF, with `ja` / `zh` |
+  |---|---|---|---|
+  | Japanese, 6 pages | 5 182 (unchanged) | 5 294 | 5 175 (−2.2%) |
+  | Chinese, 12 pages | 8 598 (unchanged) | 8 759 | 8 600 (−1.8%) |
+
+  No visible character changes in any case, and the PDF output with the new rules has exactly the DOCX's visible text: the joins undo every line break the typesetting added. The saving is smaller than on the synthetic files because these laws have short articles and write numbers in kanji, so there are few line breaks per paragraph and no full-width digits.
 - The character-count thresholds (`LAYOUT_SIZE_MIN_CHARS` 25, `SUBSTANTIVE_MIN_CHARS` 40) were tuned on Latin text, where a character says less. They are measured on the CJK corpus and changed only if they measurably misbehave.
 
 ### 6. Not in this ADR
