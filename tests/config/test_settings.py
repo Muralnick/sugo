@@ -41,7 +41,9 @@ def test_defaults_without_any_file(tmp_path: Path) -> None:
 def test_system_language_is_added_to_english(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LANG", "it_IT.UTF-8")
     assert default_languages() == ("en", "it")
-    monkeypatch.setenv("LANG", "ja_JP.UTF-8")  # no pack yet: English only
+    monkeypatch.setenv("LANG", "ja_JP.UTF-8")
+    assert default_languages() == ("en", "ja")
+    monkeypatch.setenv("LANG", "ko_KR.UTF-8")  # no pack yet: English only
     assert default_languages() == ("en",)
 
 

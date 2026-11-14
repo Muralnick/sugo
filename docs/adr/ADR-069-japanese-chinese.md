@@ -7,6 +7,7 @@
 **Builds on:** ADR-004 (OCR engine), ADR-039 (lite image stack), ADR-050 (text edits), ADR-051 (configured languages)
 **Amends:** ADR-050 (two new checked edits), ROADMAP (Korean moves to v0.3)
 **Adds dependencies:** none
+**Notes:** 2026-11-14, while implementing: the receipt schema gains the edit kind `cjk_join` (section 7); headings need no serializer rule (section 2); a lone half-width sound mark is left alone, and a line that starts with one is never joined (sections 2 and 3); full-width letters and digits are full-width forms, so they count as CJK characters for the join and a full-width number broken across lines is joined (section 2).
 
 ## Context
 
@@ -39,14 +40,14 @@ OCR does not change: same models, same engine name, same speed.
 
 `EditKind.CJK_JOIN` removes a line break, with any spaces or tabs around it, when the characters on both sides are CJK: Han ideographs, Hiragana, Katakana (including the prolonged sound mark), CJK punctuation (`。、「」『』（）` and the like) and full-width forms. The core checks it mechanically, like `hyphen_join`: the span is only whitespace containing exactly one line feed, the replacement is empty, and the character before and after the span belongs to those blocks. The definition of "CJK character" lives in `sugo.core.text`, shared by the cleaner and the core.
 
-The text normalisation cleaner proposes it only when `ja` or `zh` is a configured language, only in prose blocks (as today), and never when a Latin letter or digit touches the break (`Python\nを` stays: when in doubt, leave it). A blank line (a paragraph break) is never touched. Headings rendered on one line are joined without a space between two CJK characters, the same rule in the serializer.
+The text normalisation cleaner proposes it only when `ja` or `zh` is a configured language, only in prose blocks (as today), and never when an ASCII letter or digit touches the break (`Python\nを` stays: when in doubt, leave it). A blank line (a paragraph break) is never touched. Headings are prose blocks, so the same edit joins their lines before the serializer renders them on one line; the serializer needs no rule of its own (implementation note: the first draft planned one).
 
 ### 3. Width normalisation as an accepted `normalize`
 
 The ADR-050 equivalence is extended by two exact mappings, and nothing else:
 
 - full-width ASCII **letters and digits** (U+FF10–FF19, U+FF21–FF3A, U+FF41–FF5A) to ASCII;
-- half-width Katakana (U+FF65–FF9F) to full-width Katakana, composing a following half-width sound mark (`ｶﾞ` → `ガ`).
+- half-width Katakana (U+FF65–FF9F) to full-width Katakana, composing a following half-width sound mark (`ｶﾞ` → `ガ`). A sound mark that does not follow a half-width Katakana is left as it is: written full width it would combine with the character before it, a letter the reader never saw (found by the property test).
 
 Full-width punctuation, the full-width space U+3000 (used for indentation) and everything else stay. These are proposed only for `ja` and `zh`. Full NFKC stays refused, as in ADR-050.
 
@@ -59,6 +60,14 @@ Chunks already break after `。！？`. They may also break after `、` and `，
 - Unit and property tests for both edits, including the invariant tests of ADR-050 (the original text is always recoverable; no visible character changes except the two width mappings).
 - Fixtures are generated in the tests from PyMuPDF's built-in CJK fonts, and screenshots are rendered from those PDFs, so CI needs no font files.
 - A small real corpus outside the repository (TESTING.md): Japanese laws from e-Gov and Chinese laws from the National People's Congress site, both outside copyright as official legislative texts (Japan Copyright Act art. 13, PRC Copyright Law art. 5), with a manifest and checksums. Token savings and content loss are measured there before release.
+- Measured on 2026-11-14 (`../sugo-corpus/cjk`, manifest and `measure.py` there). Neither site serves these laws as PDF, only DOCX: 労働契約法 from e-Gov (22 KB) and 中华人民共和国劳动合同法 from the national law database (35 KB). Each DOCX is converted as it is, then its text is typeset into a PDF with PyMuPDF's CJK fonts, as for EUR-Lex. On o200k_base tokens:
+
+  | Document | DOCX | PDF, `en` only | PDF, with `ja` / `zh` |
+  |---|---|---|---|
+  | Japanese, 6 pages | 5 182 (unchanged) | 5 294 | 5 175 (−2.2%) |
+  | Chinese, 12 pages | 8 598 (unchanged) | 8 759 | 8 600 (−1.8%) |
+
+  No visible character changes in any case, and the PDF output with the new rules has exactly the DOCX's visible text: the joins undo every line break the typesetting added. The saving is smaller than on the synthetic files because these laws have short articles and write numbers in kanji, so there are few line breaks per paragraph and no full-width digits.
 - The character-count thresholds (`LAYOUT_SIZE_MIN_CHARS` 25, `SUBSTANTIVE_MIN_CHARS` 40) were tuned on Latin text, where a character says less. They are measured on the CJK corpus and changed only if they measurably misbehave.
 
 ### 6. Not in this ADR
@@ -69,7 +78,7 @@ Chunks already break after `。！？`. They may also break after `、` and `，
 
 ### 7. Release
 
-Additive: two new accepted language codes and two new edit kinds, internal to the IR (edits are not in `sugo.api`). Output changes only for users who configure `ja` or `zh`. It ships as 0.2.2. The receipt and JSONL schemas do not change.
+Additive: two new accepted language codes and two new edit kinds, internal to the IR (edits are not in `sugo.api`). Output changes only for users who configure `ja` or `zh`. It ships as 0.2.2. The JSONL chunk schema does not change. The receipt schema (`schemas/receipt-v1.schema.json`) lists the edit kinds, so it gains the value `cjk_join`: an additive change, but a strict validator built from the old schema would refuse a receipt that holds it (implementation note: the first draft said the receipt schema did not change; maintainer approved the addition on 2026-11-14).
 
 ## Alternatives considered
 

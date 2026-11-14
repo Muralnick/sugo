@@ -94,6 +94,17 @@ def test_long_paragraph_is_split_at_sentences() -> None:
     assert words(" ".join(c.text for c in chunks)) == words(text)
 
 
+def test_long_cjk_sentence_is_cut_after_a_comma() -> None:
+    """Japanese and Chinese put no space between words: a comma is a pause (ADR-069)."""
+    comma = chr(0xFF0C)  # full-width comma
+    text = comma.join(["这是一个较长的中文句子的一部分"] * 40) + "。"
+    chunks = chunk([page(0, para("p", text))], max_tokens=40)
+    assert len(chunks) > 1
+    assert all(c.tokens <= 40 for c in chunks)
+    assert all(c.text.endswith((comma, "。")) for c in chunks)
+    assert "".join(c.text for c in chunks) == text
+
+
 def test_word_longer_than_the_limit_is_cut() -> None:
     blob = "Z" * 3000
     chunks = chunk([page(0, para("p", blob))], max_tokens=40)

@@ -43,8 +43,10 @@ from sugo.serializers.markdown import render, render_widest
 # beginning of a run of punctuation and never gives characters back, so a
 # long run without a space after it costs linear time, not quadratic.
 _SENTENCE_BREAK = re.compile(r"(?<![.!?;:])[.!?;:]++\s+|[\u3002\uff01\uff1f]+\s*|\n+")
-# Where a run of text may be cut between words: after its spaces.
-_WORD_BREAK = re.compile(r"\s+")
+# Where a run of text may be cut between words: after its spaces, or after
+# a CJK comma (ideographic or full-width), since Japanese and Chinese put no
+# space between words (ADR-069).
+_WORD_BREAK = re.compile(r"\s+|(?<=[\u3001\uff0c])")
 # Below this many tokens from the limit, the open chunk is counted exactly.
 _ESTIMATE_MARGIN = 16
 # Headings may take at most this share of the limit before the text that

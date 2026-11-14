@@ -7,6 +7,22 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+### Added
+
+- Japanese and Chinese (ADR-069): `languages` accepts `ja` and `zh`, and a
+  Japanese or Chinese system locale selects them by default. The bundled OCR
+  model already read both; what changes is the text. A line break between
+  two Japanese or Chinese characters is removed, because PDFs break lines
+  in the middle of words, and full-width letters and digits become ASCII.
+  On test PDFs this saves about 6% of tokens in Chinese and 13% in
+  Japanese. Full-width punctuation stays, and simplified and traditional
+  Chinese are never converted into each other.
+- Long Japanese and Chinese sentences are cut into chunks after a comma.
+
+### Changed
+
+- The receipt schema gains the edit kind `cjk_join`.
+
 ## [0.2.1] - 2026-11-13
 
 ### Security

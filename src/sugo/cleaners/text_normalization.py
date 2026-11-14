@@ -15,6 +15,13 @@ exception the core checks separately: a line-break hyphen inside a word.
 that; otherwise the hyphen stays (ADR-025: when in doubt, leave it). A soft
 hyphen is always a word break, so it always joins.
 
+Japanese and Chinese put no space between words, so a PDF line can end in
+the middle of one. When one of them is a configured language, a line break
+between two CJK characters goes ("全" + "角" -> "全角"), and full-width letters
+and digits become ASCII, which costs fewer tokens (full-width "ABC123" is
+5 tokens, ASCII "ABC123" 2).
+Full-width punctuation stays: it is part of the writing (ADR-069).
+
 Code, tables and formulas are left alone: their spacing can matter.
 """
 
@@ -26,8 +33,17 @@ from sugo.analyzers.lexicon import Lexicon
 from sugo.core.constants import INVISIBLE_CHARS, LIGATURES, MAX_EDITS_PER_BLOCK, SPECIAL_SPACES
 from sugo.core.decisions import EditDecision, within_limits
 from sugo.core.models import BlockType, EditKind, Page
-from sugo.core.text import APOSTROPHES, HYPHEN_BREAK, is_letter
-from sugo.languages.packs import elisions
+from sugo.core.text import (
+    APOSTROPHES,
+    CJK_CHARS,
+    FULL_WIDTH_ALNUM,
+    HALF_WIDTH_KATAKANA,
+    HALF_WIDTH_SOUND_MARKS,
+    HYPHEN_BREAK,
+    canonical,
+    is_letter,
+)
+from sugo.languages.packs import elisions, writes_cjk
 
 # Block types whose text is prose.
 TEXT_TYPES = frozenset(
@@ -48,23 +64,29 @@ REASON_INVISIBLE = "invisible character"
 REASON_LIGATURE = "typographic ligature"
 REASON_COMPOSED = "accented letter stored as two characters"
 REASON_ELISION = "space after an elision"
+REASON_CJK_LINE = "line break inside Japanese or Chinese text"
+REASON_WIDTH = "full-width or half-width character"
 
 _LETTER = r"[^\W\d_]"
 _SPACE = f"[ {SPECIAL_SPACES}]"
-# One pass over the text; alternatives never overlap, earlier ones win.
-_RULES = re.compile(
-    "|".join(
-        (
-            f"(?P<hyphen>{HYPHEN_BREAK})",
-            rf"(?P<elision>(?<=[{APOSTROPHES}]){_SPACE}+(?={_LETTER}))",
-            rf"(?P<trailing>(?<=\S){_SPACE}+(?=\n|\Z))",
-            rf"(?P<spaces>(?<=\S)(?:{_SPACE}{{2,}}|[{SPECIAL_SPACES}]))",
-            f"(?P<invisible>[{INVISIBLE_CHARS}])",
-            f"(?P<ligature>[{''.join(LIGATURES)}])",
-            r"(?P<composed>.[\u0300-\u036f]+)",
-        )
-    )
+# Only for Japanese and Chinese (ADR-069). First, so that the spaces around
+# such a line break go with it rather than as trailing spaces.
+_CJK_RULES = (
+    rf"(?P<cjk>(?<=[{CJK_CHARS}])[ \t]*+\n[ \t]*+(?=[{CJK_CHARS}])(?![{HALF_WIDTH_SOUND_MARKS}]))",
+    f"(?P<width>[{FULL_WIDTH_ALNUM}]+|{HALF_WIDTH_KATAKANA})",
 )
+_COMMON_RULES = (
+    f"(?P<hyphen>{HYPHEN_BREAK})",
+    rf"(?P<elision>(?<=[{APOSTROPHES}]){_SPACE}+(?={_LETTER}))",
+    rf"(?P<trailing>(?<=\S){_SPACE}+(?=\n|\Z))",
+    rf"(?P<spaces>(?<=\S)(?:{_SPACE}{{2,}}|[{SPECIAL_SPACES}]))",
+    f"(?P<invisible>[{INVISIBLE_CHARS}])",
+    f"(?P<ligature>[{''.join(LIGATURES)}])",
+    r"(?P<composed>.[\u0300-\u036f]+)",
+)
+# One pass over the text; alternatives never overlap, earlier ones win.
+_RULES = re.compile("|".join(_COMMON_RULES))
+_RULES_CJK = re.compile("|".join((*_CJK_RULES, *_COMMON_RULES)))
 # Longer "words" are not words; capping the scan keeps it linear on hostile text.
 _MAX_WORD = 64
 
@@ -80,6 +102,7 @@ class TextNormalizationCleaner:
             ValueError: If a language has no pack.
         """
         self._elisions = elisions(languages)
+        self._rules = _RULES_CJK if writes_cjk(languages) else _RULES
 
     def propose(self, page: Page, stats: Lexicon) -> list[EditDecision]:
         """Return one edit per spot to normalise in the page's prose."""
@@ -91,7 +114,7 @@ class TextNormalizationCleaner:
 
     def _block_edits(self, block_id: str, text: str, stats: Lexicon) -> list[EditDecision]:
         decisions: list[EditDecision] = []
-        for match in _RULES.finditer(text):
+        for match in self._rules.finditer(text):
             edit = self._edit(text, match, stats)
             if edit is not None:
                 replacement, kind, reason = edit
@@ -114,6 +137,10 @@ class TextNormalizationCleaner:
         self, text: str, match: re.Match[str], lexicon: Lexicon
     ) -> tuple[str, EditKind, str] | None:
         rule, found = match.lastgroup, match.group()
+        if rule == "cjk":
+            return "", EditKind.CJK_JOIN, REASON_CJK_LINE
+        if rule == "width":
+            return canonical(found), EditKind.NORMALIZE, REASON_WIDTH
         if rule == "hyphen":
             return _hyphen(text, match, lexicon)
         if rule == "elision":

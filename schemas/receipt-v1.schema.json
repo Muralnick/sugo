@@ -39,11 +39,12 @@
       "type": "string"
     },
     "EditKind": {
-      "description": "The only kinds of text change the core applies (ADR-050).\n\nEach kind is checked mechanically by the core, so no cleaner can slip in\nnew words: a deletion only removes, a normalisation keeps every visible\ncharacter, and a hyphen join only removes a line-break hyphen.",
+      "description": "The only kinds of text change the core applies (ADR-050).\n\nEach kind is checked mechanically by the core, so no cleaner can slip in\nnew words: a deletion only removes, a normalisation keeps every visible\ncharacter, a hyphen join only removes a line-break hyphen, and a CJK join\nonly removes a line break between two CJK characters (ADR-069).",
       "enum": [
         "delete",
         "normalize",
-        "hyphen_join"
+        "hyphen_join",
+        "cjk_join"
       ],
       "title": "EditKind",
       "type": "string"

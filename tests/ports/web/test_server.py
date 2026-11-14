@@ -273,7 +273,7 @@ def test_the_page_starts_from_the_users_configuration() -> None:
         "receipt": False,
         "cache": True,
     }
-    assert data["packs"] == ["de", "en", "es", "fr", "it"]
+    assert data["packs"] == ["de", "en", "es", "fr", "it", "ja", "zh"]
 
 
 # --- Host, Origin and token ----------------------------------------------------------

@@ -136,7 +136,14 @@ def test_system_language_follows_the_locale_variables(
 
 @pytest.mark.parametrize(
     ("locale_name", "expected"),
-    [("Italian_Italy", "it"), ("it_IT", "it"), (None, None)],
+    [
+        ("Italian_Italy", "it"),
+        ("it_IT", "it"),
+        ("Japanese_Japan", "ja"),
+        ("Chinese (Simplified)_China", "zh"),
+        ("Chinese (Traditional)_Taiwan", "zh"),
+        (None, None),
+    ],
 )
 def test_system_language_falls_back_to_the_os_locale(
     monkeypatch: pytest.MonkeyPatch, locale_name: str | None, expected: str | None

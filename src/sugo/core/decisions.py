@@ -6,8 +6,9 @@ module turns them into changes. A decision says one of two things:
 - ``Decision``: remove block X, for reason Y. Removal is soft: the block stays
   in the page, marked with the cleaner's name and the reason (principle 3).
 - ``EditDecision``: replace a span of block X's text, for reason Y. The core
-  accepts only three kinds of edit, each checked mechanically here (deletion,
-  normalisation that keeps every visible character, line-break hyphen join),
+  accepts only four kinds of edit, each checked mechanically here (deletion,
+  normalisation that keeps every visible character, line-break hyphen join,
+  line-break join between two CJK characters),
   and records every edit on the block, so it can be inspected and undone
   (principles 3 and 4).
 
@@ -34,6 +35,7 @@ from sugo.core.text import (
     HYPHEN_BREAK,
     canonical,
     is_letter,
+    joins_cjk_lines,
     visible,
 )
 
@@ -179,6 +181,17 @@ def _allowed(kind: EditKind, text: str, start: int, end: int, replacement: str) 
         return replacement == ""
     if kind is EditKind.NORMALIZE:
         return _normalization(text, start, end, replacement)
+    if kind is EditKind.CJK_JOIN:
+        # One line break, with only spaces or tabs around it, between two
+        # CJK characters: "全\n角" -> "全角" (ADR-069).
+        return (
+            replacement == ""
+            and original.count("\n") == 1
+            and not original.strip(" \t\n")
+            and start > 0
+            and end < len(text)
+            and joins_cjk_lines(text[start - 1], text[end])
+        )
     # A hyphen join removes exactly a hyphen and the line break after it,
     # between two letters: "infor-\nmation" -> "information".
     return (

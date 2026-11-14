@@ -117,14 +117,14 @@ Fair caveats: the corpus is small and mostly synthetic, and it was built by the 
 | Works today | Coming next |
 |---|---|
 | Native PDFs, DOCX, XLSX, PPTX, XML | v0.1.x: PDFs refused today as "broken stream", with the PDF engine chosen by a test on real files |
-| Images and screenshots with local OCR (PNG, JPEG, WEBP) | v0.2: Japanese, Chinese, Korean |
+| Images and screenshots with local OCR (PNG, JPEG, WEBP) | v0.3: Korean, with the safe model download its OCR model needs |
 | Scans: handwriting marked, repeated letterheads removed | v0.2: LangChain and LlamaIndex loaders, a published container image |
 | Chat and code screenshot detection | v0.3: `normal` engine level (Docling): complex layouts, old Office files |
 | Markdown, and JSON Lines chunks for vector databases | v0.4: folders, archives and emails; guided setup; work profiles |
 | Conversion receipt, checked by `sugo verify` | v0.5: `quality` engine level (vision model, GPU) |
 | Token metrics per provider (`sugo stats`) | Later: EPUB and web pages, background service, folder watcher |
 | Command line, interactive shell, MCP server for agents, local web page | |
-| Interface and text rules in English, Italian, Spanish, French, German | |
+| Interface and text rules in English, Italian, Spanish, French, German; text rules also in Japanese and Chinese | |
 
 See the [roadmap](https://github.com/Muralnick/sugo/blob/main/docs/ROADMAP.md) for the full plan.
 

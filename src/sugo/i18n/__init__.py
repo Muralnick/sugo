@@ -164,8 +164,19 @@ def system_language() -> str | None:
     if not name:
         return None
     # Windows names locales in English: "Italian_Italy".
-    names = {"italian": "it", "spanish": "es", "french": "fr", "german": "de", "english": "en"}
-    return names.get(name.split("_")[0].lower(), name[:2].lower())
+    # "Chinese (Simplified)_China" and "Chinese (Traditional)_Taiwan" are both
+    # Chinese: one pack covers both writings (ADR-069).
+    names = {
+        "italian": "it",
+        "spanish": "es",
+        "french": "fr",
+        "german": "de",
+        "english": "en",
+        "japanese": "ja",
+        "chinese": "zh",
+    }
+    language = name.split("_")[0].split(" (")[0].lower()
+    return names.get(language, name[:2].lower())
 
 
 def os_reason(error: OSError) -> str:
