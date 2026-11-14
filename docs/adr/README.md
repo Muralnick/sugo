@@ -72,3 +72,4 @@
 | [068](ADR-068-langchain-llamaindex-loaders.md) | LangChain and LlamaIndex loaders | Accepted |
 | [069](ADR-069-japanese-chinese.md) | Japanese and Chinese | Accepted |
 | [070](ADR-070-model-download.md) | Safe model download, first version, and Korean | Accepted |
+| [071](ADR-071-normal-level-docling.md) | The `normal` level with Docling | Proposed |
