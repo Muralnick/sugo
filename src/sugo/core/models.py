@@ -105,7 +105,8 @@ class EditKind(StrEnum):
 
     Each kind is checked mechanically by the core, so no cleaner can slip in
     new words: a deletion only removes, a normalisation keeps every visible
-    character, and a hyphen join only removes a line-break hyphen.
+    character, a hyphen join only removes a line-break hyphen, and a CJK join
+    only removes a line break between two CJK characters (ADR-069).
     """
 
     # Remove a span, e.g. a tracking parameter from a URL.
@@ -114,6 +115,8 @@ class EditKind(StrEnum):
     NORMALIZE = "normalize"
     # "infor-\nmation" -> "information": the hyphen and the line break go.
     HYPHEN_JOIN = "hyphen_join"
+    # "全\n角" -> "全角": a line break between two CJK characters goes (ADR-069).
+    CJK_JOIN = "cjk_join"
 
 
 class TextEdit(_Model):

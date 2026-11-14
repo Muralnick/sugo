@@ -478,3 +478,38 @@ def test_receipt_flags_low_confidence_and_secret_blocks(cache: PageCache) -> Non
     result = convert(secret, cache=cache, receipt=True)
     assert result.receipt is not None
     assert any(BlockFlag.SECRET in f.flags for f in result.receipt.flagged)
+
+
+def cjk_report(fontname: str, text: str) -> bytes:
+    """A PDF whose lines end in the middle of words, as narrow CJK columns do."""
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_textbox(pymupdf.Rect(72, 72, 400, 700), text * 3, fontname=fontname, fontsize=12)
+    return doc.tobytes()
+
+
+@pytest.mark.parametrize(
+    ("language", "fontname", "text"),
+    [
+        (
+            "ja",
+            "japan",
+            "日本語の文書を変換するテストです。この段落は長い文章で、行の途中で改行されています。",
+        ),
+        (
+            "zh",
+            "china-s",
+            "这是一个中文文档转换的测试。本段落是一个较长的句子" + chr(0xFF0C) + "在行的中间换行。",
+        ),
+    ],
+)
+def test_japanese_and_chinese_pdfs_lose_their_line_breaks(
+    language: str, fontname: str, text: str
+) -> None:
+    """ADR-069: the PDF breaks lines inside words; the configured language joins them."""
+    data = cjk_report(fontname, text)
+    before = convert(data, languages=("en",))
+    after = convert(data, languages=("en", language))
+    assert "\n" in before.markdown.strip()
+    assert after.markdown.strip() == text * 3
+    assert count_tokens(after.markdown) < count_tokens(before.markdown)
