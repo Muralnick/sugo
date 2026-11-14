@@ -70,7 +70,7 @@ Chunks already break after `。！？`. They may also break after `、` and `，
 
 ### 7. Release
 
-Additive: two new accepted language codes and two new edit kinds, internal to the IR (edits are not in `sugo.api`). Output changes only for users who configure `ja` or `zh`. It ships as 0.2.2. The JSONL chunk schema does not change. The receipt schema (`schemas/receipt-v1.schema.json`) lists the edit kinds, so it gains the value `cjk_join`: an additive change, but a strict validator built from the old schema would refuse a receipt that holds it (implementation note: the first draft said the receipt schema did not change).
+Additive: two new accepted language codes and two new edit kinds, internal to the IR (edits are not in `sugo.api`). Output changes only for users who configure `ja` or `zh`. It ships as 0.2.2. The JSONL chunk schema does not change. The receipt schema (`schemas/receipt-v1.schema.json`) lists the edit kinds, so it gains the value `cjk_join`: an additive change, but a strict validator built from the old schema would refuse a receipt that holds it (implementation note: the first draft said the receipt schema did not change; maintainer approved the addition on 2026-11-14).
 
 ## Alternatives considered
 
