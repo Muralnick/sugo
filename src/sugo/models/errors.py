@@ -21,6 +21,18 @@ class ModelInvalidError(RuntimeError):
     code: ClassVar[str] = "MODEL_INVALID"
 
 
+class ModelMissingError(RuntimeError):
+    """A model that is needed, or asked for, is not installed."""
+
+    code: ClassVar[str] = "MODEL_MISSING"
+
+
+class BundleInvalidError(ValueError):
+    """An offline bundle is not one Sugo wrote, or holds something it does not trust."""
+
+    code: ClassVar[str] = "BUNDLE_INVALID"
+
+
 class ModelBusyError(RuntimeError):
     """Another Sugo is downloading the same model and did not finish in time."""
 

@@ -14,10 +14,14 @@ still change, with notice, before 1.0).
   for scripts); the file is downloaded over HTTPS from a fixed list of hosts,
   resumed after an interruption and used only once its SHA-256 matches. The
   first downloadable model is `ocr-korean`; Korean itself follows.
+- `sugo models bundle MODEL... -o FILE` and `sugo models install FILE`
+  (ADR-070): carry installed models to a computer without internet. Install
+  uses no network, accepts only files the registry knows, checks each one's
+  size and SHA-256, and installs nothing from a bundle with one bad entry.
 - Offline mode: `offline = true` in `[privacy]`, or `SUGO_OFFLINE=1`, refuses
   every download before any connection.
 - New error codes: `MODEL_UNKNOWN`, `DOWNLOAD_FAILED`, `OFFLINE`,
-  `MODEL_INVALID`, `MODEL_BUSY`.
+  `MODEL_INVALID`, `MODEL_BUSY`, `MODEL_MISSING`, `BUNDLE_INVALID`.
 
 ## [0.2.2] - 2026-11-14
 

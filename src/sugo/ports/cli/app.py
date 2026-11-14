@@ -1039,6 +1039,66 @@ def models_remove_command(
         _stderr.print(_("{model} is not installed.").format(model=card.id))
 
 
+@models_app.command(
+    "bundle",
+    cls=TranslatedCommand,
+    help=N_(
+        "Write installed models to one file, to install them on a computer without "
+        "internet with: sugo models install"
+    ),
+)
+def models_bundle_command(
+    models: Annotated[list[str], typer.Argument(help=N_("The models, e.g. ocr-korean."))],
+    output: Annotated[
+        Path, typer.Option("--output", "-o", help=N_("The bundle file to write, e.g. models.zip."))
+    ],
+) -> None:
+    """Write a bundle; the help text is in the decorator, for translation."""
+    from sugo.models.bundle import write_bundle
+    from sugo.models.registry import card as find_card
+
+    cards = []
+    for model in models:
+        with _model_failures(model):
+            cards.append(find_card(model))
+    with _model_failures(""):
+        try:
+            size = write_bundle(cards, output, sugo_version=version(DISTRIBUTION_NAME))
+        except OSError as error:
+            raise PortError(
+                code="OUTPUT_UNWRITABLE",
+                message=i18n.os_reason(error),
+                exit_code=ExitCode.ERROR,
+                details={"output": output.as_posix()},
+            ) from error
+    _stderr.print(
+        Text(_("Wrote {path} ({size}).").format(path=_shown(str(output)), size=_megabytes(size)))
+    )
+
+
+@models_app.command(
+    "install",
+    cls=TranslatedCommand,
+    help=N_(
+        "Install the models of a bundle written by sugo models bundle. No internet is used; "
+        "every file is checked against its SHA-256."
+    ),
+)
+def models_install_command(
+    bundle: Annotated[Path, typer.Argument(help=N_("The bundle file."))],
+) -> None:
+    """Install a bundle; the help text is in the decorator, for translation."""
+    from sugo.models.bundle import install_bundle
+
+    with _model_failures(""):
+        try:
+            cards = install_bundle(bundle)
+        except OSError as error:
+            raise unreadable(error) from error
+    for card in cards:
+        _stderr.print(_("Installed and verified {model}.").format(model=card.id))
+
+
 def _download(card: "ModelCard", *, offline: bool) -> None:
     """Pull the model, with a progress bar on a terminal."""
     from sugo.models.download import pull

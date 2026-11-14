@@ -1436,3 +1436,33 @@ msgstr "{model} è già installato."
 
 msgid "{model} is not installed."
 msgstr "{model} non è installato."
+
+msgid "Install the models of a bundle written by sugo models bundle. No internet is used; every file is checked against its SHA-256."
+msgstr "Installa i modelli di un pacchetto scritto con sugo models bundle. Non usa Internet; ogni file viene controllato con il suo SHA-256."
+
+msgid "Installed and verified {model}."
+msgstr "{model} installato e verificato."
+
+msgid "The bundle file to write, e.g. models.zip."
+msgstr "Il file del pacchetto da scrivere, per esempio models.zip."
+
+msgid "The bundle file."
+msgstr "Il file del pacchetto."
+
+msgid "The model {model} is not installed."
+msgstr "Il modello {model} non è installato."
+
+msgid "The models, e.g. ocr-korean."
+msgstr "I modelli, per esempio ocr-korean."
+
+msgid "This is not a bundle Sugo can trust: nothing was installed."
+msgstr "Questo non è un pacchetto di cui Sugo si possa fidare: non è stato installato niente."
+
+msgid "Write installed models to one file, to install them on a computer without internet with: sugo models install"
+msgstr "Scrive i modelli installati in un solo file, da installare su un computer senza Internet con: sugo models install"
+
+msgid "Write the bundle again with: sugo models bundle"
+msgstr "Scrivi di nuovo il pacchetto con: sugo models bundle"
+
+msgid "Wrote {path} ({size})."
+msgstr "Scritto {path} ({size})."
