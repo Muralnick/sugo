@@ -60,9 +60,11 @@ ALLOWED_HOSTS = frozenset(
         "objects.githubusercontent.com",
         "release-assets.githubusercontent.com",
         "www.modelscope.cn",
+        "huggingface.co",
     }
 )
-ALLOWED_DOMAINS = ("modelscope.cn",)
+# ModelScope's CDN, and the CDN Hugging Face redirects downloads to (ADR-071).
+ALLOWED_DOMAINS = ("modelscope.cn", "hf.co")
 MAX_REDIRECTS = 5
 TIMEOUT_S = 30.0
 CHUNK_BYTES = 1024 * 1024

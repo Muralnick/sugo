@@ -1472,3 +1472,6 @@ msgstr "modello scaricato: {model} ({size})"
 
 msgid "Not deleted: the models folder or a file in it is a link, not plain, or not yours."
 msgstr "Non cancellati: la cartella dei modelli, o un file al suo interno, è un collegamento, non è normale o non è tua."
+
+msgid "The model, e.g. ocr-korean, or normal for both Docling models."
+msgstr "Il modello, per esempio ocr-korean, oppure normal per i due modelli di Docling."

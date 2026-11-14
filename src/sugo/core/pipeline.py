@@ -122,7 +122,8 @@ def korean_ocr_engine() -> OcrEngine:
     if installed is None:
         raise ModelMissingError(card.id)
     detection, _recognition = bundled_models()
-    recognition = OcrModel(verify_model(installed), card.sha256)
+    verify_model(installed)
+    recognition = OcrModel(installed.path(), card.files[0].sha256)
     return OcrEngine(detection, recognition, name=KOREAN_ENGINE_NAME)
 
 

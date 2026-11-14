@@ -1,11 +1,12 @@
 # ADR-071: The `normal` level with Docling
 
-**Status:** Proposed (maintainer decisions of 2026-11-14: Docling with PyTorch, CPU only; no legacy Office formats; the shared engine before 0.3.0; measure on the maintainer's PC first)
+**Status:** Accepted (ADR approved 2026-11-14; maintainer decisions of 2026-11-14: Docling with PyTorch, CPU only; no legacy Office formats; the shared engine before 0.3.0; measure on the maintainer's PC first)
 **Date:** 2026-11-14
 **Deciders:** project author
 **Implements:** ADR-007 (`normal` level), ADR-001 (per-page routing, first slice for `normal`), ROADMAP v0.3 "`normal` level with Docling"
 **Builds on:** ADR-013 and ADR-070 (model download), ADR-018 (process model), ADR-043 (isolated PDF worker), ADR-054 (Office reader), ADR-035 (dependencies)
 **Amends:** ADR-070 (multi-file models; Hugging Face hosts), ADR-054 (Docling reads Office files at `normal`)
+**Notes:** 2026-11-14, step 1: model files are stored by their registry path (`<models>/<folder>/<path>`), no longer by hash, so Docling can read the folder as is; a Korean model downloaded before this change is not found and must be pulled again (never released). The gateway allows `huggingface.co` and `*.hf.co`. Real pull: both models in 56 s, and Docling 2.145.0 converted the four-table test PDF from that folder with no network.
 **Adds dependencies:** the `normal` extra only: `docling-slim` and what it needs, PyTorch CPU among them; none in the base install
 
 ## Context

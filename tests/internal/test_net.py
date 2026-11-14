@@ -84,6 +84,8 @@ class TestAddresses:
             "https://www.modelscope.cn/models/x",
             "https://cdn-lfs-cn-1.modelscope.cn/prod/x?auth_key=1",
             "https://GitHub.com./x",
+            "https://huggingface.co/org/model/resolve/abc/model.safetensors",
+            "https://us.aws.cdn.hf.co/xet-bridge-us/x",
         ],
     )
     def test_allowed_https_addresses(self, url: str) -> None:
@@ -97,6 +99,8 @@ class TestAddresses:
             "https://example.com/x",  # not on the list
             "https://github.com.evil.example/x",
             "https://evilmodelscope.cn/x",  # not a subdomain
+            "https://evilhf.co/x",
+            "https://huggingface.co.evil.example/x",
             "https://user:pw@github.com/x",
             "https://github.com:8443/x",
         ],
