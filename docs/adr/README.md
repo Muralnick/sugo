@@ -70,3 +70,4 @@
 | [066](ADR-066-uninstall-command.md) | `sugo uninstall` and `sugo cache clear` | Accepted |
 | [067](ADR-067-python-api-v1.md) | Public Python API, first version | Accepted |
 | [068](ADR-068-langchain-llamaindex-loaders.md) | LangChain and LlamaIndex loaders | Accepted |
+| [069](ADR-069-japanese-chinese.md) | Japanese and Chinese | Accepted |
