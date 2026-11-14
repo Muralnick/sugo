@@ -1,6 +1,6 @@
 # ADR-071: The `normal` level with Docling
 
-**Status:** Proposed (maintainer decisions of 2026-11-14: Docling with PyTorch, CPU only; no legacy Office formats; the shared engine before 0.3.0; measure on the maintainer's PC first)
+**Status:** Accepted (ADR approved 2026-11-14; maintainer decisions of 2026-11-14: Docling with PyTorch, CPU only; no legacy Office formats; the shared engine before 0.3.0; measure on the maintainer's PC first)
 **Date:** 2026-11-14
 **Deciders:** project author
 **Implements:** ADR-007 (`normal` level), ADR-001 (per-page routing, first slice for `normal`), ROADMAP v0.3 "`normal` level with Docling"
