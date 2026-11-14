@@ -1,5 +1,5 @@
-"""The ``sugo`` command: convert, stats, clip, doctor, mcp, ui, verify, shell, cache and
-uninstall (ADR-022, ADR-048, ADR-055, ADR-056, ADR-062, ADR-066).
+"""The ``sugo`` command: convert, stats, clip, doctor, mcp, ui, verify, shell, cache,
+models and uninstall (ADR-022, ADR-048, ADR-055, ADR-056, ADR-062, ADR-066, ADR-070).
 
 ``sugo FILE`` is short for ``sugo convert FILE``. ``sugo`` alone opens the
 interactive shell in a terminal and prints the help anywhere else, so a
@@ -52,6 +52,7 @@ from sugo.ports.errors import (
     file_changed,
     from_exception,
     level_missing,
+    model_error,
     receipt_invalid,
     unreadable,
 )
@@ -61,6 +62,7 @@ if TYPE_CHECKING:
     from sugo.core.estimate import SavingsEstimate
     from sugo.core.pipeline import Conversion
     from sugo.core.receipt import Receipt
+    from sugo.models.registry import ModelCard
 
 _log = logging.getLogger(__name__)
 # Markup and highlighting off: file names and messages are shown as typed.
@@ -905,6 +907,177 @@ def cache_clear_command() -> None:
     else:
         _stderr.print(_("Deleted the cache ({size}).").format(size=_megabytes(found.cache_bytes)))
     _say_kept(kept)
+
+
+# --- models -------------------------------------------------------------------
+
+
+models_app = typer.Typer(
+    cls=TranslatedGroup,
+    help=N_("Download and manage the models Sugo uses for some languages (ADR-070)."),
+    no_args_is_help=True,
+)
+app.add_typer(models_app, name="models")
+
+
+@models_app.command(
+    "list",
+    cls=TranslatedCommand,
+    help=N_("List the models Sugo can download, and which are installed."),
+)
+def models_list_command(
+    json_output: Annotated[bool, typer.Option("--json", help=N_("Print one JSON object."))] = False,
+) -> None:
+    """List models; the help text is in the decorator, for translation."""
+    from sugo.models.registry import REGISTRY
+    from sugo.models.store import find
+
+    _english_for_json(json_output)
+    rows = [(card, find(card) is not None) for card in REGISTRY.values()]
+    if json_output:
+        _write_json(
+            {
+                "models": [
+                    {
+                        "id": card.id,
+                        "task": card.task,
+                        "languages": list(card.languages),
+                        "installed": installed,
+                        "size_bytes": card.size,
+                        "licence": card.licence,
+                    }
+                    for card, installed in rows
+                ]
+            }
+        )
+        return
+    table = Table(box=None, pad_edge=False)
+    for header in (_("model"), _("languages"), _("size"), _("licence"), _("installed")):
+        table.add_column(header)
+    for card, installed in rows:
+        table.add_row(
+            card.id,
+            ", ".join(card.languages),
+            _megabytes(card.size),
+            card.licence,
+            _("yes") if installed else _("no"),
+        )
+    _stdout.print(table)
+
+
+@models_app.command(
+    "pull",
+    cls=TranslatedCommand,
+    help=N_(
+        "Download a model, after showing its size, source and licence. "
+        "Checked against its SHA-256 before use."
+    ),
+)
+def models_pull_command(
+    model: Annotated[str, typer.Argument(help=N_("The model, e.g. ocr-korean."))],
+    yes: Annotated[bool, typer.Option("--yes", help=N_("Download without asking."))] = False,
+) -> None:
+    """Download a model; the help text is in the decorator, for translation."""
+    from sugo.models.download import is_offline
+    from sugo.models.errors import ModelInvalidError, OfflineModeError
+    from sugo.models.registry import card as find_card
+    from sugo.models.store import find, verify
+
+    with _model_failures(model):
+        card = find_card(model)
+        settings = _settings(quiet=False)
+        installed = find(card)
+        if installed is not None:
+            try:
+                verify(installed)
+            except ModelInvalidError:
+                # pull() replaces it; saying so explains the download.
+                _stderr.print(_("The installed copy of {model} is damaged.").format(model=card.id))
+            else:
+                _stderr.print(_("{model} is already installed.").format(model=card.id))
+                return
+        if is_offline(settings.privacy.offline):
+            # Said before asking: the answer could not change anything.
+            raise OfflineModeError("offline mode is on")
+    _stderr.print(
+        _("Sugo will download {model}: {size}, licence {licence}.").format(
+            model=card.id, size=_megabytes(card.size), licence=card.licence
+        )
+    )
+    _stderr.print(Text("  " + card.notice))
+    sources = ", ".join(source.name for source in card.sources)
+    _stderr.print(Text("  " + _("From: {sources}, in this order.").format(sources=sources)))
+    if not yes and not _interactive():
+        _stderr.print(_("Not a terminal: add --yes to download it."))
+        raise typer.Exit(ExitCode.USAGE)
+    if not yes and not _confirm(_("Download? [y/N] ")):
+        _stderr.print(_("Nothing was downloaded."))
+        return
+    with _model_failures(model):
+        _download(card, offline=settings.privacy.offline)
+    _stderr.print(_("Downloaded and verified {model}.").format(model=card.id))
+
+
+@models_app.command(
+    "remove",
+    cls=TranslatedCommand,
+    help=N_("Delete a downloaded model. It can be downloaded again later."),
+)
+def models_remove_command(
+    model: Annotated[str, typer.Argument(help=N_("The model, e.g. ocr-korean."))],
+) -> None:
+    """Delete a model; the help text is in the decorator, for translation."""
+    from sugo.models.registry import card as find_card
+    from sugo.models.store import remove
+
+    with _model_failures(model):
+        card = find_card(model)
+        freed = remove(card)
+    if freed:
+        _stderr.print(_("Deleted {model} ({size}).").format(model=card.id, size=_megabytes(freed)))
+    else:
+        _stderr.print(_("{model} is not installed.").format(model=card.id))
+
+
+def _download(card: "ModelCard", *, offline: bool) -> None:
+    """Pull the model, with a progress bar on a terminal."""
+    from sugo.models.download import pull
+
+    if not _interactive():
+        pull(card, offline=offline)
+        return
+    from rich.progress import BarColumn, DownloadColumn, Progress, TransferSpeedColumn
+
+    with Progress(
+        BarColumn(), DownloadColumn(), TransferSpeedColumn(), console=_stderr, transient=True
+    ) as bar:
+        task = bar.add_task(card.id, total=card.size)
+        pull(card, offline=offline, progress=lambda done: bar.update(task, completed=done))
+
+
+@contextmanager
+def _model_failures(model: str) -> Iterator[None]:
+    """Turn model errors into the error model; everything else as ``_failures``."""
+    from sugo.storage.paths import StorageDirError
+
+    with _failures(json_output=False):
+        try:
+            yield
+        except StorageDirError:
+            raise PortError(
+                code="STORAGE_REFUSED",
+                message=_(
+                    "The models folder or a file in it is a link, not plain, "
+                    "or belongs to another user."
+                ),
+                exit_code=ExitCode.SECURITY,
+                hint=_("Check it by hand: Sugo writes only plain folders that are yours."),
+            ) from None
+        except Exception as error:
+            converted = model_error(error, model)
+            if converted is None:
+                raise
+            raise converted from None
 
 
 # --- uninstall ----------------------------------------------------------------

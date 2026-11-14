@@ -7,6 +7,7 @@
 **Builds on:** ADR-004 (OCR engine), ADR-036 (network boundaries), ADR-039 (lite image stack), ADR-045 (private storage), ADR-048 (CLI), ADR-066 (uninstall), ADR-067 (Python API), ADR-069 (Japanese and Chinese)
 **Amends:** ADR-066 (`sugo uninstall` also removes downloaded models)
 **Adds dependencies:** none
+**Notes:** 2026-11-14, while implementing step 1: two more error codes, `MODEL_UNKNOWN` (exit 2) and `MODEL_BUSY` (exit 1), and the existing `STORAGE_REFUSED` for an unsafe models folder; the tests use a fake server in place of a local HTTPS one, since a test certificate would need a new dependency or an `openssl` binary; `pull` downloads again a model whose installed copy is damaged instead of stopping with `MODEL_INVALID`; the model exceptions live in the network-free `sugo.models.errors`, so the MCP server can report them without importing the gateway.
 
 ## Context
 

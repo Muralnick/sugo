@@ -1334,3 +1334,105 @@ msgstr "Conversione di {source}, pagina {page}"
 
 msgid "already clean: nothing to remove"
 msgstr "testo già pulito: niente da togliere"
+
+msgid "Another Sugo is downloading {model}."
+msgstr "Un altro Sugo sta scaricando {model}."
+
+msgid "Check it by hand: Sugo writes only plain folders that are yours."
+msgstr "Controllala a mano: Sugo scrive solo in cartelle normali che sono tue."
+
+msgid "Check the internet connection and try again."
+msgstr "Controlla la connessione a Internet e riprova."
+
+msgid "Could not download {model}."
+msgstr "Impossibile scaricare {model}."
+
+msgid "Delete a downloaded model. It can be downloaded again later."
+msgstr "Elimina un modello scaricato. Si può scaricare di nuovo in seguito."
+
+msgid "Deleted {model} ({size})."
+msgstr "Eliminato {model} ({size})."
+
+msgid "Download a model, after showing its size, source and licence. Checked against its SHA-256 before use."
+msgstr "Scarica un modello, dopo averne mostrato dimensione, fonte e licenza. Prima dell'uso viene controllato con il suo SHA-256."
+
+msgid "Download and manage the models Sugo uses for some languages (ADR-070)."
+msgstr "Scarica e gestisci i modelli che Sugo usa per alcune lingue (ADR-070)."
+
+msgid "Download without asking."
+msgstr "Scarica senza chiedere."
+
+msgid "Download? [y/N] "
+msgstr "Scaricare? [s/N] "
+
+msgid "Downloaded and verified {model}."
+msgstr "{model} scaricato e verificato."
+
+msgid "From: {sources}, in this order."
+msgstr "Da: {sources}, in quest'ordine."
+
+msgid "List the models Sugo can download, and which are installed."
+msgstr "Elenca i modelli che Sugo può scaricare e quali sono installati."
+
+msgid "No model is called {model}."
+msgstr "Nessun modello si chiama {model}."
+
+msgid "Not a terminal: add --yes to download it."
+msgstr "Non è un terminale: aggiungi --yes per scaricarlo."
+
+msgid "Nothing was downloaded."
+msgstr "Non è stato scaricato niente."
+
+msgid "Offline mode is on: nothing was downloaded."
+msgstr "La modalità offline è attiva: non è stato scaricato niente."
+
+msgid "See the models Sugo knows: sugo models list"
+msgstr "Vedi i modelli che Sugo conosce: sugo models list"
+
+msgid "Sugo will download {model}: {size}, licence {licence}."
+msgstr "Sugo scaricherà {model}: {size}, licenza {licence}."
+
+msgid "The installed copy of {model} is damaged."
+msgstr "La copia installata di {model} è danneggiata."
+
+msgid "The model {model} does not match its checksum: it was changed or damaged."
+msgstr "Il modello {model} non corrisponde al suo codice di controllo: è stato modificato o è danneggiato."
+
+msgid "The model, e.g. ocr-korean."
+msgstr "Il modello, per esempio ocr-korean."
+
+msgid "The models folder or a file in it is a link, not plain, or belongs to another user."
+msgstr "La cartella dei modelli, o un file al suo interno, è un collegamento, non è normale o appartiene a un altro utente."
+
+msgid "Turn it off with offline = false in [privacy], or SUGO_OFFLINE=0."
+msgstr "Disattivala con offline = false in [privacy], oppure SUGO_OFFLINE=0."
+
+msgid "Wait for it to finish, then try again."
+msgstr "Aspetta che finisca, poi riprova."
+
+msgid "installed"
+msgstr "installato"
+
+msgid "languages"
+msgstr "lingue"
+
+msgid "licence"
+msgstr "licenza"
+
+msgid "model"
+msgstr "modello"
+
+msgid "no"
+msgstr "no"
+
+msgid "size"
+msgstr "dimensione"
+
+msgid "yes"
+msgstr "sì"
+
+msgid "{model} is already installed."
+msgstr "{model} è già installato."
+
+msgid "{model} is not installed."
+msgstr "{model} non è installato."

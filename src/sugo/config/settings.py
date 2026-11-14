@@ -43,6 +43,7 @@ ENVIRONMENT: dict[str, tuple[str, str]] = {
     "SUGO_CHUNK_MAX_TOKENS": ("chunking", "max_tokens"),
     "SUGO_CACHE": ("storage", "cache"),
     "SUGO_UI_LANGUAGE": ("ui", "language"),
+    "SUGO_OFFLINE": ("privacy", "offline"),
 }
 
 # Keys of the designed schema (ARCHITECTURE §14) that v0.1 does not use yet.
@@ -51,7 +52,7 @@ _RESERVED: dict[str, frozenset[str] | None] = {
     "target": None,
     "cleaning": frozenset({"compression"}),
     "chunking": frozenset({"keep_tables_whole"}),
-    "privacy": None,
+    "privacy": frozenset({"anonymize", "audit_log"}),
     "storage": frozenset({"retention_days"}),
     "hardware": None,
     "aliases": None,
@@ -107,6 +108,11 @@ class Chunking(_Section):
     )
 
 
+class Privacy(_Section):
+    # Refuse every download, before any connection (ADR-070, ADR-036).
+    offline: bool = False
+
+
 class Storage(_Section):
     cache: Literal["persistent", "ephemeral"] = "persistent"
 
@@ -121,6 +127,7 @@ class Settings(_Section):
     general: General = General()
     cleaning: Cleaning = Cleaning()
     chunking: Chunking = Chunking()
+    privacy: Privacy = Privacy()
     storage: Storage = Storage()
     ui: Ui = Ui()
 
@@ -320,7 +327,7 @@ def _environment() -> dict[str, Any]:
 def _from_text(variable: str, key: str, raw: str) -> object:
     if key == "languages":
         return [part.strip() for part in raw.split(",") if part.strip()]
-    if key == "strip_tracking_urls":
+    if key in ("strip_tracking_urls", "offline"):
         if raw.lower() in _TRUE:
             return True
         if raw.lower() in _FALSE:

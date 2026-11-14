@@ -27,6 +27,17 @@ def _no_user_configuration(
 
 
 @pytest.fixture(autouse=True)
+def _no_internet(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Tests never download: one that forgets to pass a fake opener fails here.
+    from sugo._internal import net
+
+    def refuse() -> net.Opener:
+        raise AssertionError("a test tried to reach the internet")
+
+    monkeypatch.setattr(net, "_default_opener", refuse)
+
+
+@pytest.fixture(autouse=True)
 def _english_after_each_test() -> Iterator[None]:
     yield
     # The interface language is process-wide: a test that switches it switches it back.

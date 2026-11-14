@@ -547,7 +547,7 @@ def test_invalid_configuration_stops_with_usage_exit(workdir: Path) -> None:
 
 
 def test_reserved_keys_warn_and_convert(workdir: Path) -> None:
-    (workdir / "sugo.toml").write_text("[privacy]\noffline = true\n")
+    (workdir / "sugo.toml").write_text("[privacy]\nanonymize = true\n")
     result = run("report.pdf")
     assert result.exit_code == ExitCode.OK
     assert "not used in this version" in result.stderr

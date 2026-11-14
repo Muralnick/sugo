@@ -125,6 +125,56 @@ def from_exception(error: Exception) -> PortError | None:
     return None
 
 
+def model_error(error: Exception, model: str) -> PortError | None:
+    """The error for a model that cannot be found, downloaded or used (ADR-070), else None.
+
+    Only the network-free ``sugo.models.errors`` is imported, so the MCP
+    server can report these errors without reaching the gateway.
+    """
+    from sugo.models import errors
+
+    if isinstance(error, errors.UnknownModelError):
+        return PortError(
+            code="MODEL_UNKNOWN",
+            message=_("No model is called {model}.").format(model=model),
+            exit_code=ExitCode.USAGE,
+            hint=_("See the models Sugo knows: sugo models list"),
+        )
+    if isinstance(error, errors.OfflineModeError):
+        return PortError(
+            code="OFFLINE",
+            message=_("Offline mode is on: nothing was downloaded."),
+            exit_code=ExitCode.ERROR,
+            hint=_("Turn it off with offline = false in [privacy], or SUGO_OFFLINE=0."),
+        )
+    if isinstance(error, errors.DownloadFailedError):
+        return PortError(
+            code="DOWNLOAD_FAILED",
+            message=_("Could not download {model}.").format(model=model),
+            exit_code=ExitCode.ERROR,
+            hint=_("Check the internet connection and try again."),
+            # English reasons, one per source: no file name, no document text.
+            details={"sources": dict(error.failures)},
+        )
+    if isinstance(error, errors.ModelInvalidError):
+        return PortError(
+            code="MODEL_INVALID",
+            message=_(
+                "The model {model} does not match its checksum: it was changed or damaged."
+            ).format(model=model),
+            exit_code=ExitCode.MISSING,
+            hint=f"sugo models pull {model}",
+        )
+    if isinstance(error, errors.ModelBusyError):
+        return PortError(
+            code="MODEL_BUSY",
+            message=_("Another Sugo is downloading {model}.").format(model=model),
+            exit_code=ExitCode.ERROR,
+            hint=_("Wait for it to finish, then try again."),
+        )
+    return None
+
+
 def web_request_refused() -> PortError:
     """A request the web UI's protections refused (ADR-055).
 
