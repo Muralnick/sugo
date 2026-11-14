@@ -142,6 +142,7 @@ def test_system_language_follows_the_locale_variables(
         ("Japanese_Japan", "ja"),
         ("Chinese (Simplified)_China", "zh"),
         ("Chinese (Traditional)_Taiwan", "zh"),
+        ("Korean_Korea", "ko"),
         (None, None),
     ],
 )

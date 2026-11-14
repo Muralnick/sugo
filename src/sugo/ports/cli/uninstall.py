@@ -1,7 +1,8 @@
-"""What ``sugo uninstall`` and ``sugo cache clear`` delete, and how (ADR-066).
+"""What ``sugo uninstall`` and ``sugo cache clear`` delete, and how (ADR-066, ADR-070).
 
-Sugo leaves two things on disk: the user's settings file and the page
-cache, which holds text of converted documents. This module finds them and
+Sugo leaves three things on disk: the user's settings file, the page cache,
+which holds text of converted documents, and downloaded models. ``cache
+clear`` deletes only the page cache: models are not document text. This module finds them and
 deletes them; the commands in ``app`` ask and report. Only Sugo's own files
 are deleted, never a folder with anything else in it, and no other program
 is run: removing the package is left to the tool that installed it, whose
@@ -31,6 +32,8 @@ class Found:
     settings: Path | None
     cache: Path | None
     cache_bytes: int
+    # Downloaded models, by id, with their size (ADR-070).
+    models: tuple[tuple[str, int], ...] = ()
 
 
 def find() -> Found:
@@ -40,11 +43,42 @@ def find() -> Found:
     settings = user_config_path()
     folder = cache_dir()
     sizes = [size for size in map(_size, cache_files(folder)) if size is not None]
+    from sugo.models.registry import REGISTRY
+    from sugo.models.store import find as find_model
+
+    models = tuple(
+        (card.id, card.size) for card in REGISTRY.values() if find_model(card) is not None
+    )
     return Found(
         settings=settings if _size(settings) is not None else None,
         cache=folder if sizes else None,
         cache_bytes=sum(sizes),
+        models=models,
     )
+
+
+def delete_models() -> None:
+    """Delete every downloaded model, with the safe-delete rules of ``remove``.
+
+    Raises:
+        PortError: STORAGE_REFUSED or DELETE_FAILED, as for the cache.
+    """
+    from sugo.models.registry import REGISTRY
+    from sugo.models.store import models_dir, remove
+
+    refused = _(
+        "Not deleted: the models folder or a file in it is a link, not plain, or not yours."
+    )
+    folder = models_dir()
+    with _deleting(folder, refused=refused):
+        for card in REGISTRY.values():
+            remove(card)
+        try:
+            check_plain_dir(folder)
+        except FileNotFoundError:
+            return
+        if not any(folder.iterdir()):
+            folder.rmdir()
 
 
 def clear_cache() -> Path | None:

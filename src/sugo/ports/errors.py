@@ -122,7 +122,8 @@ def from_exception(error: Exception) -> PortError | None:
             exit_code=ExitCode.SECURITY,
             hint=_("Reinstall Sugo; a bundled file was altered or damaged."),
         )
-    return None
+    # A conversion can need a downloaded model, e.g. Korean OCR (ADR-070).
+    return model_error(error, "")
 
 
 def model_error(error: Exception, model: str) -> PortError | None:
@@ -171,11 +172,15 @@ def model_error(error: Exception, model: str) -> PortError | None:
             hint=f"sugo models pull {model}",
         )
     if isinstance(error, errors.ModelMissingError):
+        from sugo.models.registry import REGISTRY
+
+        card = REGISTRY.get(model)
         return PortError(
             code="MODEL_MISSING",
             message=_("The model {model} is not installed.").format(model=model),
             exit_code=ExitCode.MISSING,
             hint=f"sugo models pull {model}",
+            details={"model": model, "size_mb": card.size_mb} if card else {"model": model},
         )
     if isinstance(error, errors.BundleInvalidError):
         return PortError(

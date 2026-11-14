@@ -1,4 +1,4 @@
-"""The language packs: Italian, Spanish, French, German, English, Japanese, Chinese.
+"""The language packs: Italian, Spanish, French, German, English, Japanese, Chinese, Korean.
 
 Most text rules hold for every language and live in the text normalisation
 cleaner. A pack adds only what one language needs. In v0.1 that is the
@@ -13,8 +13,10 @@ Japanese and Chinese are written without spaces between words, so a line
 break inside a paragraph can split a word in two: their packs join lines
 between two CJK characters and write full-width letters and digits as ASCII
 (ADR-069). One Chinese pack covers simplified and traditional writing; Sugo
-never converts between them. Languages are chosen in the configuration,
-never guessed: Sugo has no language detector.
+never converts between them. Korean separates words with spaces, so it needs
+no rule of its own; what it needs is its OCR model, which Sugo downloads on
+request (ADR-070). Languages are chosen in the configuration, never guessed:
+Sugo has no language detector.
 """
 
 from dataclasses import dataclass
@@ -95,6 +97,8 @@ PACKS = MappingProxyType(
         "en": LanguagePack("en"),
         "ja": LanguagePack("ja", cjk=True),
         "zh": LanguagePack("zh", cjk=True),
+        # Korean separates words with spaces: the universal rules are enough.
+        "ko": LanguagePack("ko"),
     }
 )
 

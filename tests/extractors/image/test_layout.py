@@ -190,6 +190,8 @@ def test_two_column_image_end_to_end(engine: OcrEngine, encode: Encode) -> None:
 
 def test_blank_image_skips_ocr(encode: Encode) -> None:
     class NoOcr:
+        name = "none"
+
         def read(self, image: object) -> list[OcrLine]:
             raise AssertionError("OCR must not run on a blank image")
 

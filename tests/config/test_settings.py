@@ -43,7 +43,7 @@ def test_system_language_is_added_to_english(monkeypatch: pytest.MonkeyPatch) ->
     assert default_languages() == ("en", "it")
     monkeypatch.setenv("LANG", "ja_JP.UTF-8")
     assert default_languages() == ("en", "ja")
-    monkeypatch.setenv("LANG", "ko_KR.UTF-8")  # no pack yet: English only
+    monkeypatch.setenv("LANG", "pt_BR.UTF-8")  # no pack: English only
     assert default_languages() == ("en",)
 
 

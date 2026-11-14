@@ -48,7 +48,12 @@ from sugo.core.models import BlockFlag, Page
 from sugo.core.receipt import EditRecord, FlaggedBlock, Receipt, RemovalRecord
 from sugo.extractors.image.extract import extract_page
 from sugo.extractors.image.loader import UnsupportedImageError, detect_format
-from sugo.extractors.image.ocr_engine import OcrEngine
+from sugo.extractors.image.ocr_engine import (
+    KOREAN_ENGINE_NAME,
+    OcrEngine,
+    OcrModel,
+    bundled_models,
+)
 from sugo.extractors.office import extract as office
 from sugo.extractors.pymupdf.extract import (
     PDF_SIGNATURE,
@@ -59,6 +64,10 @@ from sugo.extractors.pymupdf.extract import (
 )
 from sugo.i18n import gettext as _
 from sugo.metrics.tokenizer import count_tokens
+from sugo.models.errors import ModelMissingError
+from sugo.models.registry import card as model_card
+from sugo.models.store import find as find_model
+from sugo.models.store import verify as verify_model
 from sugo.serializers.markdown import render
 from sugo.storage.page_cache import (
     CacheLevel,
@@ -97,6 +106,35 @@ CLEANERS: tuple[Cleaner[EdgeStats], ...] = (
 
 # For callers that pass no languages; the ports pass the configured ones (ADR-051).
 DEFAULT_LANGUAGES = ("en",)
+# The downloaded model that reads Korean (ADR-070).
+KOREAN_OCR_MODEL = "ocr-korean"
+
+
+def korean_ocr_engine() -> OcrEngine:
+    """The bundled detection model with the downloaded Korean recognition model.
+
+    Raises:
+        sugo.models.errors.ModelMissingError: If the Korean model is not installed.
+        sugo.models.errors.ModelInvalidError: If it fails its SHA-256.
+    """
+    card = model_card(KOREAN_OCR_MODEL)
+    installed = find_model(card)
+    if installed is None:
+        raise ModelMissingError(card.id)
+    detection, _recognition = bundled_models()
+    recognition = OcrModel(verify_model(installed), card.sha256)
+    return OcrEngine(detection, recognition, name=KOREAN_ENGINE_NAME)
+
+
+def ocr_for(languages: tuple[str, ...]) -> Callable[[], OcrEngine]:
+    """The OCR engine the configured languages need (ADR-069 §6, ADR-070 §5).
+
+    With Korean, every line is read with the Korean model, which also reads
+    Latin letters and digits; a page mixing Korean with Japanese or Chinese
+    is a known limit. It is loaded only when a page needs OCR, so native
+    PDFs and Office files without pictures convert without it.
+    """
+    return korean_ocr_engine if "ko" in languages else default_ocr_engine
 
 
 class InputKind(StrEnum):
@@ -174,7 +212,7 @@ def convert_file(
     path: Path,
     *,
     cache: PageCache | None = None,
-    ocr: Callable[[], OcrEngine] = default_ocr_engine,
+    ocr: Callable[[], OcrEngine] | None = None,
     source: str | None = None,
     max_chunk_tokens: int | None = None,
     count_raw_tokens: bool = False,
@@ -222,7 +260,7 @@ def convert(
     data: bytes,
     *,
     cache: PageCache | None = None,
-    ocr: Callable[[], OcrEngine] = default_ocr_engine,
+    ocr: Callable[[], OcrEngine] | None = None,
     source: str | None = None,
     max_chunk_tokens: int | None = None,
     count_raw_tokens: bool = False,
@@ -236,7 +274,8 @@ def convert(
     Args:
         data: The file's content.
         cache: The page cache; None uses a private temporary one for this job.
-        ocr: Called at most once, when a page needs OCR, to get the engine.
+        ocr: Called at most once, when a page needs OCR, to get the engine;
+            None picks it from ``languages`` (``ocr_for``).
         source: Name of the document, e.g. its path as the user gave it. It
             gives the document its id, kept across new editions (ADR-047).
         max_chunk_tokens: Chunk size in tokens; None makes no chunks.
@@ -260,6 +299,8 @@ def convert(
         sugo.extractors.office.extract.OfficeError: If a DOCX, XLSX or XML file is refused.
     """
     kind = detect_kind(data)
+    if ocr is None:
+        ocr = ocr_for(languages)
     if max_chunk_tokens is not None and max_chunk_tokens < CHUNK_MIN_TOKENS:
         raise ValueError(f"max_chunk_tokens must be at least {CHUNK_MIN_TOKENS}")
     options = _Options(
@@ -366,7 +407,7 @@ class _Job:
         self._cache = cache
         self._ocr = _OnceOcr(ocr)
         self._sha256 = hashlib.sha256(data).hexdigest()
-        self._engine = _engine_identity(kind)
+        self._engine = _engine_identity(kind, korean="ko" in options.languages)
         # Extracted pages the cache could not or must not store, by index.
         self._spilled: dict[int, Page] = {}
         # Pages the PDF worker could not read in this run.
@@ -660,7 +701,7 @@ def _version(name: str) -> str:
         return "absent"
 
 
-def _engine_identity(kind: InputKind) -> str:
+def _engine_identity(kind: InputKind, *, korean: bool = False) -> str:
     # Library versions change what the engines produce; Sugo's own code and
     # model hashes are already part of every key (ADR-045).
     if kind is InputKind.XML:
@@ -668,8 +709,11 @@ def _engine_identity(kind: InputKind) -> str:
     if kind in _OFFICE_KINDS:
         # Pictures inside are read with OCR when sugo[lite] is installed.
         libraries = ["defusedxml", "rapidocr", "onnxruntime", "pillow"]
-        return f"{kind.value}:" + ";".join(f"{name}={_version(name)}" for name in libraries)
-    libraries = ["rapidocr", "onnxruntime", "pillow"]
-    if kind is InputKind.PDF:
-        libraries.insert(0, "pymupdf")
-    return f"{kind.value}:" + ";".join(f"{name}={version(name)}" for name in libraries)
+        identity = f"{kind.value}:" + ";".join(f"{name}={_version(name)}" for name in libraries)
+    else:
+        libraries = ["rapidocr", "onnxruntime", "pillow"]
+        if kind is InputKind.PDF:
+            libraries.insert(0, "pymupdf")
+        identity = f"{kind.value}:" + ";".join(f"{name}={version(name)}" for name in libraries)
+    # Pages read with another recognition model are other pages (ADR-070).
+    return identity + (f";ocr={KOREAN_ENGINE_NAME}" if korean else "")

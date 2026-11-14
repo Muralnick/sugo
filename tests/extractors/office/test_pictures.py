@@ -35,6 +35,7 @@ class Counting:
 
     def __init__(self, engine: OcrEngine) -> None:
         self.engine = engine
+        self.name = engine.name
         self.reads = 0
 
     def __call__(self) -> OcrEngine:

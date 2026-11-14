@@ -1072,8 +1072,8 @@ msgstr "Gestisci la cache delle pagine, che conserva il testo dei documenti conv
 msgid "Delete the page cache. Conversions are slower until it fills again (ADR-066)."
 msgstr "Cancella la cache delle pagine. Le conversioni sono più lente finché non si riempie di nuovo (ADR-066)."
 
-msgid "Delete Sugo's settings and page cache, then show how to remove the program. Asks first; your documents and outputs are never touched (ADR-066)."
-msgstr "Cancella le impostazioni e la cache delle pagine di Sugo, poi mostra come togliere il programma. Chiede prima; i tuoi documenti e i file prodotti non vengono mai toccati (ADR-066)."
+msgid "Delete Sugo's settings, page cache and downloaded models, then show how to remove the program. Asks first; your documents and outputs are never touched (ADR-066)."
+msgstr "Cancella le impostazioni, la cache delle pagine e i modelli scaricati di Sugo, poi mostra come togliere il programma. Chiede prima; i tuoi documenti e i file prodotti non vengono mai toccati (ADR-066)."
 
 msgid "Delete without asking."
 msgstr "Cancella senza chiedere."
@@ -1466,3 +1466,9 @@ msgstr "Scrivi di nuovo il pacchetto con: sugo models bundle"
 
 msgid "Wrote {path} ({size})."
 msgstr "Scritto {path} ({size})."
+
+msgid "downloaded model: {model} ({size})"
+msgstr "modello scaricato: {model} ({size})"
+
+msgid "Not deleted: the models folder or a file in it is a link, not plain, or not yours."
+msgstr "Non cancellati: la cartella dei modelli, o un file al suo interno, è un collegamento, non è normale o non è tua."
