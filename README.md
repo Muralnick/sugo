@@ -215,6 +215,34 @@ pip install langchain-sugo            # from langchain_sugo import SugoLoader
 pip install llama-index-readers-sugo  # from llama_index.readers.sugo import SugoReader
 ```
 
+### Tables and complex layouts: the `normal` level
+
+By default Sugo runs at the `lite` level: fast, light, and right for most files. For PDFs whose tables or layout matter, the `normal` level reads PDF pages with [Docling](https://github.com/docling-project/docling), which rebuilds tables cell by cell. It is an optional install of about 1.3 GB, plus 384 MB of models downloaded once:
+
+```bash
+# Linux only: take PyTorch's CPU build first (from PyPI, pip would add
+# several GB of NVIDIA libraries Sugo never uses)
+pip install "torch==2.14.1" "torchvision==0.29.1" --index-url https://download.pytorch.org/whl/cpu
+# Every system
+pip install "sugo-cli[normal]"
+sugo models pull normal      # pinned to a commit, checked by SHA-256
+
+sugo convert report.pdf -l normal
+```
+
+You can also set `level = "normal"` in `[general]` of the configuration file, or use `SUGO_LEVEL=normal`, `/level normal` in the shell, the "Engine level" setting on the web page, or `sugo.convert(..., level="normal")`.
+
+Measured on the reference machine (Intel i5-10300H, 4 cores, no GPU) on PDFs in five languages ([details](https://github.com/Muralnick/sugo/blob/main/docs/TESTING.md)):
+
+| | `lite` | `normal` |
+|---|---|---|
+| Rows of a ruled table kept intact | 0 of 35 | **35 of 35** |
+| Text lost | none | none |
+| Time per PDF | 0.3–0.4 s | 9–16 s for one file; about 7 s each when several are converted together |
+| Memory | about 0.4 GB | about 1.8 GB while Docling is loaded |
+
+`normal` is slow on purpose: use it where structure matters. The shell, the web page and multi-file runs keep Docling loaded between PDFs and stop it after 5 minutes without work. The MCP server uses the configured level, with a fresh Docling for each document, so no file can affect another's result. Docling runs in its own process with no network, and its OCR is off: scanned pages, images and Office files are read as at `lite`.
+
 ### Use it from an AI agent (MCP)
 
 Sugo can serve agents such as Claude Code or Codex over MCP. It reads only inside the folders you name:

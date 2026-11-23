@@ -212,6 +212,34 @@ pip install langchain-sugo            # from langchain_sugo import SugoLoader
 pip install llama-index-readers-sugo  # from llama_index.readers.sugo import SugoReader
 ```
 
+### Tabelle e impaginazioni complesse: il livello `normal`
+
+Di default Sugo lavora al livello `lite`: veloce, leggero e adatto alla maggior parte dei file. Per i PDF in cui contano tabelle e impaginazione, il livello `normal` legge le pagine PDF con [Docling](https://github.com/docling-project/docling), che ricostruisce le tabelle cella per cella. È un'installazione facoltativa di circa 1,3 GB, più 384 MB di modelli scaricati una volta sola:
+
+```bash
+# Solo Linux: prima PyTorch nella versione per CPU (da PyPI, pip
+# aggiungerebbe diversi GB di librerie NVIDIA che Sugo non usa)
+pip install "torch==2.14.1" "torchvision==0.29.1" --index-url https://download.pytorch.org/whl/cpu
+# Tutti i sistemi
+pip install "sugo-cli[normal]"
+sugo models pull normal      # fissati a un commit, verificati con SHA-256
+
+sugo convert relazione.pdf -l normal
+```
+
+Puoi anche scrivere `level = "normal"` in `[general]` nel file di configurazione, oppure usare `SUGO_LEVEL=normal`, `/level normal` nella shell, l'impostazione "Livello del motore" nella pagina web, o `sugo.convert(..., level="normal")`.
+
+Misure sulla macchina di riferimento (Intel i5-10300H, 4 core, senza GPU), su PDF in cinque lingue ([dettagli](docs/TESTING.md), in inglese):
+
+| | `lite` | `normal` |
+|---|---|---|
+| Righe di una tabella con bordi rimaste intere | 0 su 35 | **35 su 35** |
+| Testo perso | nessuno | nessuno |
+| Tempo per PDF | 0,3–0,4 s | 9–16 s per un file; circa 7 s l'uno se ne converti diversi insieme |
+| Memoria | circa 0,4 GB | circa 1,8 GB mentre Docling è caricato |
+
+`normal` è lento di proposito: usalo dove la struttura conta. La shell, la pagina web e le conversioni di più file tengono Docling caricato tra un PDF e l'altro e lo spengono dopo 5 minuti senza lavoro. Il server MCP usa il livello configurato, con un Docling nuovo per ogni documento, così nessun file può influire sul risultato di un altro. Docling gira in un processo separato e senza rete, e il suo OCR è spento: pagine scansionate, immagini e file Office si leggono come a `lite`.
+
 ### Usarlo da un agente AI (MCP)
 
 Sugo può servire agenti come Claude Code o Codex tramite MCP. Legge solo dentro le cartelle che indichi:
