@@ -33,6 +33,8 @@
 
   // --- Settings: the user's configuration, changed here and remembered here. ---
 
+  const LEVELS = ["lite", "normal"];
+
   function validSettings(value) {
     const d = data.defaults;
     const s = value && typeof value === "object" ? value : {};
@@ -43,6 +45,7 @@
       ui_language: Object.hasOwn(data.texts, s.ui_language) ? s.ui_language : d.ui_language,
       languages: languages.length > 0 ? languages : d.languages.slice(),
       strip_tracking_urls: typeof s.strip_tracking_urls === "boolean" ? s.strip_tracking_urls : d.strip_tracking_urls,
+      level: LEVELS.includes(s.level) ? s.level : d.level,
       chunks: typeof s.chunks === "boolean" ? s.chunks : d.chunks,
       receipt: typeof s.receipt === "boolean" ? s.receipt : d.receipt,
       // The page can turn the cache off, never on against the configuration.
@@ -143,6 +146,7 @@
   function renderSettings() {
     $("ui-language").value = settings.ui_language;
     $("strip-tracking").checked = settings.strip_tracking_urls;
+    $("level").value = settings.level;
     $("make-chunks").checked = settings.chunks;
     const size = $("chunk-tokens");
     size.min = String(data.chunk_min);
@@ -159,6 +163,10 @@
     settings.ui_language = validSettings({ ...settings, ui_language: event.target.value }).ui_language;
     saveSettings();
     applyTexts();
+  });
+  $("level").addEventListener("change", (event) => {
+    settings.level = validSettings({ ...settings, level: event.target.value }).level;
+    saveSettings();
   });
   $("strip-tracking").addEventListener("change", (event) => {
     settings.strip_tracking_urls = event.target.checked;
@@ -238,6 +246,7 @@
       "X-Sugo-Language": settings.ui_language,
       "X-Sugo-Languages": settings.languages.join(","),
       "X-Sugo-Strip-Tracking": String(settings.strip_tracking_urls),
+      "X-Sugo-Level": settings.level,
     };
     if (settings.chunks) headers["X-Sugo-Chunk-Tokens"] = String(settings.chunk_tokens);
     if (settings.receipt) headers["X-Sugo-Receipt"] = "true";

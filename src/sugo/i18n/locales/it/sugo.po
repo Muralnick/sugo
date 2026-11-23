@@ -1502,3 +1502,12 @@ msgstr "Livello: {level}"
 
 msgid "level"
 msgstr "livello"
+
+msgid "Engine level"
+msgstr "Livello del motore"
+
+msgid "lite: fast, for most files"
+msgstr "lite: veloce, per la maggior parte dei file"
+
+msgid "normal: Docling for PDF layouts and tables; slower, needs sugo-cli[normal]"
+msgstr "normal: Docling per impaginazioni e tabelle dei PDF; più lento, richiede sugo-cli[normal]"
