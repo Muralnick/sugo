@@ -9,11 +9,13 @@ still change, with notice, before 1.0).
 
 ### Added
 
-- Choosing the `normal` level (ADR-071 §4), first part: `level` in
-  `[general]` (until now reserved) and `SUGO_LEVEL` take `lite` or `normal`;
+- Choosing the `normal` level (ADR-071 §4): `level` in `[general]` (until
+  now reserved) and `SUGO_LEVEL` take `lite` or `normal`;
+  `sugo convert` and `sugo stats` take `--level` / `-l`; the shell has
+  `/level` and shows the level in its bottom bar;
   `sugo.convert(..., level="normal")` in Python. Leaving `level` out of
-  `sugo.convert` now uses the configured level, `lite` by default. The
-  command line, the shell, the web interface and the MCP server come next.
+  `sugo.convert` now uses the configured level, `lite` by default. The web
+  interface and the MCP server come next.
 
 - The `normal` level, first part (ADR-071): `pip install "sugo-cli[normal]"`
   adds Docling with PyTorch for the CPU. With its models

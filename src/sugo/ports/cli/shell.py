@@ -97,12 +97,19 @@ class State:
     """What the shell remembers between lines, in memory only."""
 
     settings: "Settings"
+    # The engine level for the next files; None until /level, then the configured one.
+    chosen_level: str | None = None
     chunk_tokens: int | None = None
     receipt: bool = False
     cache: bool = True
     last: list[Result] = field(default_factory=list)
     # Lines read so far: picks the next hint.
     lines_read: int = 0
+
+    @property
+    def level(self) -> str:
+        """The level the next files are converted at (ADR-071 §4)."""
+        return self.chosen_level or self.settings.general.level
 
     @property
     def persistent_cache(self) -> bool:
@@ -231,6 +238,7 @@ def _convert_files(state: State, names: list[str]) -> None:
                         languages=settings.languages,
                         strip_tracking_urls=settings.cleaning.strip_tracking_urls,
                         receipt=state.receipt,
+                        level=state.level,
                     )
             except KeyboardInterrupt:
                 raise
@@ -500,6 +508,15 @@ def _receipt(state: State, argument: str) -> None:
     _say(_("Receipt: {value}").format(value=_on_off(state.receipt)))
 
 
+def _level(state: State, argument: str) -> None:
+    word = argument.strip().casefold()
+    if word:
+        if word not in cli.LEVELS:
+            raise Notice(_("The level is one of: {levels}.").format(levels=", ".join(cli.LEVELS)))
+        state.chosen_level = word
+    _say(_("Level: {level}").format(level=state.level))
+
+
 def _cache(state: State, argument: str) -> None:
     if state.settings.storage.cache != "persistent":
         _say(_("The cache is off in your configuration file."))
@@ -558,6 +575,11 @@ COMMANDS: dict[str, Command] = {
     ),
     "/receipt": Command(
         "/receipt [on|off]", N_("Also make a receipt for the next files"), _receipt
+    ),
+    "/level": Command(
+        "/level [lite|normal]",
+        N_("Engine level for the next files; normal reads PDFs with Docling"),
+        _level,
     ),
     "/cache": Command("/cache [on|off]", N_("Keep the page cache on disk or not"), _cache),
     "/verify": Command(N_("/verify FILE RECEIPT"), N_("Check a receipt, as sugo verify"), _verify),
@@ -744,6 +766,8 @@ def _line_reader(state: State) -> Callable[[], str]:
             parts.append(
                 ("class:bottom-toolbar.on" if value else "class:bottom-toolbar.off", _on_off(value))
             )
+        parts.append(("", "  ·  " + _("level") + " "))
+        parts.append(("class:bottom-toolbar.on", state.level))
         parts.append(("", "     " + _("Tab completes · Esc clears · /help")))
         return FormattedText(parts)
 

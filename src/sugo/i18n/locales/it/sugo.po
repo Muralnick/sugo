@@ -1484,3 +1484,21 @@ msgstr "Docling non è riuscito a leggere questo documento."
 
 msgid "Convert it at the lite level, or run: sugo doctor"
 msgstr "Convertilo al livello lite, oppure lancia: sugo doctor"
+
+msgid "Engine level: lite, or normal to read PDFs with Docling."
+msgstr "Livello del motore: lite, oppure normal per leggere i PDF con Docling."
+
+msgid "unknown level {level}; choose from {choices}"
+msgstr "livello sconosciuto {level}; scegli tra {choices}"
+
+msgid "Engine level for the next files; normal reads PDFs with Docling"
+msgstr "Livello del motore per i prossimi file; normal legge i PDF con Docling"
+
+msgid "The level is one of: {levels}."
+msgstr "Il livello è uno di questi: {levels}."
+
+msgid "Level: {level}"
+msgstr "Livello: {level}"
+
+msgid "level"
+msgstr "livello"
