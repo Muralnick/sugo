@@ -231,6 +231,21 @@ class TestWarmWorker:
         assert first[0] != second[0]
         assert docling.started == 2
 
+    def test_a_read_after_close_keeps_nothing_running(self, tmp_path: Path) -> None:
+        # A warm block that ends while a read waits for the worker (security review of #133).
+        docling = DoclingWorker(worker=serving_worker(tmp_path), idle_s=60)
+        docling.close()
+        assert read_text(docling, "a")[1:] == (1, "a")
+        assert docling._process is None
+        assert docling._timer is None
+
+    def test_a_worker_that_cannot_start_is_a_normal_failure(self, tmp_path: Path) -> None:
+        # Popen's OSError is reported like any worker failure (#133 review).
+        docling = DoclingWorker(worker=[str(tmp_path / "no-such-program")], idle_s=None)
+        with pytest.raises(NormalFailedError):
+            docling.read(b"x", kind="pdf", page_count=1, artifacts=Path("m"))
+        assert docling._process is None
+
     def test_other_models_start_another_worker(self, tmp_path: Path) -> None:
         docling = DoclingWorker(worker=serving_worker(tmp_path), idle_s=None)
         try:

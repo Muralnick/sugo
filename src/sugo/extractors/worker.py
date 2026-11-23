@@ -141,6 +141,10 @@ class WorkerProcess:
         """Send one more input, as a frame; only for a worker started without ``data``."""
         self._inputs.put(data)
 
+    def end_input(self) -> None:
+        """Close the worker's stdin once the inputs sent so far are written."""
+        self._inputs.put(None)
+
     def alive(self) -> bool:
         """Whether the worker process still runs."""
         return self._process.poll() is None

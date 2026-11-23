@@ -351,6 +351,8 @@ def test_several_files_keep_docling_loaded(
     extra = ["-o", "out"] if len(files) > 1 else []
     assert run(*files, *extra).exit_code == ExitCode.OK
     assert [item is not None for item in seen] == [warm] * len(files)
+    # One worker for the whole run, never one per file (#133 review).
+    assert len({id(item) for item in seen}) == 1
     assert extract._shared_worker() is None
 
 

@@ -85,7 +85,11 @@ def extract_docling(
     if shared is not None:
         return shared.read(data, kind=kind, page_count=page_count, artifacts=artifacts)
     one_off = DoclingWorker(
-        worker=worker, load_timeout=load_timeout, page_timeout=page_timeout, idle_s=None
+        worker=worker,
+        load_timeout=load_timeout,
+        page_timeout=page_timeout,
+        recycle_after=1,
+        idle_s=None,
     )
     try:
         return one_off.read(data, kind=kind, page_count=page_count, artifacts=artifacts)
@@ -122,6 +126,8 @@ class DoclingWorker:
         self._timer: threading.Timer | None = None
         # Bumped by every read: an idle timer armed before a read stops nothing.
         self._generation = 0
+        # Set by close(): a read that still comes in runs, then stops its worker.
+        self._closed = False
         # Processes started so far, for tests and diagnostics.
         self.started = 0
 
@@ -142,7 +148,11 @@ class DoclingWorker:
                 or self._documents >= self._recycle_after
             ):
                 self._stop()
-                self._start(kind, artifacts)
+                try:
+                    self._start(kind, artifacts)
+                except OSError:
+                    # The worker could not even start (cubic review of #133).
+                    raise NormalFailedError(_failed()) from None
             process = self._process
             if process is None:
                 raise NormalFailedError(_failed())
@@ -153,12 +163,17 @@ class DoclingWorker:
                 self._stop()
                 raise
             self._documents += 1
-            self._arm_timer()
+            if self._closed:
+                # Its warm block ended while this read waited: keep nothing running.
+                self._stop()
+            else:
+                self._arm_timer()
             return pages
 
     def close(self) -> None:
-        """Stop the worker, if any."""
+        """Stop the worker, if any; a later read still works but keeps nothing running."""
         with self._lock:
+            self._closed = True
             self._generation += 1
             self._cancel_timer()
             self._stop()
@@ -184,6 +199,9 @@ class DoclingWorker:
             first_wait += self._load_timeout
         pages: list[Page] = []
         process.send(data)
+        if self._documents + 1 >= self._recycle_after:
+            # Its last document: end its input, so it exits by itself once done.
+            process.end_input()
         try:
             message = parse_message(process.frame(first_wait))
             if isinstance(message, Refused):

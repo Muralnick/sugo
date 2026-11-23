@@ -12,6 +12,7 @@ names (principle 11), and it never runs typed text as anything but its own
 commands.
 """
 
+import contextlib
 import glob
 import logging
 import os
@@ -107,6 +108,9 @@ class State:
     last: list[Result] = field(default_factory=list)
     # Lines read so far: picks the next hint.
     lines_read: int = 0
+    # Closed when the shell ends; holds the warm Docling block once entered.
+    resources: contextlib.ExitStack | None = None
+    warm: bool = False
 
     @property
     def level(self) -> str:
@@ -222,6 +226,10 @@ def _say(text: str, style: str | None = None) -> None:
 
 def _convert_files(state: State, names: list[str]) -> None:
     from sugo.core import pipeline
+
+    if state.resources is not None and not state.warm:
+        state.resources.enter_context(pipeline.warm_docling())
+        state.warm = True
 
     settings = state.settings
     results: list[Result] = []
@@ -725,10 +733,10 @@ def run_shell(lines: Iterable[str] | None = None) -> None:
         cli._require_lite()
     state = State(settings)
     _banner()
-    from sugo.core import pipeline
-
-    # Docling stays loaded while the shell is in use (ADR-072).
-    with pipeline.warm_docling():
+    # Docling stays loaded while the shell is in use (ADR-072); the block is
+    # entered by the first conversion, so starting the shell imports nothing heavy.
+    with contextlib.ExitStack() as stack:
+        state.resources = stack
         _read_lines(state, lines)
 
 
