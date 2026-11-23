@@ -917,6 +917,27 @@ def made_receipt(server: WebServer, document: bytes) -> bytes:
     return str(response.json()["receipt_file"]).encode()
 
 
+@pytest.mark.parametrize("level", ["lite", "normal"])
+def test_the_page_converts_at_the_configured_level(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, level: str
+) -> None:
+    from sugo.core import pipeline
+
+    asked: list[str] = []
+    real = pipeline.convert
+
+    def spy(*args: object, level: str, **kwargs: object) -> object:
+        asked.append(level)
+        return real(*args, level="lite", **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setenv(CACHE_DIR_ENV, str(tmp_path / "cache"))
+    monkeypatch.setattr(pipeline, "convert", spy)
+    settings = Settings(general=General(level=level))  # type: ignore[arg-type]
+    options = Options(language="en", languages=("en",), strip_tracking_urls=True, chunk_tokens=None)
+    converter(settings)(NOTE, options)
+    assert asked == [level]
+
+
 def test_a_normal_receipt_is_verified_at_normal(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

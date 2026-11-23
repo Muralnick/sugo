@@ -15,7 +15,8 @@ still change, with notice, before 1.0).
   `/level` and shows the level in its bottom bar;
   `sugo.convert(..., level="normal")` in Python. Leaving `level` out of
   `sugo.convert` now uses the configured level, `lite` by default. The web
-  interface and the MCP server come next.
+  interface and the MCP server use the configured level; the web page has
+  no control for it yet.
 
 - Receipts record the engine level (ADR-056 amendment): a receipt made at
   `normal` has `"level": "normal"` and `schema_version` `"1.1"`, and

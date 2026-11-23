@@ -148,6 +148,49 @@ def test_estimate_savings_reports_the_baselines(server: Server) -> None:
     assert estimate["text"]["result_tokens"] > 0
 
 
+@pytest.mark.parametrize("level", ["lite", "normal"])
+def test_both_tools_use_the_configured_level(
+    root: Path, monkeypatch: pytest.MonkeyPatch, level: str
+) -> None:
+    # The level comes from the user's configuration only (ADR-071 §4).
+    from sugo.config.settings import General
+
+    asked: list[str] = []
+    real = pipeline.convert
+
+    def spy(*args: object, level: str, **kwargs: object) -> object:
+        asked.append(level)
+        return real(*args, level="lite", **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(tools, "convert", spy)
+    settings = Settings(general=General(level=level))  # type: ignore[arg-type]
+    configured = Server(ToolRunner(Roots([root]), cache=None, settings=settings))
+    configured.handle(request("initialize", {"protocolVersion": "2025-06-18"}))
+    call(configured, "convert_document", path="book.pdf")
+    call(configured, "estimate_savings", path="book.pdf")
+    assert asked == [level, level]
+
+
+def test_normal_without_its_models_is_a_tool_error_naming_the_pull(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sugo.config.settings import General
+    from sugo.models.errors import ModelMissingError
+
+    def no_models() -> None:
+        raise ModelMissingError("normal")
+
+    monkeypatch.setattr(pipeline, "_docling_reader", no_models)
+    settings = Settings(general=General(level="normal"))
+    configured = Server(ToolRunner(Roots([root]), cache=None, settings=settings))
+    configured.handle(request("initialize", {"protocolVersion": "2025-06-18"}))
+    result = call(configured, "convert_document", path="book.pdf")["result"]
+    assert result["isError"] is True
+    error = json.loads(result["content"][0]["text"])["error"]
+    assert error["code"] == "MODEL_MISSING"
+    assert error["hint"] == "sugo models pull normal"
+
+
 def test_refusals_are_tool_errors_the_agent_can_read(server: Server, root: Path) -> None:
     outside = call(server, "convert_document", path=str(root.parent / "secret.pdf"))["result"]
     assert outside["isError"] is True

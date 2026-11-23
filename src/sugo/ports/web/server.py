@@ -514,6 +514,8 @@ def converter(settings: Settings) -> Converter:
                 strip_tracking_urls=options.strip_tracking_urls,
                 receipt=options.receipt,
                 source=options.source,
+                # The configured level (ADR-071 §4); the page has no control for it yet.
+                level=settings.general.level,
             )
         estimate = estimate_savings(data, conversion, list_providers())
         # Kind, pages and token counts come from the estimate.

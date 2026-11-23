@@ -163,6 +163,8 @@ class ToolRunner:
             max_chunk_tokens=self._settings.chunking.max_tokens if chunks else None,
             languages=self._settings.languages,
             strip_tracking_urls=self._settings.cleaning.strip_tracking_urls,
+            # From the user's configuration only, like every MCP setting (ADR-071 §4).
+            level=self._settings.general.level,
         )
         if conversion.secret_blocks:
             raise _content_excluded("This file holds credentials; Sugo never sends it to agents.")
@@ -228,6 +230,8 @@ class ToolRunner:
             count_raw_tokens=True,
             languages=self._settings.languages,
             strip_tracking_urls=self._settings.cleaning.strip_tracking_urls,
+            # From the user's configuration only, like every MCP setting (ADR-071 §4).
+            level=self._settings.general.level,
         )
         estimate = estimate_savings(data, conversion, providers)
         return [json.dumps({"source": allowed.source, **estimate_json(estimate)})]
