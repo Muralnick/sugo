@@ -15,7 +15,8 @@ still change, with notice, before 1.0).
   `/level` and shows the level in its bottom bar;
   `sugo.convert(..., level="normal")` in Python. Leaving `level` out of
   `sugo.convert` now uses the configured level, `lite` by default. The web
-  interface and the MCP server come next.
+  interface and the MCP server use the configured level; the web page has
+  no control for it yet.
 
 - The `normal` level, first part (ADR-071): `pip install "sugo-cli[normal]"`
   adds Docling with PyTorch for the CPU. With its models
