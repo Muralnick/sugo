@@ -109,19 +109,20 @@ Limiti da tenere presenti: il corpus è piccolo e per lo più sintetico, ed è s
 ## Stato
 
 > [!NOTE]
-> **La v0.2.2 è uscita**, su [PyPI](https://pypi.org/project/sugo-cli/) con il nome `sugo-cli` e nel [registro MCP](https://registry.modelcontextprotocol.io/) ufficiale come `io.github.Muralnick/sugo`. Le novità sono nel [changelog](CHANGELOG.md) (in inglese). È ancora 0.x: i contratti possono cambiare, con preavviso, prima della 1.0. Le release sono costruite in modo riproducibile, con SBOM, attestazioni Sigstore e PyPI Trusted Publishing.
+> **La v0.3.0 è uscita**, su [PyPI](https://pypi.org/project/sugo-cli/) con il nome `sugo-cli` e nel [registro MCP](https://registry.modelcontextprotocol.io/) ufficiale come `io.github.Muralnick/sugo`. Le novità sono nel [changelog](CHANGELOG.md) (in inglese). È ancora 0.x: i contratti possono cambiare, con preavviso, prima della 1.0. Le release sono costruite in modo riproducibile, con SBOM, attestazioni Sigstore e PyPI Trusted Publishing.
 
 | Funziona oggi | In arrivo |
 |---|---|
-| PDF nativi, DOCX, XLSX, PPTX, XML | v0.1.x: i PDF rifiutati oggi come "broken stream", con il motore PDF scelto da un test su file reali |
-| Immagini e screenshot con OCR locale (PNG, JPEG, WEBP) | v0.3: coreano, con il download sicuro del modello OCR che gli serve |
-| Scansioni: scrittura a mano segnata, carta intestata ripetuta tolta | v0.2: loader per LangChain e LlamaIndex, un'immagine container pubblicata |
-| Riconoscimento di screenshot di chat e di codice | v0.3: livello di motore `normal` (Docling): impaginazioni complesse, vecchi file Office |
-| Markdown, e chunk in JSON Lines per i database vettoriali | v0.4: cartelle, archivi ed email; configurazione guidata; profili di lavoro |
-| Ricevuta di conversione, controllata da `sugo verify` | v0.5: livello di motore `quality` (modello di visione, GPU) |
-| Metriche dei token per provider (`sugo stats`) | Più avanti: EPUB e pagine web, servizio in background, controllo delle cartelle |
-| Riga di comando, shell interattiva, server MCP per agenti, pagina web locale | |
-| Interfaccia e regole del testo in inglese, italiano, spagnolo, francese, tedesco; regole del testo anche in giapponese e cinese | |
+| PDF nativi, DOCX, XLSX, PPTX, XML | v0.3.x: file Office letti da Docling a livello `normal`, dopo averlo misurato su file reali |
+| Immagini e screenshot con OCR locale (PNG, JPEG, WEBP) | v0.3.x: un'immagine container pubblicata; il motore PDF scelto da un test su file reali |
+| Scansioni: scrittura a mano segnata, carta intestata ripetuta tolta | v0.4: cartelle, archivi ed email; configurazione guidata; profili di lavoro; un unico motore condiviso da tutte le interfacce |
+| Il livello `normal`: tabelle e impaginazioni dei PDF con Docling (installazione facoltativa) | v0.5: livello di motore `quality` (modello di visione, GPU) |
+| Riconoscimento di screenshot di chat e di codice | Più avanti: EPUB e pagine web, servizio in background, controllo delle cartelle |
+| Markdown, e chunk in JSON Lines per i database vettoriali; loader per LangChain e LlamaIndex | |
+| Ricevuta di conversione, controllata da `sugo verify` | |
+| Metriche dei token per provider (`sugo stats`) | |
+| Riga di comando, shell interattiva, server MCP per agenti, pagina web locale, API Python | |
+| Interfaccia e regole del testo in inglese, italiano, spagnolo, francese, tedesco; regole del testo anche in giapponese, cinese e coreano (modello OCR coreano scaricato su richiesta) | |
 
 Il piano completo è nella [roadmap](docs/ROADMAP.md) (in inglese).
 

@@ -112,19 +112,20 @@ Fair caveats: the corpus is small and mostly synthetic, and it was built by the 
 ## Status
 
 > [!NOTE]
-> **v0.2.2 is out**, on [PyPI](https://pypi.org/project/sugo-cli/) as `sugo-cli` and in the official [MCP Registry](https://registry.modelcontextprotocol.io/) as `io.github.Muralnick/sugo`. See the [changelog](https://github.com/Muralnick/sugo/blob/main/CHANGELOG.md) for what changed. It is still 0.x: contracts may change, with notice, before 1.0. Releases are built reproducibly, with an SBOM, Sigstore attestations and PyPI Trusted Publishing.
+> **v0.3.0 is out**, on [PyPI](https://pypi.org/project/sugo-cli/) as `sugo-cli` and in the official [MCP Registry](https://registry.modelcontextprotocol.io/) as `io.github.Muralnick/sugo`. See the [changelog](https://github.com/Muralnick/sugo/blob/main/CHANGELOG.md) for what changed. It is still 0.x: contracts may change, with notice, before 1.0. Releases are built reproducibly, with an SBOM, Sigstore attestations and PyPI Trusted Publishing.
 
 | Works today | Coming next |
 |---|---|
-| Native PDFs, DOCX, XLSX, PPTX, XML | v0.1.x: PDFs refused today as "broken stream", with the PDF engine chosen by a test on real files |
-| Images and screenshots with local OCR (PNG, JPEG, WEBP) | v0.3: Korean, with the safe model download its OCR model needs |
-| Scans: handwriting marked, repeated letterheads removed | v0.2: LangChain and LlamaIndex loaders, a published container image |
-| Chat and code screenshot detection | v0.3: `normal` engine level (Docling): complex layouts, old Office files |
-| Markdown, and JSON Lines chunks for vector databases | v0.4: folders, archives and emails; guided setup; work profiles |
-| Conversion receipt, checked by `sugo verify` | v0.5: `quality` engine level (vision model, GPU) |
-| Token metrics per provider (`sugo stats`) | Later: EPUB and web pages, background service, folder watcher |
-| Command line, interactive shell, MCP server for agents, local web page | |
-| Interface and text rules in English, Italian, Spanish, French, German; text rules also in Japanese and Chinese | |
+| Native PDFs, DOCX, XLSX, PPTX, XML | v0.3.x: Office files through Docling at `normal`, once measured on real files |
+| Images and screenshots with local OCR (PNG, JPEG, WEBP) | v0.3.x: a published container image; the PDF engine chosen by a test on real files |
+| Scans: handwriting marked, repeated letterheads removed | v0.4: folders, archives and emails; guided setup; work profiles; one shared engine for every port |
+| The `normal` level: PDF tables and layouts with Docling (optional install) | v0.5: `quality` engine level (vision model, GPU) |
+| Chat and code screenshot detection | Later: EPUB and web pages, background service, folder watcher |
+| Markdown, and JSON Lines chunks for vector databases; LangChain and LlamaIndex loaders | |
+| Conversion receipt, checked by `sugo verify` | |
+| Token metrics per provider (`sugo stats`) | |
+| Command line, interactive shell, MCP server for agents, local web page, Python API | |
+| Interface and text rules in English, Italian, Spanish, French, German; text rules also in Japanese, Chinese and Korean (Korean OCR model downloaded on request) | |
 
 See the [roadmap](https://github.com/Muralnick/sugo/blob/main/docs/ROADMAP.md) for the full plan.
 
