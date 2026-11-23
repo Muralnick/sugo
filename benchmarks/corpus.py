@@ -6,7 +6,8 @@ EUR-Lex samples in ``corpus_eur_lex.py``, not these). Covers v0.1's in-scope
 languages only (ROADMAP.md: Italian, Spanish, French, German, English;
 Japanese and Chinese ship later) and its in-scope document kinds: a native
 PDF with a running header, footer and page numbers; a two-column PDF page;
-an XLSX table; and chat and code screenshots, one of them in dark mode.
+an XLSX table; a ruled table in a PDF; and chat and code screenshots, one
+of them in dark mode.
 
 The XLSX builder (``row``, ``xlsx``) is reused from the DOCX/XLSX reader's
 own test fixtures (tests/extractors/office/xlsx_files.py) rather than
@@ -68,6 +69,14 @@ _TABLE_ROWS = {
     "fr": (("Pain", "2,50"), ("Lait", "1,20"), ("Café", "4,80")),
     "de": (("Brot", "2,50"), ("Milch", "1,20"), ("Kaffee", "4,80")),
     "en": (("Bread", "2.50"), ("Milk", "1.20"), ("Coffee", "4.80")),
+}
+# Extra columns of the ruled PDF table: quantity and line total.
+_TABLE_EXTRA_HEADER = {
+    "it": ("Quantità", "Totale"),
+    "es": ("Cantidad", "Total"),
+    "fr": ("Quantité", "Total"),
+    "de": ("Menge", "Summe"),
+    "en": ("Quantity", "Total"),
 }
 # Three left messages, three right messages: above CHAT_MIN_MESSAGES (3) and
 # CHAT_MIN_ALIGNED_SHARE (0.6), well inside CHAT_SIDE_MARGIN (0.15) of each edge.
@@ -139,6 +148,8 @@ class CorpusDocument:
     data: bytes
     ground_truth: tuple[str, ...]
     needs_ocr: bool
+    # For a table: its rows, each of which should come out on one line.
+    table_rows: tuple[tuple[str, ...], ...] = ()
 
 
 def report_pdf(language: str, pages: int = 5) -> CorpusDocument:
@@ -191,6 +202,41 @@ def table_xlsx(language: str) -> CorpusDocument:
     return CorpusDocument(f"table_{language}.xlsx", xlsx(sheet), ground_truth, needs_ocr=False)
 
 
+def table_pdf(language: str) -> CorpusDocument:
+    """A native PDF page with a short paragraph and a ruled four-column table.
+
+    The table layout is where the normal level (Docling) should differ from
+    lite (ADR-071): each row's cells must stay together.
+    """
+    header = (*_TABLE_HEADER[language], *_TABLE_EXTRA_HEADER[language])
+    decimal = "." if language == "en" else ","
+    rows = []
+    for index, (product, price) in enumerate(_TABLE_ROWS[language] * 2):
+        quantity = index + 1
+        total = f"{float(price.replace(',', '.')) * quantity:.2f}".replace(".", decimal)
+        rows.append((f"{product} {index + 1}", price, str(quantity), total))
+    table = (header, *rows)
+    document = pymupdf.open()
+    page = document.new_page()
+    intro = f"Note: {_SENTENCE[language]}"
+    page.insert_text((72, 80), intro, fontsize=11)
+    left, top, width, height = 72, 120, 110, 24
+    for row_index, cells in enumerate(table):
+        y = top + row_index * height
+        for column, text in enumerate(cells):
+            x = left + column * width
+            page.draw_rect(pymupdf.Rect(x, y, x + width, y + height), width=0.6)
+            page.insert_text((x + 6, y + 16), text, fontsize=10)
+    ground_truth = (intro, *(cell for cells in table for cell in cells))
+    return CorpusDocument(
+        f"table_{language}.pdf",
+        document.tobytes(),
+        ground_truth,
+        needs_ocr=False,
+        table_rows=tuple(table),
+    )
+
+
 def chat_screenshot(language: str, *, dark: bool = False) -> CorpusDocument:
     """A rendered PNG of a two-sided chat, in light or dark mode."""
     size = (1080, 1920)
@@ -232,6 +278,7 @@ def synthetic_documents() -> list[CorpusDocument]:
         documents.append(report_pdf(language))
         documents.append(two_column_pdf(language))
         documents.append(table_xlsx(language))
+        documents.append(table_pdf(language))
         documents.append(chat_screenshot(language))
         documents.append(code_screenshot(language))
     documents.append(chat_screenshot("en", dark=True))

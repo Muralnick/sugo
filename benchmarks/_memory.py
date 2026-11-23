@@ -20,6 +20,21 @@ def peak_rss_mb() -> float:
     return peak / 1024 if sys.platform == "linux" else peak / (1024 * 1024)
 
 
+def peak_child_rss_mb() -> float | None:
+    """Largest peak of any finished child process, in MB; None on Windows.
+
+    The PDF and Docling workers run as child processes (ADR-043, ADR-071), so
+    their memory is not in ``peak_rss_mb``. POSIX reports the largest child,
+    not a sum; Windows has no such counter in the standard library.
+    """
+    if sys.platform == "win32":
+        return None
+    import resource  # POSIX only
+
+    peak = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
+    return peak / 1024 if sys.platform == "linux" else peak / (1024 * 1024)
+
+
 class _ProcessMemoryCounters(ctypes.Structure):
     _fields_ = [
         ("cb", ctypes.c_ulong),

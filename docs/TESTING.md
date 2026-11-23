@@ -89,6 +89,17 @@ Step 8 corpus benchmark, on the reference machine (i5-10300H), `lite`, 31 docume
 
 The EUR-Lex sample is fetched separately (its text, not Sugo's typeset PDF, is the original: see `benchmarks/corpus_eur_lex.py` and the manifest it reads) and kept outside the repository with its licence and checksums (this section, above); `benchmarks/corpus_bench.py` runs the synthetic corpus alone when it is absent.
 
+`normal` against `lite` (ADR-071 step 3), on the reference machine (i5-10300H, Linux), 2026-11-23, synthetic corpus only (EUR-Lex not fetched on this machine): 31 documents, now including a ruled four-column table PDF per language, whose rows must each come out on one line (`benchmarks/corpus_bench.py --level normal`; both reports in `benchmarks/results/`). Only PDFs read differently at `normal`; images and the XLSX are read as in `lite`.
+
+| PDF kind (5 languages each) | Table rows intact, `lite` → `normal` | Tokens, `normal` vs `lite` | Content lost | Median time per document, `lite` → `normal` |
+|---|---|---|---|---|
+| Ruled table, 4 columns × 7 rows | **0/35 → 35/35** (`lite` reads it column by column) | +5 (about +4%): the table's separators | None at either level | 0.3 s → 11–12 s |
+| Report, 5 pages with running header, footer, page numbers | — | −3 to 0; the same 13–14 blocks removed by Sugo's cleaners | None | 0.3–0.4 s → 14–16 s |
+| Two columns | — | +6 | None | 0.3 s → 9 s |
+| Peak memory | — | — | — | 422 MB → 314 MB in Sugo's process plus **1 520 MB** in the Docling worker (budget 2.5 GB) |
+
+Docling starts and loads its models for each document, which is most of its time; the shared engine (ADR-071 step 4, ADR-018) is what can remove that cost. The OCR results of the screenshots are the same at both levels.
+
 ## Logging and diagnostics
 
 | Aspect | Decision |

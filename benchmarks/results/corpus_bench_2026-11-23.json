@@ -1,0 +1,524 @@
+{
+  "date": "2026-11-23",
+  "level": "lite",
+  "documents": 31,
+  "peak_rss_mb": 422,
+  "peak_child_rss_mb": 422,
+  "median_tokens_saved_percent": 0.0,
+  "content_issues": [
+    "chat_it.png",
+    "chat_es.png",
+    "chat_fr.png"
+  ],
+  "results": [
+    {
+      "name": "report_it.pdf",
+      "pages": 5,
+      "tokens_before": 374,
+      "tokens_after": 232,
+      "saved_percent": 38.0,
+      "image_baseline": [],
+      "removed": {
+        "headers_footers": 8,
+        "page_numbers": 5
+      },
+      "median_s": 0.392,
+      "missing_text": []
+    },
+    {
+      "name": "two_column_it.pdf",
+      "pages": 1,
+      "tokens_before": 209,
+      "tokens_after": 209,
+      "saved_percent": 0.0,
+      "image_baseline": [],
+      "removed": {},
+      "median_s": 0.325,
+      "missing_text": []
+    },
+    {
+      "name": "table_it.xlsx",
+      "pages": 1,
+      "tokens_before": 32,
+      "tokens_after": 32,
+      "saved_percent": 0.0,
+      "image_baseline": [],
+      "removed": {},
+      "median_s": 0.179,
+      "missing_text": []
+    },
+    {
+      "name": "table_it.pdf",
+      "pages": 1,
+      "tokens_before": 121,
+      "tokens_after": 121,
+      "saved_percent": 0.0,
+      "image_baseline": [],
+      "removed": {},
+      "median_s": 0.336,
+      "missing_text": [],
+      "table_rows": 7,
+      "table_rows_intact": 0
+    },
+    {
+      "name": "chat_it.png",
+      "pages": 1,
+      "tokens_before": 47,
+      "tokens_after": 47,
+      "saved_percent": 0.0,
+      "image_baseline": [
+        {
+          "provider": "claude",
+          "saved_percent": 98.3
+        },
+        {
+          "provider": "gemini",
+          "saved_percent": 97.0
+        },
+        {
+          "provider": "openai",
+          "saved_percent": 98.1
+        }
+      ],
+      "removed": {},
+      "median_s": 0.756,
+      "character_error_rate": 0.0108
+    },
+    {
+      "name": "code_it.png",
+      "pages": 1,
+      "tokens_before": 29,
+      "tokens_after": 29,
+      "saved_percent": 0.0,
+      "image_baseline": [
+        {
+          "provider": "claude",
+          "saved_percent": 97.0
+        },
+        {
+          "provider": "gemini",
+          "saved_percent": 94.4
+        },
+        {
+          "provider": "openai",
+          "saved_percent": 96.8
+        }
+      ],
+      "removed": {},
+      "median_s": 0.726,
+      "character_error_rate": 0.0
+    },
+    {
+      "name": "report_es.pdf",
+      "pages": 5,
+      "tokens_before": 339,
+      "tokens_after": 225,
+      "saved_percent": 33.6,
+      "image_baseline": [],
+      "removed": {
+        "headers_footers": 8,
+        "page_numbers": 5
+      },
+      "median_s": 0.378,
+      "missing_text": []
+    },
+    {
+      "name": "two_column_es.pdf",
+      "pages": 1,
+      "tokens_before": 209,
+      "tokens_after": 209,
+      "saved_percent": 0.0,
+      "image_baseline": [],
+      "removed": {},
+      "median_s": 0.338,
+      "missing_text": []
+    },
+    {
+      "name": "table_es.xlsx",
+      "pages": 1,
+      "tokens_before": 29,
+      "tokens_after": 29,
+      "saved_percent": 0.0,
+      "image_baseline": [],
+      "removed": {},
+      "median_s": 0.172,
+      "missing_text": []
+    },
+    {
+      "name": "table_es.pdf",
+      "pages": 1,
+      "tokens_before": 113,
+      "tokens_after": 113,
+      "saved_percent": 0.0,
+      "image_baseline": [],
+      "removed": {},
+      "median_s": 0.325,
+      "missing_text": [],
+      "table_rows": 7,
+      "table_rows_intact": 0
+    },
+    {
+      "name": "chat_es.png",
+      "pages": 1,
+      "tokens_before": 41,
+      "tokens_after": 41,
+      "saved_percent": 0.0,
+      "image_baseline": [
+        {
+          "provider": "claude",
+          "saved_percent": 98.5
+        },
+        {
+          "provider": "gemini",
+          "saved_percent": 97.4
+        },
+        {
+          "provider": "openai",
+          "saved_percent": 98.3
+        }
+      ],
+      "removed": {},
+      "median_s": 0.898,
+      "character_error_rate": 0.0636
+    },
+    {
+      "name": "code_es.png",
+      "pages": 1,
+      "tokens_before": 29,
+      "tokens_after": 29,
+      "saved_percent": 0.0,
+      "image_baseline": [
+        {
+          "provider": "claude",
+          "saved_percent": 97.0
+        },
+        {
+          "provider": "gemini",
+          "saved_percent": 94.4
+        },
+        {
+          "provider": "openai",
+          "saved_percent": 96.8
+        }
+      ],
+      "removed": {},
+      "median_s": 0.71,
+      "character_error_rate": 0.0
+    },
+    {
+      "name": "report_fr.pdf",
+      "pages": 5,
+      "tokens_before": 354,
+      "tokens_after": 236,
+      "saved_percent": 33.3,
+      "image_baseline": [],
+      "removed": {
+        "headers_footers": 8,
+        "page_numbers": 5
+      },
+      "median_s": 0.331,
+      "missing_text": []
+    },
+    {
+      "name": "two_column_fr.pdf",
+      "pages": 1,
+      "tokens_before": 215,
+      "tokens_after": 215,
+      "saved_percent": 0.0,
+      "image_baseline": [],
+      "removed": {},
+      "median_s": 0.3,
+      "missing_text": []
+    },
+    {
+      "name": "table_fr.xlsx",
+      "pages": 1,
+      "tokens_before": 29,
+      "tokens_after": 29,
+      "saved_percent": 0.0,
+      "image_baseline": [],
+      "removed": {},
+      "median_s": 0.159,
+      "missing_text": []
+    },
+    {
+      "name": "table_fr.pdf",
+      "pages": 1,
+      "tokens_before": 115,
+      "tokens_after": 115,
+      "saved_percent": 0.0,
+      "image_baseline": [],
+      "removed": {},
+      "median_s": 0.3,
+      "missing_text": [],
+      "table_rows": 7,
+      "table_rows_intact": 0
+    },
+    {
+      "name": "chat_fr.png",
+      "pages": 1,
+      "tokens_before": 42,
+      "tokens_after": 41,
+      "saved_percent": 2.4,
+      "image_baseline": [
+        {
+          "provider": "claude",
+          "saved_percent": 98.5
+        },
+        {
+          "provider": "gemini",
+          "saved_percent": 97.4
+        },
+        {
+          "provider": "openai",
+          "saved_percent": 98.3
+        }
+      ],
+      "removed": {},
+      "median_s": 0.71,
+      "character_error_rate": 0.0707
+    },
+    {
+      "name": "code_fr.png",
+      "pages": 1,
+      "tokens_before": 29,
+      "tokens_after": 29,
+      "saved_percent": 0.0,
+      "image_baseline": [
+        {
+          "provider": "claude",
+          "saved_percent": 97.0
+        },
+        {
+          "provider": "gemini",
+          "saved_percent": 94.4
+        },
+        {
+          "provider": "openai",
+          "saved_percent": 96.8
+        }
+      ],
+      "removed": {},
+      "median_s": 0.644,
+      "character_error_rate": 0.0
+    },
+    {
+      "name": "report_de.pdf",
+      "pages": 5,
+      "tokens_before": 339,
+      "tokens_after": 214,
+      "saved_percent": 36.9,
+      "image_baseline": [],
+      "removed": {
+        "headers_footers": 9,
+        "page_numbers": 5
+      },
+      "median_s": 0.332,
+      "missing_text": []
+    },
+    {
+      "name": "two_column_de.pdf",
+      "pages": 1,
+      "tokens_before": 191,
+      "tokens_after": 191,
+      "saved_percent": 0.0,
+      "image_baseline": [],
+      "removed": {},
+      "median_s": 0.295,
+      "missing_text": []
+    },
+    {
+      "name": "table_de.xlsx",
+      "pages": 1,
+      "tokens_before": 31,
+      "tokens_after": 31,
+      "saved_percent": 0.0,
+      "image_baseline": [],
+      "removed": {},
+      "median_s": 0.16,
+      "missing_text": []
+    },
+    {
+      "name": "table_de.pdf",
+      "pages": 1,
+      "tokens_before": 116,
+      "tokens_after": 116,
+      "saved_percent": 0.0,
+      "image_baseline": [],
+      "removed": {},
+      "median_s": 0.298,
+      "missing_text": [],
+      "table_rows": 7,
+      "table_rows_intact": 0
+    },
+    {
+      "name": "chat_de.png",
+      "pages": 1,
+      "tokens_before": 46,
+      "tokens_after": 46,
+      "saved_percent": 0.0,
+      "image_baseline": [
+        {
+          "provider": "claude",
+          "saved_percent": 98.3
+        },
+        {
+          "provider": "gemini",
+          "saved_percent": 97.0
+        },
+        {
+          "provider": "openai",
+          "saved_percent": 98.1
+        }
+      ],
+      "removed": {},
+      "median_s": 0.734,
+      "character_error_rate": 0.0
+    },
+    {
+      "name": "code_de.png",
+      "pages": 1,
+      "tokens_before": 29,
+      "tokens_after": 29,
+      "saved_percent": 0.0,
+      "image_baseline": [
+        {
+          "provider": "claude",
+          "saved_percent": 97.0
+        },
+        {
+          "provider": "gemini",
+          "saved_percent": 94.4
+        },
+        {
+          "provider": "openai",
+          "saved_percent": 96.8
+        }
+      ],
+      "removed": {},
+      "median_s": 0.645,
+      "character_error_rate": 0.0
+    },
+    {
+      "name": "report_en.pdf",
+      "pages": 5,
+      "tokens_before": 304,
+      "tokens_after": 200,
+      "saved_percent": 34.2,
+      "image_baseline": [],
+      "removed": {
+        "headers_footers": 9,
+        "page_numbers": 5
+      },
+      "median_s": 0.34,
+      "missing_text": []
+    },
+    {
+      "name": "two_column_en.pdf",
+      "pages": 1,
+      "tokens_before": 191,
+      "tokens_after": 191,
+      "saved_percent": 0.0,
+      "image_baseline": [],
+      "removed": {},
+      "median_s": 0.309,
+      "missing_text": []
+    },
+    {
+      "name": "table_en.xlsx",
+      "pages": 1,
+      "tokens_before": 27,
+      "tokens_after": 27,
+      "saved_percent": 0.0,
+      "image_baseline": [],
+      "removed": {},
+      "median_s": 0.162,
+      "missing_text": []
+    },
+    {
+      "name": "table_en.pdf",
+      "pages": 1,
+      "tokens_before": 106,
+      "tokens_after": 106,
+      "saved_percent": 0.0,
+      "image_baseline": [],
+      "removed": {},
+      "median_s": 0.301,
+      "missing_text": [],
+      "table_rows": 7,
+      "table_rows_intact": 0
+    },
+    {
+      "name": "chat_en.png",
+      "pages": 1,
+      "tokens_before": 43,
+      "tokens_after": 43,
+      "saved_percent": 0.0,
+      "image_baseline": [
+        {
+          "provider": "claude",
+          "saved_percent": 98.4
+        },
+        {
+          "provider": "gemini",
+          "saved_percent": 97.2
+        },
+        {
+          "provider": "openai",
+          "saved_percent": 98.2
+        }
+      ],
+      "removed": {},
+      "median_s": 0.72,
+      "character_error_rate": 0.0
+    },
+    {
+      "name": "code_en.png",
+      "pages": 1,
+      "tokens_before": 29,
+      "tokens_after": 29,
+      "saved_percent": 0.0,
+      "image_baseline": [
+        {
+          "provider": "claude",
+          "saved_percent": 97.0
+        },
+        {
+          "provider": "gemini",
+          "saved_percent": 94.4
+        },
+        {
+          "provider": "openai",
+          "saved_percent": 96.8
+        }
+      ],
+      "removed": {},
+      "median_s": 0.655,
+      "character_error_rate": 0.0
+    },
+    {
+      "name": "chat_en_dark.png",
+      "pages": 1,
+      "tokens_before": 43,
+      "tokens_after": 43,
+      "saved_percent": 0.0,
+      "image_baseline": [
+        {
+          "provider": "claude",
+          "saved_percent": 98.4
+        },
+        {
+          "provider": "gemini",
+          "saved_percent": 97.2
+        },
+        {
+          "provider": "openai",
+          "saved_percent": 98.2
+        }
+      ],
+      "removed": {},
+      "median_s": 0.75,
+      "character_error_rate": 0.0
+    }
+  ]
+}

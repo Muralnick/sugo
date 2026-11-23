@@ -1,6 +1,6 @@
 """Run the benchmark corpus through sugo: savings, content accuracy, time and memory.
 
-Run with ``uv run python benchmarks/corpus_bench.py`` on the reference
+Run with ``uv run python benchmarks/corpus_bench.py [--level normal]`` on the reference
 machine (8 GB RAM, 4 cores, no GPU; docs/TESTING.md); close other programs
 first, timings are sensitive to load. Covers the synthetic corpus
 (``corpus.py``, generated in memory) and, once fetched, the EUR-Lex sample
@@ -9,8 +9,13 @@ been fetched. Every document keeps an exact ground truth, so "content lost"
 is measured, not guessed, alongside token savings (TESTING.md's golden
 rule). Results go to standard output as JSON and are archived under
 ``benchmarks/results/``.
+
+``--level normal`` needs ``sugo-cli[normal]`` and ``sugo models pull normal``
+(ADR-071); only PDFs read differently at that level. Docling runs in a child
+process, so the report also gives the largest child's peak memory.
 """
 
+import argparse
 import json
 import re
 import statistics
@@ -20,7 +25,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from _memory import peak_rss_mb
+from _memory import peak_child_rss_mb, peak_rss_mb
 from _text import character_error_rate
 from corpus import CorpusDocument, synthetic_documents
 from corpus_eur_lex import eur_lex_documents
@@ -53,14 +58,20 @@ def _read_lines(markdown: str) -> list[str]:
     return lines
 
 
-def _bench_one(document: CorpusDocument, providers: list[str]) -> dict[str, Any]:
+def _rows_intact(rows: tuple[tuple[str, ...], ...], markdown: str) -> int:
+    """Table rows whose cells all come out on one Markdown line, in any table format."""
+    lines = [line.replace("\\", "") for line in markdown.splitlines()]
+    return sum(1 for cells in rows if any(all(cell in line for cell in cells) for line in lines))
+
+
+def _bench_one(document: CorpusDocument, providers: list[str], level: str) -> dict[str, Any]:
     timings = []
     start = time.perf_counter()
-    conversion = convert(document.data, source=document.name, count_raw_tokens=True)
+    conversion = convert(document.data, source=document.name, count_raw_tokens=True, level=level)
     timings.append(time.perf_counter() - start)
     for _ in range(RUNS - 1):
         start = time.perf_counter()
-        convert(document.data, source=document.name, count_raw_tokens=True)
+        convert(document.data, source=document.name, count_raw_tokens=True, level=level)
         timings.append(time.perf_counter() - start)
     savings = estimate_savings(document.data, conversion, providers)
     content: dict[str, Any]
@@ -71,6 +82,9 @@ def _bench_one(document: CorpusDocument, providers: list[str]) -> dict[str, Any]
         }
     else:
         content = {"missing_text": _missing_text(document.ground_truth, conversion.markdown)}
+    if document.table_rows:
+        content["table_rows"] = len(document.table_rows)
+        content["table_rows_intact"] = _rows_intact(document.table_rows, conversion.markdown)
     return {
         "name": document.name,
         "pages": conversion.pages,
@@ -88,6 +102,9 @@ def _bench_one(document: CorpusDocument, providers: list[str]) -> dict[str, Any]
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--level", choices=("lite", "normal"), default="lite")
+    level = parser.parse_args().level
     documents = synthetic_documents() + eur_lex_documents()
     if not any(document.name.startswith("eur_lex_") for document in documents):
         sys.stderr.write(
@@ -99,17 +116,24 @@ def main() -> None:
         if document.needs_ocr:
             convert(document.data, source=document.name)
             break
+    if level != "lite":
+        # Likewise for Docling: its first load reads the models from disk.
+        first_pdf = next(document for document in documents if document.name.endswith(".pdf"))
+        convert(first_pdf.data, source=first_pdf.name, level=level)
     providers = list_providers()
-    results = [_bench_one(document, providers) for document in documents]
+    results = [_bench_one(document, providers, level) for document in documents]
     content_issues = [
         result["name"]
         for result in results
         if result.get("missing_text") or result.get("character_error_rate", 0.0) > 0.0
     ]
+    child_peak = peak_child_rss_mb()
     report = {
         "date": datetime.now(UTC).date().isoformat(),
+        "level": level,
         "documents": len(results),
         "peak_rss_mb": round(peak_rss_mb()),
+        "peak_child_rss_mb": None if child_peak is None else round(child_peak),
         "median_tokens_saved_percent": round(
             statistics.median(result["saved_percent"] for result in results), 1
         ),
@@ -117,7 +141,8 @@ def main() -> None:
         "results": results,
     }
     RESULTS_DIR.mkdir(exist_ok=True)
-    out_path = RESULTS_DIR / f"corpus_bench_{report['date']}.json"
+    suffix = "" if level == "lite" else f"_{level}"
+    out_path = RESULTS_DIR / f"corpus_bench_{report['date']}{suffix}.json"
     out_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     sys.stdout.write(json.dumps(report, indent=2) + "\n")
 
