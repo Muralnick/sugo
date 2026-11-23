@@ -178,6 +178,10 @@ def _extract(archive: zipfile.ZipFile, cards: list[ModelCard]) -> list[ModelCard
         for card in cards:
             with download_lock(card):
                 for file in card.files:
+                    # An installed file that passes its SHA-256 is kept and its
+                    # archive entry is not read: nothing from that entry reaches
+                    # the disk, so a tampered entry there cannot be installed.
+                    # Every entry that is extracted is hashed in ``_extract_one``.
                     if file_valid(card, file):
                         continue
                     # A damaged copy is replaced by the bundle's.
