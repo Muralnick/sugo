@@ -1,10 +1,11 @@
 # ADR-072: A warm Docling worker, the first step of the shared engine
 
-**Status:** Accepted (ADR approved 2026-11-23; maintainer decisions of 2026-11-23: the warm worker first, the full engine later; the MCP server shares a warm worker, recycled as in §2; N = 20 documents)
+**Status:** Accepted (ADR approved 2026-11-23; maintainer decisions of 2026-11-23: the warm worker first, the full engine after 0.3.0; the MCP server uses a fresh worker per document; N = 20 documents)
 **Date:** 2026-11-23
 **Deciders:** project author
 **Implements:** ADR-071 §6 step 4 ("the shared engine, its own ADR"), first part; ADR-018 (model residency, idle unload)
 **Builds on:** ADR-043 (isolated workers), ADR-071 (Docling worker), ADR-036 (network boundaries), ADR-049 (MCP server), ADR-055 (web UI), ADR-062 (shell)
+**Amends:** ADR-071 §6 and its decision of 2026-11-14 ("the shared engine before 0.3.0"): 0.3.0 ships this warm worker; the full per-user engine moves after it (§5)
 **Adds dependencies:** none
 
 ## Context
@@ -30,12 +31,12 @@ The Docling worker (ADR-071 §3) stays alive between documents in the process th
 | Port | The worker lives |
 |---|---|
 | `sugo convert` / `sugo stats` with several files | for the run |
-| Shell (`sugo`) | for the session |
-| `sugo ui` | for the server's life |
-| MCP server | for the server's life |
+| Shell (`sugo`) | while it is in use, as `sugo ui` |
+| `sugo ui` | while it is in use: stopped after 5 minutes idle (§2), started again by the next PDF at `normal` |
+| MCP server | never warm: a fresh worker per document (§6) |
 | `sugo convert` with one file, Python API one call | as today: one document. The API keeps it warm only inside an explicit `with sugo.Session():` (§5, deferred) |
 
-There is no socket, no daemon and no new channel: the worker still talks only to its parent, through the same pipe.
+Ports and the Python API opt in explicitly; anything else keeps one worker per document. There is no socket, no daemon and no new channel: the worker still talks only to its parent, through the same pipe.
 
 ### 2. Recycling: never more than a bounded number of documents per worker
 
@@ -45,7 +46,7 @@ A worker that has read many untrusted files is a risk. A crafted PDF that compro
 - after **N = 20 documents** (maintainer decision): each recycle costs about 8 s, so 20 documents spread it to about 0.4 s each;
 - after **5 minutes idle**, which also returns the ~1.8 GB to the system (ADR-018: "unloaded after idle timeout").
 
-The MCP server follows the same rule (§6).
+The MCP server does not reuse a worker at all (§6).
 
 ### 3. Protocol: documents in sequence over the existing pipe
 
@@ -53,7 +54,9 @@ The parent sends one document at a time: a length-prefixed frame, the same frami
 
 ### 4. Memory
 
-Only one warm Docling worker per Sugo process. In `lite`, nothing changes and no worker is kept. `sugo doctor` reports the level's expected memory. The per-process address-space cap stays as set in ADR-071.
+Only one warm Docling worker per Sugo process. In `lite`, nothing changes and no worker is kept. The per-process address-space cap stays as set in ADR-071.
+
+**Known limit of this step:** the 2.5 GB budget holds per Sugo process, not per user. A shell and `sugo ui` converting PDFs at `normal` at the same time can each hold a worker of about 1.5–1.8 GB. The idle stop (§2) bounds how long that lasts. The documentation says so. A per-user reservation needs the shared engine (§5), which is the place for it.
 
 ### 5. What stays for the full shared engine (later, its own ADR)
 
@@ -64,9 +67,9 @@ Only one warm Docling worker per Sugo process. In `lite`, nothing changes and no
 
 These come with v0.4's background service (watcher, clipboard mode), which needs a long-running engine anyway.
 
-### 6. The MCP server (maintainer decision, 2026-11-23)
+### 6. The MCP server: a fresh worker per document (maintainer decision, 2026-11-23)
 
-The MCP server shares one warm worker across the agent's requests, recycled as in §2, rather than a new worker per document (about 8 s more per PDF). Every file the server opens has already passed its allowed-roots and credentials checks.
+An agent's requests can mix files of very different trust, and its answers feed straight back into the agent. A crafted PDF that compromised docling-parse undetected, past the allowed-roots and credentials checks, could alter or poison the next files' results while the worker lives. So the MCP server never reuses a Docling worker: each PDF at `normal` gets a fresh one, as before this ADR, at about 8 s more per PDF. The shell, `sugo ui` and multi-file conversions keep the warm worker: there the person chose the files in front of them.
 
 ## Alternatives considered
 
@@ -79,7 +82,7 @@ The MCP server shares one warm worker across the agent's requests, recycled as i
 
 ## Consequences
 
-- `normal` gets 2–4× faster in the shell, the web UI, the MCP server and multi-file conversions. One-shot single-file commands stay as today. The README states `normal`'s real speed.
+- `normal` gets 2–4× faster in the shell, the web UI and multi-file conversions. The MCP server and one-shot single-file commands stay as today. The README states `normal`'s real speed and the memory limit of §4.
 - No new public contract and no new network surface. The internal worker protocol gains "next document".
 - Tests: several documents through one worker; recycling after N documents, after a failure and after idle time; output identical to a fresh worker's; memory returned after idle.
 - ADR-018's full engine remains planned, now scoped by §5.
