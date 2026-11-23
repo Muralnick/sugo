@@ -85,3 +85,24 @@ sugo verify FILE RECEIPT [--json]
 - `Conversion` gains one field (`receipt: Receipt | None`); existing callers are unaffected since it defaults to `None`.
 - Strengthens principle 3 ("no silent loss... can be inspected") with a self-contained, shareable artifact: `verify` needs only `FILE` and `RECEIPT`, never the machine, cache or original command line that produced it.
 - Residual: `verify` only promises a match under the `sugo_version` that produced the receipt; a version difference is reported as a warning, not a hard failure, because output can legitimately change between releases (this is the same boundary `Conversion.config_hash` already has).
+
+## Amendment (2026-11-23): the engine level, schema 1.1
+
+ADR-071 adds the `normal` level. A receipt did not record the level, so
+`sugo verify` re-converted a `normal` receipt at `lite` and reported false
+differences. Maintainer decision (2026-11-23): the receipt records the level,
+so it stays self-sufficient.
+
+- New optional field `level`, written only when the conversion was not at
+  `lite` (today only `"normal"`). Such a receipt has `schema_version` `"1.1"`
+  (an addition is a minor change, ADR-023). A `lite` receipt is unchanged:
+  `"1.0"`, no `level` field, byte for byte as before.
+- The two must agree: `"1.1"` with a level, `"1.0"` without; anything else is
+  `RECEIPT_INVALID`. A receipt with no `level` reads as `lite`.
+- `sugo verify` converts again at the receipt's level, as it already does with
+  its languages. Verifying a `normal` receipt without the `normal` extra or
+  its models fails with `LEVEL_MISSING` or `MODEL_MISSING`, never with a
+  false mismatch.
+- `schemas/receipt-v1.schema.json` accepts both versions and the optional
+  `level`. A Sugo older than this change refuses a 1.1 receipt as invalid,
+  which is the safe failure.

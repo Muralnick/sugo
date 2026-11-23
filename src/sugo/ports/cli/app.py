@@ -794,10 +794,11 @@ def verify_command(
                 languages=stored.languages,
                 strip_tracking_urls=stored.strip_tracking_urls,
                 receipt=True,
+                level=stored.engine_level,
             )
         if fresh.receipt is None:
             raise RuntimeError("internal error: receipt=True did not produce a receipt")
-        # languages and strip_tracking_urls are forced equal above (the receipt is
+        # languages, strip_tracking_urls and the level are forced equal above (the receipt is
         # self-sufficient), so only the Sugo version itself can make cleaning
         # disagree; config_hash also carries max_chunk_tokens, which verify never
         # sets, so comparing it here would warn on every receipt made with --chunks.

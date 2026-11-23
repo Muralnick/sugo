@@ -322,6 +322,65 @@ def test_verify_confirms_a_matching_receipt(workdir: Path) -> None:
     assert as_json == {"match": True, "version_drifted": False, "differences": []}
 
 
+def normal_receipt(workdir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A receipt made at the normal level, with a stand-in for Docling."""
+    from sugo.core import pipeline
+    from sugo.core.models import Block, BlockType, Page, PageOrigin
+    from sugo.exporters.receipt import write_receipt
+
+    def docling_pages(data: bytes, count: int) -> list[Page]:
+        return [
+            Page(
+                index=n,
+                width=595,
+                height=842,
+                origin=PageOrigin.NATIVE,
+                blocks=(
+                    Block(
+                        id=f"p{n}-d0",
+                        type=BlockType.PARAGRAPH,
+                        text=f"Docling page {n}",
+                        origin_engine="docling",
+                    ),
+                ),
+            )
+            for n in range(count)
+        ]
+
+    monkeypatch.setattr(pipeline, "_docling_reader", lambda: docling_pages)
+    conversion = pipeline.convert_file(workdir / "report.pdf", level="normal", receipt=True)
+    assert conversion.receipt is not None
+    assert conversion.receipt.level == "normal"
+    target = workdir / "normal.receipt.json"
+    write_receipt(target, conversion.receipt)
+    return target
+
+
+def test_verify_converts_again_at_the_receipts_level(
+    workdir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    receipt = normal_receipt(workdir, monkeypatch)
+    as_json = json.loads(run("verify", "report.pdf", str(receipt), "--json").stdout)
+    assert as_json == {"match": True, "version_drifted": False, "differences": []}
+
+
+def test_verify_of_a_normal_receipt_needs_the_normal_level(
+    workdir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sugo.core import pipeline
+    from sugo.extractors.docling.extract import NormalLevelMissingError
+
+    receipt = normal_receipt(workdir, monkeypatch)
+
+    def missing() -> None:
+        raise NormalLevelMissingError("The normal level is not installed.")
+
+    monkeypatch.setattr(pipeline, "_docling_reader", missing)
+    result = run("verify", "report.pdf", str(receipt), "--json")
+    assert result.exit_code == ExitCode.MISSING
+    assert json.loads(result.stderr)["error"]["code"] == "LEVEL_MISSING"
+
+
 @pytest.mark.usefixtures("workdir")
 def test_verify_does_not_warn_over_chunk_size_alone(workdir: Path) -> None:
     # max_chunk_tokens is part of config_hash but irrelevant to cleaning, and

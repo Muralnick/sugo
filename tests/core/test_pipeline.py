@@ -554,6 +554,16 @@ class TestNormalLevel:
         assert lite.config_hash == convert(report(1), level="lite").config_hash
         assert normal.config_hash != lite.config_hash
 
+    def test_the_receipt_records_normal_and_not_lite(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(pipeline, "_docling_reader", lambda: self.docling_pages)
+        normal = convert(report(1), level="normal", receipt=True).receipt
+        lite = convert(report(1), receipt=True).receipt
+        assert normal is not None
+        assert lite is not None
+        assert (normal.schema_version, normal.level) == ("1.1", "normal")
+        assert (lite.schema_version, lite.level) == ("1.0", None)
+        assert "level" not in lite.model_dump(mode="json")
+
     def test_unknown_level_is_refused(self) -> None:
         with pytest.raises(ValueError, match="level must be one of"):
             convert(report(1), level="quality")

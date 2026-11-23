@@ -45,7 +45,13 @@ from sugo.core.constants import (
 )
 from sugo.core.decisions import InvalidDecisionError, Proposal, apply_decisions
 from sugo.core.models import BlockFlag, Page, PageOrigin
-from sugo.core.receipt import EditRecord, FlaggedBlock, Receipt, RemovalRecord
+from sugo.core.receipt import (
+    RECEIPT_SCHEMA_VERSION_LEVEL,
+    EditRecord,
+    FlaggedBlock,
+    Receipt,
+    RemovalRecord,
+)
 from sugo.extractors.docling.extract import (
     NormalLevelMissingError,
     docling_installed,
@@ -589,6 +595,14 @@ class _Job:
                 removed=tuple(removal_records),
                 edited=tuple(edit_records),
                 flagged=tuple(flagged_records),
+                **(
+                    {}
+                    if self._options.level == LITE
+                    else {
+                        "schema_version": RECEIPT_SCHEMA_VERSION_LEVEL,
+                        "level": self._options.level,
+                    }
+                ),
             )
         )
         return Conversion(
