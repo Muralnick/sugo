@@ -43,12 +43,20 @@ def test_torch_and_torchvision_are_a_matched_pair(lock: Path) -> None:
     assert (major, vision_minor, vision_patch) == (2, minor + _VISION_OFFSET, patch)
 
 
+def _linux_only(markers: list[str]) -> bool:
+    return bool(markers) and all("sys_platform == 'linux'" in marker for marker in markers)
+
+
 def test_on_linux_both_come_from_the_cpu_index() -> None:
+    # Checked on each record's resolution markers, so a CPU build that stopped
+    # being selected for Linux fails here too (#128 review).
     for name in ("torch", "torchvision"):
-        sources = {
-            str(package["version"]): package["source"]["registry"]  # type: ignore[index]
-            for package in _packages(ROOT / "uv.lock", name)
-        }
-        cpu = [version for version, registry in sources.items() if registry == CPU_INDEX]
-        assert cpu, f"{name} has no CPU build in the lock"
-        assert all(version.endswith("+cpu") for version in cpu)
+        records = _packages(ROOT / "uv.lock", name)
+        cpu = [r for r in records if r["source"]["registry"] == CPU_INDEX]  # type: ignore[index]
+        other = [r for r in records if r["source"]["registry"] != CPU_INDEX]  # type: ignore[index]
+        assert len(cpu) == 1, f"{name} has no single CPU build in the lock"
+        assert str(cpu[0]["version"]).endswith("+cpu")
+        assert _linux_only(cpu[0]["resolution-markers"])  # type: ignore[arg-type]
+        for record in other:
+            markers: list[str] = record["resolution-markers"]  # type: ignore[assignment]
+            assert not any("sys_platform == 'linux'" in marker for marker in markers)
