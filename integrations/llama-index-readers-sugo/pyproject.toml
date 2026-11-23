@@ -1,6 +1,6 @@
 [project]
 name = "llama-index-readers-sugo"
-version = "0.1.1"
+version = "0.1.2"
 description = "LlamaIndex reader for Sugo: local, compact Markdown chunks from PDF, Office files and images."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -9,7 +9,7 @@ requires-python = ">=3.12,<3.15"
 dependencies = [
     # The public API (ADR-067) first ships in sugo-cli 0.2; 0.2.1 adds
     # Result.has_credentials, which the loader skips on.
-    "sugo-cli>=0.2.1,<0.3",
+    "sugo-cli>=0.2.1,<0.4",
     "llama-index-core>=0.14.25,<0.15",
 ]
 classifiers = [

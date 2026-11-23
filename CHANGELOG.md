@@ -11,6 +11,10 @@ still change, with notice, before 1.0).
 
 ### Added
 
+- `langchain-sugo` 0.1.2 and `llama-index-readers-sugo` 0.1.2: no change in
+  the loaders; they accept `sugo-cli` 0.3 (`>=0.2.1,<0.4`), where 0.1.1
+  stopped at 0.3.
+
 - A warm Docling worker (ADR-072): at `normal`, the shell, `sugo ui` and
   `sugo convert` on several files keep Docling loaded between PDFs instead
   of starting it for each one, about twice as fast on a run of small PDFs
