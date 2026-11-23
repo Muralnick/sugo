@@ -22,6 +22,7 @@ import hashlib
 import json
 import os
 import zipfile
+import zlib
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
@@ -235,7 +236,9 @@ def _read_entry(
                     raise BundleInvalidError("an entry is larger than it declares")
                 digest.update(chunk)
                 sink(chunk)
-    except zipfile.BadZipFile:
+    except (zipfile.BadZipFile, zlib.error, EOFError):
+        # A damaged deflate stream raises zlib.error, a cut one EOFError: both
+        # are a damaged bundle, never a traceback.
         raise BundleInvalidError("an entry is damaged") from None
     if written != file.size or digest.hexdigest() != file.sha256:
         raise BundleInvalidError("an entry does not match its SHA-256")

@@ -106,6 +106,28 @@ def test_an_altered_bundle_is_refused_even_when_the_model_is_installed(tmp_path:
     assert not list((tmp_path / "cache").rglob("*.part"))
 
 
+@pytest.mark.parametrize("installed", [False, True])
+def test_a_damaged_deflate_stream_is_a_bundle_error(tmp_path: Path, installed: bool) -> None:
+    # Checked whether or not the model is already installed (#123 review).
+    if installed:
+        install_model()
+    path = hand_made(
+        tmp_path / "bad.zip",
+        {MANIFEST_NAME: manifest(), ENTRY: BODY},
+        compression=zipfile.ZIP_DEFLATED,
+    )
+    data = bytearray(path.read_bytes())
+    with zipfile.ZipFile(path) as archive:
+        info = archive.getinfo(ENTRY)
+    # The compressed bytes start after the local header, its name and extra field.
+    start = info.header_offset + 30 + len(ENTRY.encode()) + len(info.extra)
+    data[start : start + 8] = b"\xff" * 8
+    path.write_bytes(bytes(data))
+    with pytest.raises(BundleInvalidError, match=r"damaged|SHA-256"):
+        install_bundle(path)
+    assert not list((tmp_path / "cache").rglob("*.part"))
+
+
 def test_a_compressed_bomb_is_refused_by_its_declared_size(tmp_path: Path) -> None:
     bomb = b"\0" * (len(BODY) * 50)
     path = hand_made(
