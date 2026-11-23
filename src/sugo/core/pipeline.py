@@ -25,7 +25,7 @@ from enum import StrEnum
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from types import MappingProxyType
-from typing import ClassVar, Protocol, TypeVar
+from typing import ClassVar, Literal, Protocol, TypeVar
 
 from sugo.analyzers.edges import EdgeAnalyzer, EdgeStats
 from sugo.analyzers.lexicon import Lexicon, LexiconAnalyzer
@@ -45,7 +45,14 @@ from sugo.core.constants import (
 )
 from sugo.core.decisions import InvalidDecisionError, Proposal, apply_decisions
 from sugo.core.models import BlockFlag, Page, PageOrigin
-from sugo.core.receipt import EditRecord, FlaggedBlock, Receipt, RemovalRecord
+from sugo.core.receipt import (
+    RECEIPT_SCHEMA_VERSION,
+    RECEIPT_SCHEMA_VERSION_LEVEL,
+    EditRecord,
+    FlaggedBlock,
+    Receipt,
+    RemovalRecord,
+)
 from sugo.extractors.docling.extract import (
     NormalLevelMissingError,
     docling_installed,
@@ -572,6 +579,7 @@ class _Job:
         markdown = "\n\n".join(parts)
         raw_tokens = None if raw_parts is None else count_tokens("\n\n".join(raw_parts))
         failed_pages = tuple(index + 1 for index in sorted(self._failed))
+        level: Literal["normal"] | None = "normal" if self._options.level == NORMAL else None
         receipt = (
             None
             if not self._options.receipt
@@ -589,6 +597,11 @@ class _Job:
                 removed=tuple(removal_records),
                 edited=tuple(edit_records),
                 flagged=tuple(flagged_records),
+                # Recorded only when not lite, so lite receipts stay 1.0 (ADR-056).
+                schema_version=(
+                    RECEIPT_SCHEMA_VERSION if level is None else RECEIPT_SCHEMA_VERSION_LEVEL
+                ),
+                level=level,
             )
         )
         return Conversion(

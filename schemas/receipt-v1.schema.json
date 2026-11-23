@@ -194,8 +194,11 @@
   "description": "Self-contained record of one conversion's cleaning stage (ADR-056).",
   "properties": {
     "schema_version": {
-      "const": "1.0",
       "default": "1.0",
+      "enum": [
+        "1.0",
+        "1.1"
+      ],
       "title": "Schema Version",
       "type": "string"
     },
@@ -285,6 +288,11 @@
       },
       "title": "Flagged",
       "type": "array"
+    },
+    "level": {
+      "const": "normal",
+      "title": "Level",
+      "type": "string"
     }
   },
   "required": [
@@ -304,5 +312,28 @@
     "flagged"
   ],
   "title": "Receipt",
-  "type": "object"
+  "type": "object",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "1.1"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "level"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "level"
+          ]
+        }
+      }
+    }
+  ]
 }

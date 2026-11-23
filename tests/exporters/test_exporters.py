@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from sugo.core.chunks import Chunk, chunk_json_schema
 from sugo.core.models import BlockType
@@ -185,9 +186,56 @@ def test_receipt_every_field_is_written_in_schema_order(tmp_path: Path) -> None:
     target = tmp_path / "doc.receipt.json"
     write_receipt(target, receipt_sample())
     record = json.loads(target.read_text())
-    assert list(record) == list(receipt_json_schema()["properties"])
+    # A lite receipt is exactly a 1.0 receipt: every field but the optional level.
+    assert list(record) == [name for name in receipt_json_schema()["properties"] if name != "level"]
     assert set(record) == set(receipt_json_schema()["required"])
     assert record["schema_version"] == "1.0"
+
+
+def test_a_normal_receipt_records_its_level_as_1_1(tmp_path: Path) -> None:
+    target = tmp_path / "doc.receipt.json"
+    sample = receipt_sample().model_copy(update={"schema_version": "1.1", "level": "normal"})
+    write_receipt(target, sample)
+    record = json.loads(target.read_text())
+    assert list(record) == list(receipt_json_schema()["properties"])
+    assert (record["schema_version"], record["level"]) == ("1.1", "normal")
+    assert Receipt.model_validate_json(target.read_bytes()).engine_level == "normal"
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"schema_version": "1.1"},
+        {"level": "normal"},
+        {"level": "lite", "schema_version": "1.1"},
+        {"level": None, "schema_version": "1.1"},
+    ],
+)
+def test_version_and_level_must_agree(changes: dict[str, object]) -> None:
+    record = receipt_sample().model_dump(mode="json") | changes
+    with pytest.raises(ValidationError, match=r"schema_version|level"):
+        Receipt.model_validate_json(json.dumps(record))
+
+
+def test_the_published_schema_pairs_version_and_level() -> None:
+    # The same rule as the model's validator, for tools that read only the schema.
+    schema = receipt_json_schema()
+    assert schema["allOf"] == [
+        {
+            "if": {"properties": {"schema_version": {"const": "1.1"}}},
+            "then": {"required": ["level"]},
+            "else": {"not": {"required": ["level"]}},
+        }
+    ]
+    assert schema["properties"]["schema_version"]["enum"] == ["1.0", "1.1"]
+    assert schema["properties"]["level"] == {"const": "normal", "title": "Level", "type": "string"}
+    assert "level" not in schema["required"]
+
+
+def test_an_old_receipt_reads_as_lite() -> None:
+    record = receipt_sample().model_dump(mode="json")
+    assert "level" not in record
+    assert Receipt.model_validate_json(json.dumps(record)).engine_level == "lite"
 
 
 def test_receipt_published_schema_matches_the_model() -> None:

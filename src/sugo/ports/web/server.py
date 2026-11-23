@@ -566,6 +566,7 @@ def receipt_verifier(settings: Settings) -> Verifier:
                 languages=stored.languages,
                 strip_tracking_urls=stored.strip_tracking_urls,
                 receipt=True,
+                level=stored.engine_level,
             )
         if fresh.receipt is None:
             raise RuntimeError("internal error: receipt=True did not produce a receipt")
