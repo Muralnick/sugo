@@ -2,9 +2,10 @@
 
 import hashlib
 import os
+import re
 import sys
 import urllib.parse
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import pytest
 from tests.internal.test_net import FakeResponse, FakeServer
@@ -108,6 +109,9 @@ class TestRegistry:
             for file in model.files:
                 assert file.path.endswith(ALLOWED_SUFFIXES)
                 assert ".." not in file.path.split("/")
+                assert not PurePosixPath(file.path).is_absolute()
+                assert not PureWindowsPath(file.path).drive
+                assert "\\" not in file.path
                 assert len(file.sha256) == 64
                 assert int(file.sha256, 16) >= 0
                 assert file.size > 0
@@ -115,8 +119,11 @@ class TestRegistry:
                 assert all(s.url.startswith("https://") for s in file.sources)
                 assert all(s.url.endswith(file.name) for s in file.sources)
             if model.format != "onnx":
-                # Pinned to a commit, never a branch.
-                assert all("/resolve/main/" not in s.url for f in model.files for s in f.sources)
+                # Pinned to a full commit hash, never a branch or a tag.
+                for file in model.files:
+                    for source in file.sources:
+                        revision = source.url.split("/resolve/", 1)[1].split("/", 1)[0]
+                        assert re.fullmatch(r"[0-9a-f]{40}", revision), source.url
 
     def test_korean_is_the_rapidocr_file(self) -> None:
         korean = card("ocr-korean")
@@ -125,7 +132,8 @@ class TestRegistry:
         assert korean.sources == ("GitHub", "ModelScope")
 
     def test_normal_stands_for_both_docling_models(self) -> None:
-        assert [c.id for c in cards("normal")] == list(GROUPS["normal"])
+        assert [c.id for c in cards("normal")] == ["layout-docling", "tables-docling"]
+        assert list(GROUPS["normal"]) == ["layout-docling", "tables-docling"]
         assert {c.folder for c in cards("normal")} == {"docling"}
         assert card("layout-docling").size == 171_658_996 + 3268 + 444
         assert cards("ocr-korean") == (card("ocr-korean"),)
@@ -242,3 +250,22 @@ class TestStore:
         with pytest.raises(StorageDirError):
             store.remove(CARD)
         assert (elsewhere / "test.onnx").exists()
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="POSIX symbolic links")
+    def test_a_linked_folder_inside_the_model_is_refused(self, tmp_path: Path) -> None:
+        # The right files, but reached through a linked subfolder of the model.
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        (elsewhere / "model.safetensors").write_bytes(BODY)
+        (elsewhere / "config.json").write_bytes(CONFIG)
+        store.ensure_private_dir(store.model_dir(TWO))
+        os.symlink(elsewhere, store.model_dir(TWO) / "org--layout")
+        assert store.find(TWO) is None
+        assert not any(store.file_valid(TWO, file) for file in TWO.files)
+
+    def test_the_same_files_in_plain_folders_are_found(self) -> None:
+        store.prepare(TWO)
+        model_file(TWO, 0).write_bytes(BODY)
+        model_file(TWO, 1).write_bytes(CONFIG)
+        assert store.find(TWO) is not None
+        assert all(store.file_valid(TWO, file) for file in TWO.files)

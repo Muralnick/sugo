@@ -45,6 +45,13 @@ still change, with notice, before 1.0).
 - New error codes: `MODEL_UNKNOWN`, `DOWNLOAD_FAILED`, `OFFLINE`,
   `MODEL_INVALID`, `MODEL_BUSY`, `MODEL_MISSING`, `BUNDLE_INVALID`.
 
+### Fixed
+
+- A downloaded model whose file is reached through a linked subfolder is
+  no longer accepted: every folder between the file and the model folder
+  must be a plain folder of the user's, at load time too, not only when the
+  model is downloaded (review of #120).
+
 ## [0.2.2] - 2026-11-14
 
 ### Added

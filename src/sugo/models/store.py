@@ -116,11 +116,32 @@ def file_valid(card: ModelCard, file: ModelFile) -> bool:
 
 
 def _present(card: ModelCard, file: ModelFile) -> bool:
+    path = file_path(card, file)
     try:
-        info = file_path(card, file).lstat()
-    except OSError:
+        _check_folders(card, path)
+        info = path.lstat()
+    except (OSError, StorageDirError):
         return False
     return stat.S_ISREG(info.st_mode) and info.st_size == file.size
+
+
+def _check_folders(card: ModelCard, path: Path) -> None:
+    """Check every folder from the file's own up to the model's, links included.
+
+    ``lstat`` does not follow the file itself, but it does follow a linked
+    folder on the way, which could lead a nested file outside the model tree.
+
+    Raises:
+        FileNotFoundError: If a folder is missing.
+        StorageDirError: If a folder is a link, not a directory, or not the user's.
+    """
+    root = model_dir(card)
+    folder = path.parent
+    while True:
+        check_plain_dir(folder)
+        if folder == root:
+            return
+        folder = folder.parent
 
 
 def prepare(card: ModelCard) -> Path:
