@@ -1,6 +1,6 @@
 # ADR-072: A warm Docling worker, the first step of the shared engine
 
-**Status:** Proposed (2026-11-23)
+**Status:** Accepted (ADR approved 2026-11-23; maintainer decisions of 2026-11-23: the warm worker first, the full engine later; the MCP server shares a warm worker, recycled as in §2; N = 20 documents)
 **Date:** 2026-11-23
 **Deciders:** project author
 **Implements:** ADR-071 §6 step 4 ("the shared engine, its own ADR"), first part; ADR-018 (model residency, idle unload)
@@ -42,10 +42,10 @@ There is no socket, no daemon and no new channel: the worker still talks only to
 A worker that has read many untrusted files is a risk. A crafted PDF that compromised docling-parse could leave state behind that changes, or leaks into, the next document's output. So the worker is replaced:
 
 - after **every** failure, timeout or protocol error (never reused after one);
-- after **N documents** (proposed N = 20: each recycle costs about 8 s, so 20 documents spread it to about 0.4 s each);
+- after **N = 20 documents** (maintainer decision): each recycle costs about 8 s, so 20 documents spread it to about 0.4 s each;
 - after **5 minutes idle**, which also returns the ~1.8 GB to the system (ADR-018: "unloaded after idle timeout").
 
-The MCP server could instead use one worker per document, so no file an agent asks for can ever see another file's content. See the open question in §6.
+The MCP server follows the same rule (§6).
 
 ### 3. Protocol: documents in sequence over the existing pipe
 
@@ -64,9 +64,9 @@ Only one warm Docling worker per Sugo process. In `lite`, nothing changes and no
 
 These come with v0.4's background service (watcher, clipboard mode), which needs a long-running engine anyway.
 
-### 6. Open question for the maintainer
+### 6. The MCP server (maintainer decision, 2026-11-23)
 
-- **MCP**: a warm worker shared across the agent's requests (faster), or one worker per document (each file fully isolated from the others, about 8 s more per PDF)? Recommended: warm, recycled as in §2. Every file the server opens has already passed its allowed-roots and credentials checks.
+The MCP server shares one warm worker across the agent's requests, recycled as in §2, rather than a new worker per document (about 8 s more per PDF). Every file the server opens has already passed its allowed-roots and credentials checks.
 
 ## Alternatives considered
 
