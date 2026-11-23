@@ -59,7 +59,7 @@ sugo verify FILE RECEIPT [--json]
 - `--receipt` needs `-o` or `--json` (maintainer decision, 2026-11-04: left to the author to resolve, settled the same way as `--max-tokens needs --chunks` — a receipt is structured data with no sensible inline textual form mixed with plain Markdown on stdout). With `-o`, writes `NAME.receipt.json` next to `NAME.md` (atomic, owner-only, like `NAME.jsonl`, ADR-047). With `--json` alone, adds a `receipt` object to the per-document JSON, next to `chunks` when `--chunks` is also given.
 - `sugo verify FILE RECEIPT`: re-reads `FILE`, re-converts it with the `languages` and `strip_tracking_urls` stored on the receipt itself (maintainer decision, 2026-11-04: the receipt is self-sufficient — it carries the actual settings, not just `config_hash`'s digest of them, so `verify` never needs the caller to remember or re-supply the original flags), and structurally compares the result:
   - `source_sha256` differs → refuses immediately with the new error code `FILE_CHANGED`, exit 1: the receipt is for a different edition of the document.
-  - A receipt that is not valid JSON or not schema 1.0 → the new error code `RECEIPT_INVALID`, exit 1.
+  - A receipt that is not valid JSON or not schema 1.0 → the new error code `RECEIPT_INVALID`, exit 1. (Since the 2026-11-23 amendment below, schema 1.1 is accepted too.)
   - `sugo_version` differs → warns (stderr) that an exact match cannot be guaranteed across versions, then still compares and reports what it finds. `config_hash` is **not** compared here: `languages` and `strip_tracking_urls` are already forced equal (they come from the receipt itself), and `config_hash` also carries `max_chunk_tokens`, which `verify` never sets — comparing it would warn on every receipt made alongside `--chunks` even when nothing relevant changed.
   - Otherwise compares `removed`, `edited`, `flagged` and `tokens_after` entry-by-entry and prints the result itself — block ids and pages only, never text (principle 11). Like `sugo doctor`, the command reports everything itself and then sets the exit code directly (0 match, 1 mismatch), rather than wrapping a already-printed result in a second error object.
   - `--json` prints `{"match": bool, "version_drifted": bool, "differences": [...]}`, each difference naming its `category` (`removed`/`edited`/`flagged`/`tokens_after`), `kind` (`missing`/`extra`/`changed`), `page` and `block_id` — again without text.
@@ -104,5 +104,6 @@ so it stays self-sufficient.
   its models fails with `LEVEL_MISSING` or `MODEL_MISSING`, never with a
   false mismatch.
 - `schemas/receipt-v1.schema.json` accepts both versions and the optional
-  `level`. A Sugo older than this change refuses a 1.1 receipt as invalid,
+  `level`, with a conditional (`if`/`then`/`else`) that enforces the same
+  pairing as the model. A Sugo older than this change refuses a 1.1 receipt as invalid,
   which is the safe failure.

@@ -137,6 +137,14 @@ def receipt_json_schema() -> dict[str, Any]:
     # Written only when not lite, so neither required nor ever null.
     schema["required"] = [name for name in schema["required"] if name != "level"]
     schema["properties"]["level"] = {"const": "normal", "title": "Level", "type": "string"}
+    # The rule of ``_version_matches_level``: 1.1 with a level, 1.0 without.
+    schema["allOf"] = [
+        {
+            "if": {"properties": {"schema_version": {"const": "1.1"}}},
+            "then": {"required": ["level"]},
+            "else": {"not": {"required": ["level"]}},
+        }
+    ]
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": RECEIPT_SCHEMA_ID,

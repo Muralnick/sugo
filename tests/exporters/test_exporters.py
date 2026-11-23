@@ -217,6 +217,21 @@ def test_version_and_level_must_agree(changes: dict[str, object]) -> None:
         Receipt.model_validate_json(json.dumps(record))
 
 
+def test_the_published_schema_pairs_version_and_level() -> None:
+    # The same rule as the model's validator, for tools that read only the schema.
+    schema = receipt_json_schema()
+    assert schema["allOf"] == [
+        {
+            "if": {"properties": {"schema_version": {"const": "1.1"}}},
+            "then": {"required": ["level"]},
+            "else": {"not": {"required": ["level"]}},
+        }
+    ]
+    assert schema["properties"]["schema_version"]["enum"] == ["1.0", "1.1"]
+    assert schema["properties"]["level"] == {"const": "normal", "title": "Level", "type": "string"}
+    assert "level" not in schema["required"]
+
+
 def test_an_old_receipt_reads_as_lite() -> None:
     record = receipt_sample().model_dump(mode="json")
     assert "level" not in record

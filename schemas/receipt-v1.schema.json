@@ -312,5 +312,28 @@
     "flagged"
   ],
   "title": "Receipt",
-  "type": "object"
+  "type": "object",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "1.1"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "level"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "level"
+          ]
+        }
+      }
+    }
+  ]
 }
