@@ -7,6 +7,8 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-23
+
 ### Added
 
 - A warm Docling worker (ADR-072): at `normal`, the shell, `sugo ui` and
@@ -39,7 +41,7 @@ still change, with notice, before 1.0).
   Docling runs in its own process with no network. Office files stay with
   Sugo's own reader for now.
 
-- The models of the coming `normal` level (ADR-071): `sugo models pull normal`
+- The models of the `normal` level (ADR-071): `sugo models pull normal`
   downloads Docling's layout model and table model (384 MB, from Hugging Face,
   pinned to a commit and checked by SHA-256). A model can now have several
   files; they are kept in the folder layout Docling reads.
