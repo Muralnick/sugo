@@ -109,19 +109,20 @@ Limiti da tenere presenti: il corpus è piccolo e per lo più sintetico, ed è s
 ## Stato
 
 > [!NOTE]
-> **La v0.2.2 è uscita**, su [PyPI](https://pypi.org/project/sugo-cli/) con il nome `sugo-cli` e nel [registro MCP](https://registry.modelcontextprotocol.io/) ufficiale come `io.github.Muralnick/sugo`. Le novità sono nel [changelog](CHANGELOG.md) (in inglese). È ancora 0.x: i contratti possono cambiare, con preavviso, prima della 1.0. Le release sono costruite in modo riproducibile, con SBOM, attestazioni Sigstore e PyPI Trusted Publishing.
+> **La v0.3.0 è uscita**, su [PyPI](https://pypi.org/project/sugo-cli/) con il nome `sugo-cli` e nel [registro MCP](https://registry.modelcontextprotocol.io/) ufficiale come `io.github.Muralnick/sugo`. Le novità sono nel [changelog](CHANGELOG.md) (in inglese). È ancora 0.x: i contratti possono cambiare, con preavviso, prima della 1.0. Le release sono costruite in modo riproducibile, con SBOM, attestazioni Sigstore e PyPI Trusted Publishing.
 
 | Funziona oggi | In arrivo |
 |---|---|
-| PDF nativi, DOCX, XLSX, PPTX, XML | v0.1.x: i PDF rifiutati oggi come "broken stream", con il motore PDF scelto da un test su file reali |
-| Immagini e screenshot con OCR locale (PNG, JPEG, WEBP) | v0.3: coreano, con il download sicuro del modello OCR che gli serve |
-| Scansioni: scrittura a mano segnata, carta intestata ripetuta tolta | v0.2: loader per LangChain e LlamaIndex, un'immagine container pubblicata |
-| Riconoscimento di screenshot di chat e di codice | v0.3: livello di motore `normal` (Docling): impaginazioni complesse, vecchi file Office |
-| Markdown, e chunk in JSON Lines per i database vettoriali | v0.4: cartelle, archivi ed email; configurazione guidata; profili di lavoro |
-| Ricevuta di conversione, controllata da `sugo verify` | v0.5: livello di motore `quality` (modello di visione, GPU) |
-| Metriche dei token per provider (`sugo stats`) | Più avanti: EPUB e pagine web, servizio in background, controllo delle cartelle |
-| Riga di comando, shell interattiva, server MCP per agenti, pagina web locale | |
-| Interfaccia e regole del testo in inglese, italiano, spagnolo, francese, tedesco; regole del testo anche in giapponese e cinese | |
+| PDF nativi, DOCX, XLSX, PPTX, XML | v0.3.x: file Office letti da Docling a livello `normal`, dopo averlo misurato su file reali |
+| Immagini e screenshot con OCR locale (PNG, JPEG, WEBP) | v0.3.x: un'immagine container pubblicata; il motore PDF scelto da un test su file reali |
+| Scansioni: scrittura a mano segnata, carta intestata ripetuta tolta | v0.4: cartelle, archivi ed email; configurazione guidata; profili di lavoro; un unico motore condiviso da tutte le interfacce |
+| Il livello `normal`: tabelle e impaginazioni dei PDF con Docling (installazione facoltativa) | v0.5: livello di motore `quality` (modello di visione, GPU) |
+| Riconoscimento di screenshot di chat e di codice | Più avanti: EPUB e pagine web, servizio in background, controllo delle cartelle |
+| Markdown, e chunk in JSON Lines per i database vettoriali; loader per LangChain e LlamaIndex | |
+| Ricevuta di conversione, controllata da `sugo verify` | |
+| Metriche dei token per provider (`sugo stats`) | |
+| Riga di comando, shell interattiva, server MCP per agenti, pagina web locale, API Python | |
+| Interfaccia e regole del testo in inglese, italiano, spagnolo, francese, tedesco; regole del testo anche in giapponese, cinese e coreano (modello OCR coreano scaricato su richiesta) | |
 
 Il piano completo è nella [roadmap](docs/ROADMAP.md) (in inglese).
 
@@ -211,6 +212,34 @@ Per LangChain e LlamaIndex ci sono loader pronti, che danno un documento per ogn
 pip install langchain-sugo            # from langchain_sugo import SugoLoader
 pip install llama-index-readers-sugo  # from llama_index.readers.sugo import SugoReader
 ```
+
+### Tabelle e impaginazioni complesse: il livello `normal`
+
+Di default Sugo lavora al livello `lite`: veloce, leggero e adatto alla maggior parte dei file. Per i PDF in cui contano tabelle e impaginazione, il livello `normal` legge le pagine PDF con [Docling](https://github.com/docling-project/docling), che ricostruisce le tabelle cella per cella. È un'installazione facoltativa di circa 1,3 GB, più 384 MB di modelli scaricati una volta sola:
+
+```bash
+# Solo Linux: prima PyTorch nella versione per CPU (da PyPI, pip
+# aggiungerebbe diversi GB di librerie NVIDIA che Sugo non usa)
+pip install "torch==2.14.1" "torchvision==0.29.1" --index-url https://download.pytorch.org/whl/cpu
+# Tutti i sistemi
+pip install "sugo-cli[normal]"
+sugo models pull normal      # fissati a un commit, verificati con SHA-256
+
+sugo convert relazione.pdf -l normal
+```
+
+Puoi anche scrivere `level = "normal"` in `[general]` nel file di configurazione, oppure usare `SUGO_LEVEL=normal`, `/level normal` nella shell, l'impostazione "Livello del motore" nella pagina web, o `sugo.convert(..., level="normal")`.
+
+Misure sulla macchina di riferimento (Intel i5-10300H, 4 core, senza GPU), su PDF in cinque lingue ([dettagli](docs/TESTING.md), in inglese):
+
+| | `lite` | `normal` |
+|---|---|---|
+| Righe di una tabella con bordi rimaste intere | 0 su 35 | **35 su 35** |
+| Testo perso | nessuno | nessuno |
+| Tempo per PDF | 0,3–0,4 s | 9–16 s per un file; circa 7 s l'uno se ne converti diversi insieme |
+| Memoria | circa 0,4 GB | circa 1,8 GB mentre Docling è caricato |
+
+`normal` è lento di proposito: usalo dove la struttura conta. La shell, la pagina web e le conversioni di più file tengono Docling caricato tra un PDF e l'altro e lo spengono dopo 5 minuti senza lavoro. Il server MCP usa il livello configurato, con un Docling nuovo per ogni documento, così nessun file può influire sul risultato di un altro. Docling gira in un processo separato con download, telemetria e servizi remoti spenti, e legge i modelli solo dalla cartella di Sugo (il processo in sé non è isolato dalla rete); il suo OCR è spento: pagine scansionate, immagini e file Office si leggono come a `lite`.
 
 ### Usarlo da un agente AI (MCP)
 
