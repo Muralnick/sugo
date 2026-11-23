@@ -312,6 +312,64 @@ def test_receipt_appears_inline_in_json_without_output() -> None:
     assert "receipt" not in no_receipt
 
 
+@pytest.fixture
+def asked_levels(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """The levels files are converted at; the conversion itself runs at lite.
+
+    ``convert_file`` (convert) and ``stats`` both end in ``pipeline.convert``.
+    """
+    from sugo.core import pipeline
+
+    levels: list[str] = []
+    convert = pipeline.convert
+
+    def spy(*args: object, level: str, **kwargs: object) -> object:
+        levels.append(level)
+        return convert(*args, level="lite", **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(pipeline, "convert", spy)
+    return levels
+
+
+@pytest.mark.usefixtures("workdir")
+def test_level_comes_from_the_option_then_the_configuration(
+    monkeypatch: pytest.MonkeyPatch, asked_levels: list[str]
+) -> None:
+    assert run("report.pdf").exit_code == ExitCode.OK
+    assert run("report.pdf", "--level", "normal").exit_code == ExitCode.OK
+    monkeypatch.setenv("SUGO_LEVEL", "normal")
+    assert run("report.pdf").exit_code == ExitCode.OK
+    assert run("report.pdf", "-l", "lite").exit_code == ExitCode.OK
+    assert run("stats", "report.pdf", "-l", "normal").exit_code == ExitCode.OK
+    assert asked_levels == ["lite", "normal", "normal", "lite", "normal"]
+
+
+@pytest.mark.usefixtures("workdir")
+@pytest.mark.parametrize("command", [["report.pdf"], ["stats", "report.pdf"]])
+def test_an_unknown_level_is_a_usage_error(
+    command: list[str], asked_levels: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("COLUMNS", "200")  # Rich would wrap the error box.
+    result = run(*command, "--level", "quality")
+    assert result.exit_code == ExitCode.USAGE
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", result.stderr)  # Rich colours in CI.
+    assert "unknown level quality; choose from lite, normal" in plain
+    assert asked_levels == []
+
+
+@pytest.mark.usefixtures("workdir")
+def test_normal_without_the_extra_says_what_to_install() -> None:
+    from importlib.util import find_spec
+
+    if find_spec("docling") is not None:
+        pytest.skip("the normal extra is installed here")
+    result = run("report.pdf", "--level", "normal", "--json")
+    assert result.exit_code == ExitCode.MISSING
+    document = json.loads(result.stdout)["documents"][0]
+    assert document["error"]["code"] == "LEVEL_MISSING"
+    assert document["error"]["hint"] == 'pip install "sugo-cli[normal]"'
+
+
 @pytest.mark.usefixtures("workdir")
 def test_verify_confirms_a_matching_receipt(workdir: Path) -> None:
     run("report.pdf", "-o", "out", "--receipt")

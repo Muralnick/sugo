@@ -176,6 +176,31 @@ def _interactive() -> bool:
     return True
 
 
+# --- engine level ---------------------------------------------------------------
+
+# The levels a command can ask for (ADR-071 §4); `quality` comes later.
+LEVELS = ("lite", "normal")
+_LEVEL_OPTION = typer.Option(
+    "--level",
+    "-l",
+    metavar="LEVEL",
+    help=N_("Engine level: lite, or normal to read PDFs with Docling."),
+    # Typer's own default line: brackets in a help text would be Rich markup.
+    show_default="general.level, lite",
+)
+
+
+def _check_level(level: str | None) -> None:
+    """Refuse an unknown --level before any work, like the other options."""
+    if level is not None and level not in LEVELS:
+        raise typer.BadParameter(
+            _("unknown level {level}; choose from {choices}").format(
+                level=_shown(level), choices=", ".join(LEVELS)
+            ),
+            param_hint="'--level'",
+        )
+
+
 # --- convert ------------------------------------------------------------------
 
 
@@ -233,6 +258,7 @@ def convert_command(
     no_cache: Annotated[
         bool, typer.Option("--no-cache", help=N_("Keep no page cache on disk."))
     ] = False,
+    level: Annotated[str | None, _LEVEL_OPTION] = None,
     json_output: Annotated[bool, typer.Option("--json", help=N_("Print one JSON object."))] = False,
 ) -> None:
     """Convert files; the help text is in the decorator, for translation."""
@@ -257,8 +283,10 @@ def convert_command(
         # A receipt has no sensible form mixed with plain Markdown on stdout (ADR-056).
         raise typer.BadParameter(_("--receipt needs -o or --json"), param_hint="'--receipt'")
     targets = None if output is None else _targets(files, output, chunks=chunks, receipt=receipt)
+    _check_level(level)
     with _failures(json_output):
         settings = _settings(quiet=json_output)
+        engine_level = level or settings.general.level
         chunk_tokens = (max_tokens or settings.chunking.max_tokens) if chunks else None
         _require_lite()
         from sugo.core import pipeline
@@ -280,6 +308,7 @@ def convert_command(
                             languages=settings.languages,
                             strip_tracking_urls=settings.cleaning.strip_tracking_urls,
                             receipt=receipt,
+                            level=engine_level,
                         )
                     written = (
                         None
@@ -452,10 +481,12 @@ def stats_command(
         list[str] | None,
         typer.Option("--provider", help=N_("Compare with this provider only; repeatable.")),
     ] = None,
+    level: Annotated[str | None, _LEVEL_OPTION] = None,
     json_output: Annotated[bool, typer.Option("--json", help=N_("Print one JSON object."))] = False,
 ) -> None:
     """Show savings per provider; the help text is in the decorator, for translation."""
     _english_for_json(json_output)
+    _check_level(level)
     from sugo.metrics.providers import list_providers
 
     available = list_providers()
@@ -490,6 +521,7 @@ def stats_command(
                 count_raw_tokens=True,
                 languages=settings.languages,
                 strip_tracking_urls=settings.cleaning.strip_tracking_urls,
+                level=level or settings.general.level,
             )
         estimate = estimate_savings(data, conversion, providers)
         if json_output:
