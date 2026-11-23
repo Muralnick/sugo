@@ -78,7 +78,7 @@ result = sugo.convert("annual-report.pdf", level="normal")
 # Linux only: first take PyTorch's CPU build from PyTorch's own index;
 # from PyPI, pip would pick the CUDA build and several GB of NVIDIA
 # libraries Sugo never uses.
-pip install "torch>=2.15,<2.16" --index-url https://download.pytorch.org/whl/cpu
+pip install "torch==2.14.1" "torchvision==0.29.1" --index-url https://download.pytorch.org/whl/cpu
 # Every system:
 pip install "sugo-cli[normal]"
 sugo models pull normal
