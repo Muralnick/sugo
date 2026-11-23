@@ -469,6 +469,10 @@ DOCLING_LOAD_TIMEOUT_S: Final = 180.0
 # Docling reads the whole file before the first page comes back: the wait for
 # it grows with the page count. Measured: 3.4 s per text page, 8.4 with tables.
 DOCLING_PAGE_TIMEOUT_S: Final = 60.0
+# A warm Docling worker (ADR-072): replaced after this many documents, or after
+# any failure, and stopped after this long without work, to return its memory.
+DOCLING_RECYCLE_DOCUMENTS: Final = 20
+DOCLING_IDLE_S: Final = 300.0
 OFFICE_MAX_MESSAGE_BYTES: Final = 64 * 1024 * 1024
 
 # --- Headers, footers and page numbers (roadmap step 5b, ADR-044) ------------

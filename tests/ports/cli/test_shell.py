@@ -221,6 +221,68 @@ def test_an_unknown_level_is_a_notice(
 
 
 @pytest.mark.usefixtures("workdir")
+def test_docling_stays_loaded_for_the_session(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # ADR-072: at normal, both files go through one shared Docling worker. Docling
+    # and its models are not installed here: the worker's read is a stand-in.
+    from sugo.core import pipeline
+    from sugo.core.models import Block, BlockType, Page, PageOrigin
+    from sugo.extractors.docling import extract
+
+    readers: list[object] = []
+
+    def read(self: extract.DoclingWorker, data: bytes, **options: object) -> list[Page]:
+        readers.append(self)
+        count = options["page_count"]
+        assert isinstance(count, int)
+        return [
+            Page(
+                index=n,
+                width=595,
+                height=842,
+                origin=PageOrigin.NATIVE,
+                blocks=(
+                    Block(
+                        id=f"p{n}-d0",
+                        type=BlockType.PARAGRAPH,
+                        text=f"Docling page {n}",
+                        origin_engine="docling",
+                    ),
+                ),
+            )
+            for n in range(count)
+        ]
+
+    monkeypatch.setattr(pipeline, "docling_installed", lambda: True)
+    monkeypatch.setattr(pipeline, "find_model", lambda card: object())
+    monkeypatch.setattr(pipeline, "verify_model", lambda installed: tmp_path)
+    monkeypatch.setattr(extract.DoclingWorker, "read", read)
+    output = run(capsys, "/cache off", "/level normal", "second.pdf", "second.pdf")
+    assert "Docling page 0" in output
+    assert len(readers) == 2
+    assert readers[0] is readers[1]
+    assert extract._shared_worker() is None
+
+
+@pytest.mark.usefixtures("workdir")
+def test_starting_the_shell_does_not_load_the_pipeline(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # The warm block is entered by the first conversion (#133 review).
+    import subprocess
+
+    probe = (
+        "import sys; from sugo.ports.cli import shell; shell.run_shell(lines=['/help', '/exit']);"
+        "print('sugo.core.pipeline' in sys.modules, file=sys.stderr)"
+    )
+    result = subprocess.run(  # noqa: S603 - fixed arguments, no shell
+        [sys.executable, "-c", probe], capture_output=True, text=True, check=True
+    )
+    assert result.stderr.strip().splitlines()[-1] == "False"
+
+
+@pytest.mark.usefixtures("workdir")
 def test_chunks_and_receipt_switch_on_for_the_next_files(
     workdir: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

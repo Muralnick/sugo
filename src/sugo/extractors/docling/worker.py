@@ -1,11 +1,13 @@
-"""Docling worker: reads one file with Docling in its own process (ADR-071).
+"""Docling worker: reads files with Docling in its own process (ADR-071, ADR-072).
 
 Started by ``sugo.extractors.docling.extract`` as
-``python -I -m sugo.extractors.docling.worker KIND ARTIFACTS``; reads the
-file from stdin and writes frames (``sugo.extractors.docling.protocol``) to
-a private copy of stdout. Docling parses untrusted files with native code
-and loads PyTorch models: running it here keeps a crash, a hang or a memory
-blow-up out of Sugo, and the time limits real.
+``python -I -m sugo.extractors.docling.worker KIND ARTIFACTS``; reads one
+file per frame from stdin, in turn, until stdin ends, and writes frames
+(``sugo.extractors.docling.protocol``) to a private copy of stdout. Docling
+and its models load once, for the first file; one file at a time is held.
+Docling parses untrusted files with native code and loads PyTorch models:
+running it here keeps a crash, a hang or a memory blow-up out of Sugo, and
+the time limits real.
 
 Before Docling is imported, every way it could reach the network is shut:
 Hugging Face and transformers run offline, the models come from Sugo's own
@@ -18,7 +20,7 @@ import os
 import sys
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import IO, Any
 
 from sugo.core.constants import (
     DOCLING_THREADS,
@@ -27,7 +29,7 @@ from sugo.core.constants import (
 )
 from sugo.extractors.docling.mapping import to_pages
 from sugo.extractors.docling.protocol import Message, Opened, PageRead, Refused, write_message
-from sugo.extractors.worker import limit_resources, private_stdout
+from sugo.extractors.worker import ProtocolError, limit_resources, private_stdout, read_frame
 
 # Set before Docling, transformers or huggingface_hub is imported.
 _OFFLINE_ENVIRONMENT = {
@@ -45,8 +47,22 @@ def main() -> None:
     os.environ.update(_OFFLINE_ENVIRONMENT)
     limit_resources(DOCLING_WORKER_MEMORY_BYTES)
     kind, artifacts = sys.argv[1], Path(sys.argv[2])
-    data = sys.stdin.buffer.read(MAX_PDF_FILE_BYTES + 1)
     with private_stdout() as out:
+        serve(sys.stdin.buffer, out, kind, artifacts)
+
+
+def serve(source: IO[bytes], out: IO[bytes], kind: str, artifacts: Path) -> None:
+    """Read documents, one frame each, until the input ends; answer each in turn.
+
+    A malformed or oversized frame ends the worker (ADR-072 §3).
+    """
+    while True:
+        try:
+            data = read_frame(source, MAX_PDF_FILE_BYTES)
+        except ProtocolError:
+            return
+        if data is None:
+            return
         for message in run(data, kind, artifacts):
             write_message(out, message)
 
@@ -70,10 +86,28 @@ def run(data: bytes, kind: str, artifacts: Path) -> Iterator[Message]:
         yield PageRead(page=page)
 
 
+# Built for the first file and kept: loading Docling and its models is most of
+# the cost of a small document (ADR-072).
+_converters: dict[Path, Any] = {}
+
+
 def _convert(data: bytes, kind: str, artifacts: Path) -> dict[str, Any]:
     """Docling's JSON export of the file."""
+    from docling.datamodel.base_models import DocumentStream
+
+    converter = _converters.get(artifacts)
+    if converter is None:
+        converter = _converters[artifacts] = _converter(artifacts)
+    stream = DocumentStream(name=f"input.{kind}", stream=io.BytesIO(data))
+    result = converter.convert(stream, raises_on_error=True)
+    exported: dict[str, Any] = result.document.export_to_dict()
+    return exported
+
+
+def _converter(artifacts: Path) -> Any:
+    """Docling's converter for PDFs, offline, with its OCR off."""
     import torch
-    from docling.datamodel.base_models import DocumentStream, InputFormat
+    from docling.datamodel.base_models import InputFormat
     from docling.datamodel.pipeline_options import PdfPipelineOptions, TableFormerMode
     from docling.document_converter import DocumentConverter, PdfFormatOption
 
@@ -86,14 +120,10 @@ def _convert(data: bytes, kind: str, artifacts: Path) -> dict[str, Any]:
     options.allow_external_plugins = False
     options.generate_page_images = False
     options.generate_picture_images = False
-    converter = DocumentConverter(
+    return DocumentConverter(
         allowed_formats=[InputFormat.PDF],
         format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=options)},
     )
-    stream = DocumentStream(name=f"input.{kind}", stream=io.BytesIO(data))
-    result = converter.convert(stream, raises_on_error=True)
-    exported: dict[str, Any] = result.document.export_to_dict()
-    return exported
 
 
 if __name__ == "__main__":

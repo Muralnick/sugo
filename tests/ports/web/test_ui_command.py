@@ -130,3 +130,23 @@ def test_ctrl_c_while_the_browser_opens_stops_cleanly(
     assert result.exit_code == 0
     assert "Stopped." in result.stderr
     assert served == []
+
+
+def test_docling_stays_loaded_while_the_server_runs(
+    served: list[WebServer], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # ADR-072: the page keeps one Docling worker between documents.
+    from sugo.extractors.docling import extract
+
+    seen: list[object] = []
+
+    def interrupted(self: WebServer, poll_interval: float = 0.5) -> None:
+        seen.append(extract._shared_worker())
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(WebServer, "serve_forever", interrupted)
+    result = CliRunner().invoke(cli.app, ["ui", "--no-browser"])
+    assert result.exit_code == 0, result.output
+    assert seen
+    assert seen[0] is not None
+    assert extract._shared_worker() is None

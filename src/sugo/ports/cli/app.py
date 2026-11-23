@@ -14,6 +14,7 @@ Messages and help follow ``ui.language`` (ADR-052); ``--json`` output and
 ``sugo mcp`` are always in English, for the programs and agents that read them.
 """
 
+import contextlib
 import hashlib
 import io
 import json
@@ -296,7 +297,12 @@ def convert_command(
         documents: list[dict[str, Any]] = []
         errors: list[PortError] = []
         partial = False
-        with _page_cache(enabled=not no_cache and settings.storage.cache == "persistent") as cache:
+        # Several files keep Docling loaded between them at `normal` (ADR-072).
+        warm = pipeline.warm_docling() if len(files) > 1 else contextlib.nullcontext()
+        with (
+            warm,
+            _page_cache(enabled=not no_cache and settings.storage.cache == "persistent") as cache,
+        ):
             for path in files:
                 source = path.as_posix()
                 try:
@@ -719,11 +725,13 @@ def ui_command(
     with _failures(json_output=False):
         settings = _settings(quiet=False)
         _require_lite()
+        from sugo.core import pipeline
         from sugo.ports.web.server import WebServer, converter
 
         # Ctrl+C is the normal way to stop, even while the browser is opening.
+        # Docling stays loaded while the page is in use (ADR-072).
         try:
-            with WebServer(converter(settings), settings) as server:
+            with pipeline.warm_docling(), WebServer(converter(settings), settings) as server:
                 if no_browser:
                     _write(server.url + "\n")
                     _stderr.print(_("Press Ctrl+C to stop."))
