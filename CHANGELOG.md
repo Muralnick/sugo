@@ -15,6 +15,11 @@ still change, with notice, before 1.0).
   `sugo.convert` now uses the configured level, `lite` by default. The
   command line, the shell, the web interface and the MCP server come next.
 
+- Receipts record the engine level (ADR-056 amendment): a receipt made at
+  `normal` has `"level": "normal"` and `schema_version` `"1.1"`, and
+  `sugo verify` converts again at that level. Receipts made at `lite` are
+  unchanged (`"1.0"`, no `level`).
+
 - The `normal` level, first part (ADR-071): `pip install "sugo-cli[normal]"`
   adds Docling with PyTorch for the CPU. With its models
   (`sugo models pull normal`), PDF pages with a text layer are read by

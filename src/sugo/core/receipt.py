@@ -16,12 +16,22 @@ much trust as Sugo's own process, re-checkable with ``sugo verify``.
 
 from typing import Annotated, Any, Final, Literal
 
-from pydantic import ConfigDict, Field
+from pydantic import (
+    ConfigDict,
+    Field,
+    SerializationInfo,
+    SerializerFunctionWrapHandler,
+    model_serializer,
+    model_validator,
+)
 
 from sugo.core.constants import SHA256_HEX_LENGTH
 from sugo.core.models import BlockFlag, BlockType, EditKind, NonEmptyStr, UnitInterval, _Model
 
 RECEIPT_SCHEMA_VERSION: Final = "1.0"
+# 1.1 adds ``level``, written only for a conversion that was not at lite, so
+# lite receipts stay exactly as in 1.0 (ADR-056 amendment, ADR-071).
+RECEIPT_SCHEMA_VERSION_LEVEL: Final = "1.1"
 RECEIPT_SCHEMA_ID: Final = (
     "https://raw.githubusercontent.com/Muralnick/sugo/main/schemas/receipt-v1.schema.json"
 )
@@ -79,7 +89,7 @@ class Receipt(_Model):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    schema_version: Literal["1.0"] = RECEIPT_SCHEMA_VERSION
+    schema_version: Literal["1.0", "1.1"] = RECEIPT_SCHEMA_VERSION
     source: NonEmptyStr | None
     source_sha256: _Sha256
     sugo_version: NonEmptyStr
@@ -93,14 +103,52 @@ class Receipt(_Model):
     removed: tuple[RemovalRecord, ...]
     edited: tuple[EditRecord, ...]
     flagged: tuple[FlaggedBlock, ...]
+    # The engine level when it was not lite; ``sugo verify`` converts again at
+    # the same level. Absent from lite receipts.
+    level: Literal["normal"] | None = None
+
+    @model_validator(mode="after")
+    def _version_matches_level(self) -> "Receipt":
+        expected = RECEIPT_SCHEMA_VERSION if self.level is None else RECEIPT_SCHEMA_VERSION_LEVEL
+        if self.schema_version != expected:
+            raise ValueError("schema_version 1.1 goes with a level, 1.0 without")
+        return self
+
+    @model_serializer(mode="wrap")
+    def _without_lite_level(  # type: ignore[no-untyped-def]
+        self, handler: SerializerFunctionWrapHandler, info: SerializationInfo
+    ):
+        # No return annotation on purpose: pydantic then keeps the model's own
+        # fields in the published JSON Schema instead of an untyped object.
+        data = handler(self)
+        if self.level is None and isinstance(data, dict):
+            data.pop("level", None)
+        return data
+
+    @property
+    def engine_level(self) -> str:
+        """The level the conversion ran at: ``lite`` unless recorded."""
+        return self.level or "lite"
 
 
 def receipt_json_schema() -> dict[str, Any]:
     """The JSON Schema of a receipt, as published in ``schemas/``."""
+    schema = Receipt.model_json_schema(mode="serialization")
+    # Written only when not lite, so neither required nor ever null.
+    schema["required"] = [name for name in schema["required"] if name != "level"]
+    schema["properties"]["level"] = {"const": "normal", "title": "Level", "type": "string"}
+    # The rule of ``_version_matches_level``: 1.1 with a level, 1.0 without.
+    schema["allOf"] = [
+        {
+            "if": {"properties": {"schema_version": {"const": "1.1"}}},
+            "then": {"required": ["level"]},
+            "else": {"not": {"required": ["level"]}},
+        }
+    ]
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": RECEIPT_SCHEMA_ID,
-        **Receipt.model_json_schema(mode="serialization"),
+        **schema,
     }
 
 

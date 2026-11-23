@@ -917,6 +917,48 @@ def made_receipt(server: WebServer, document: bytes) -> bytes:
     return str(response.json()["receipt_file"]).encode()
 
 
+def test_a_normal_receipt_is_verified_at_normal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Like sugo verify: converted again at the receipt's level (ADR-056 amendment).
+    import pymupdf
+
+    from sugo.core import pipeline
+    from sugo.core.models import Block, BlockType, Page, PageOrigin
+    from sugo.ports.web.server import receipt_verifier
+
+    def docling_pages(data: bytes, count: int) -> list[Page]:
+        return [
+            Page(
+                index=n,
+                width=595,
+                height=842,
+                origin=PageOrigin.NATIVE,
+                blocks=(
+                    Block(
+                        id=f"p{n}-d0",
+                        type=BlockType.PARAGRAPH,
+                        # Far longer than lite's line: a lite re-conversion differs.
+                        text=f"Docling page {n}: " + "layout and tables rebuilt. " * 20,
+                        origin_engine="docling",
+                    ),
+                ),
+            )
+            for n in range(count)
+        ]
+
+    monkeypatch.setenv(CACHE_DIR_ENV, str(tmp_path / "cache"))
+    monkeypatch.setattr(pipeline, "_docling_reader", lambda: docling_pages)
+    document = pymupdf.open()
+    document.new_page().insert_text((72, 100), "Lite reads this line.", fontsize=11)
+    pdf = document.tobytes()
+    made = pipeline.convert(pdf, level="normal", receipt=True).receipt
+    assert made is not None
+    options = Options(language="en", languages=("en",), strip_tracking_urls=True, chunk_tokens=None)
+    result = receipt_verifier(Settings())(made.model_dump_json().encode(), pdf, options)
+    assert result == {"match": True, "version_drifted": False, "differences": []}
+
+
 def test_a_receipt_verifies_like_sugo_verify(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
