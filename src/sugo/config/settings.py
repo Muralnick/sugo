@@ -39,6 +39,7 @@ MAX_CONFIG_BYTES = 1024 * 1024
 # Environment variables and the key each one sets.
 ENVIRONMENT: dict[str, tuple[str, str]] = {
     "SUGO_LANGUAGES": ("general", "languages"),
+    "SUGO_LEVEL": ("general", "level"),
     "SUGO_STRIP_TRACKING_URLS": ("cleaning", "strip_tracking_urls"),
     "SUGO_CHUNK_MAX_TOKENS": ("chunking", "max_tokens"),
     "SUGO_CACHE": ("storage", "cache"),
@@ -48,7 +49,6 @@ ENVIRONMENT: dict[str, tuple[str, str]] = {
 
 # Keys of the designed schema (ARCHITECTURE §14) that v0.1 does not use yet.
 _RESERVED: dict[str, frozenset[str] | None] = {
-    "general": frozenset({"level"}),
     "target": None,
     "cleaning": frozenset({"compression"}),
     "chunking": frozenset({"keep_tables_whole"}),
@@ -75,6 +75,8 @@ class _Section(BaseModel):
 class General(_Section):
     # None: the system's language and English (``default_languages``).
     languages: tuple[str, ...] | None = None
+    # Engine level (ADR-007, ADR-071); ``normal`` needs its extra and models.
+    level: Literal["lite", "normal"] = "lite"
 
     @field_validator("languages", mode="before")
     @classmethod

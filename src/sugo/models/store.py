@@ -118,29 +118,33 @@ def file_valid(card: ModelCard, file: ModelFile) -> bool:
 def _present(card: ModelCard, file: ModelFile) -> bool:
     path = file_path(card, file)
     try:
-        _check_folders(card, path)
+        _check_folders(path)
         info = path.lstat()
     except (OSError, StorageDirError):
         return False
     return stat.S_ISREG(info.st_mode) and info.st_size == file.size
 
 
-def _check_folders(card: ModelCard, path: Path) -> None:
-    """Check every folder from the file's own up to the model's, links included.
+def _check_folders(path: Path) -> None:
+    """Check every folder from the file's own up to the cache folder, links included.
 
     ``lstat`` does not follow the file itself, but it does follow a linked
-    folder on the way, which could lead a nested file outside the model tree.
+    folder on the way, which could lead a model file outside the cache. The
+    folders checked are the ones ``prepare`` creates private.
 
     Raises:
         FileNotFoundError: If a folder is missing.
-        StorageDirError: If a folder is a link, not a directory, or not the user's.
+        StorageDirError: If a folder is a link, not a directory, (on Linux
+            and macOS) not the user's, or the file is not inside the cache.
     """
-    root = model_dir(card)
+    top = cache_dir()
     folder = path.parent
     while True:
         check_plain_dir(folder)
-        if folder == root:
+        if folder == top:
             return
+        if folder == folder.parent:
+            raise StorageDirError("model file is not inside the cache folder")
         folder = folder.parent
 
 

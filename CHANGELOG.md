@@ -9,6 +9,12 @@ still change, with notice, before 1.0).
 
 ### Added
 
+- Choosing the `normal` level (ADR-071 §4), first part: `level` in
+  `[general]` (until now reserved) and `SUGO_LEVEL` take `lite` or `normal`;
+  `sugo.convert(..., level="normal")` in Python. Leaving `level` out of
+  `sugo.convert` now uses the configured level, `lite` by default. The
+  command line, the shell, the web interface and the MCP server come next.
+
 - Receipts record the engine level (ADR-056 amendment): a receipt made at
   `normal` has `"level": "normal"` and `schema_version` `"1.1"`, and
   `sugo verify` converts again at that level. Receipts made at `lite` are
@@ -18,8 +24,7 @@ still change, with notice, before 1.0).
   adds Docling with PyTorch for the CPU. With its models
   (`sugo models pull normal`), PDF pages with a text layer are read by
   Docling, which rebuilds tables; scanned pages are read as in `lite`.
-  Docling runs in its own process with no network. Choosing the level from
-  the command line and the settings comes next; Office files stay with
+  Docling runs in its own process with no network. Office files stay with
   Sugo's own reader for now.
 
 - The models of the coming `normal` level (ADR-071): `sugo models pull normal`
@@ -53,9 +58,12 @@ still change, with notice, before 1.0).
 ### Fixed
 
 - A downloaded model whose file is reached through a linked subfolder is
-  no longer accepted: every folder between the file and the model folder
-  must be a plain folder of the user's, at load time too, not only when the
-  model is downloaded (review of #120).
+  no longer accepted: every folder between the file and the cache folder
+  must be a plain folder (and, on Linux and macOS, the user's), at load time
+  too, not only when the model is downloaded (review of #120).
+- `sugo models install` refuses a bundle with an altered file even when that
+  model is already installed and valid, as ADR-070 says; before, the entry
+  was skipped without being checked.
 
 ## [0.2.2] - 2026-11-14
 

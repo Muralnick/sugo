@@ -153,11 +153,35 @@ def test_invalid_variables_are_named(
 
 
 def test_reserved_keys_only_warn(isolated: Path) -> None:
-    write(isolated, '[general]\nlevel = "normal"\n[privacy]\nanonymize = true\n[hardware]\n')
+    write(isolated, "[cleaning]\ncompression = 2\n[privacy]\nanonymize = true\n[hardware]\n")
     loaded = load()
     assert loaded.settings.cleaning == Settings().cleaning
     assert len(loaded.warnings) == 3
     assert all("not used in this version" in warning for warning in loaded.warnings)
+
+
+def test_level_from_the_file_and_the_environment(
+    isolated: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert load().settings.general.level == "lite"
+    write(isolated, '[general]\nlevel = "normal"\n')
+    loaded = load()
+    assert loaded.settings.general.level == "normal"
+    assert loaded.warnings == ()
+    monkeypatch.setenv("SUGO_LEVEL", "lite")
+    assert load().settings.general.level == "lite"
+
+
+@pytest.mark.parametrize("value", ["quality", "Normal"])
+def test_an_unknown_level_is_refused(
+    isolated: Path, monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    # "quality" is designed (ADR-007) but does not exist yet.
+    monkeypatch.setenv("SUGO_LEVEL", value)
+    with pytest.raises(ConfigError) as error:
+        load()
+    assert "SUGO_LEVEL" in str(error.value)
+    assert value not in str(error.value)
 
 
 def test_offline_mode_from_the_file_and_the_environment(
