@@ -72,14 +72,19 @@ except sugo.SugoError as error:
 result = sugo.convert("annual-report.pdf", level="normal")
 ```
 
-`level="normal"` reads PDF pages that have a text layer with Docling, which rebuilds layout and tables; scanned pages and other files are read as in `lite`. It needs the extra and its models, once:
+`level="normal"` reads PDF pages that have a text layer with Docling, which rebuilds layout and tables; scanned pages and other files are read as in `lite`. A PDF at `normal` needs the extra and its models, once:
 
 ```bash
+# Linux only: first take PyTorch's CPU build from PyTorch's own index;
+# from PyPI, pip would pick the CUDA build and several GB of NVIDIA
+# libraries Sugo never uses.
+pip install "torch>=2.15,<2.16" --index-url https://download.pytorch.org/whl/cpu
+# Every system:
 pip install "sugo-cli[normal]"
 sugo models pull normal
 ```
 
-Without the extra, `convert` raises `SugoError` with code `LEVEL_MISSING`; without the models, `MODEL_MISSING`. Leaving `level` out uses the configured level (`level` in `[general]`, or `SUGO_LEVEL`), which is `lite` unless you change it.
+For a PDF, `convert` raises `SugoError` with code `LEVEL_MISSING` without the extra, and `MODEL_MISSING` without the models. Other files need neither: they are read as in `lite`. Leaving `level` out uses the configured level (`level` in `[general]`, or `SUGO_LEVEL`), which is `lite` unless you change it.
 
 ## Settings and cache
 

@@ -19,8 +19,7 @@ still change, with notice, before 1.0).
   adds Docling with PyTorch for the CPU. With its models
   (`sugo models pull normal`), PDF pages with a text layer are read by
   Docling, which rebuilds tables; scanned pages are read as in `lite`.
-  Docling runs in its own process with no network. Choosing the level from
-  the command line and the settings comes next; Office files stay with
+  Docling runs in its own process with no network. Office files stay with
   Sugo's own reader for now.
 
 - The models of the coming `normal` level (ADR-071): `sugo models pull normal`

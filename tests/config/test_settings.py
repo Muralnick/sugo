@@ -181,6 +181,7 @@ def test_an_unknown_level_is_refused(
     with pytest.raises(ConfigError) as error:
         load()
     assert "SUGO_LEVEL" in str(error.value)
+    assert value not in str(error.value)
 
 
 def test_offline_mode_from_the_file_and_the_environment(
