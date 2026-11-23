@@ -22,7 +22,7 @@ import hashlib
 import json
 import os
 import zipfile
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 from sugo.models.errors import BundleInvalidError, ModelMissingError
@@ -178,11 +178,11 @@ def _extract(archive: zipfile.ZipFile, cards: list[ModelCard]) -> list[ModelCard
         for card in cards:
             with download_lock(card):
                 for file in card.files:
-                    # An installed file that passes its SHA-256 is kept and its
-                    # archive entry is not read: nothing from that entry reaches
-                    # the disk, so a tampered entry there cannot be installed.
-                    # Every entry that is extracted is hashed in ``_extract_one``.
                     if file_valid(card, file):
+                        # The installed copy is kept, but the bundle's entry is
+                        # still checked: an altered bundle is refused whole
+                        # (ADR-070), even when nothing from it would be written.
+                        _check_entry(archive, card, file)
                         continue
                     # A damaged copy is replaced by the bundle's.
                     parts.append((_extract_one(archive, card, file), file_path(card, file)))
@@ -199,23 +199,43 @@ def _extract_one(archive: zipfile.ZipFile, card: ModelCard, file: ModelFile) -> 
     part = final.with_name(final.name + PART_SUFFIX)
     # A leftover, or a planted link, is removed rather than written through.
     part.unlink(missing_ok=True)
+    try:
+        with part.open("wb") as target:
+            _read_entry(archive, card, file, target.write)
+    except BaseException:
+        part.unlink(missing_ok=True)
+        raise
+    return part
+
+
+def _check_entry(archive: zipfile.ZipFile, card: ModelCard, file: ModelFile) -> None:
+    """Read one entry only to check its size and SHA-256, writing nothing."""
+    _read_entry(archive, card, file, lambda _chunk: None)
+
+
+def _read_entry(
+    archive: zipfile.ZipFile,
+    card: ModelCard,
+    file: ModelFile,
+    sink: Callable[[bytes], object],
+) -> None:
+    """Stream one entry to ``sink``, capped at its registry size, then check its SHA-256.
+
+    Raises:
+        BundleInvalidError: If the entry is damaged, larger or smaller than
+            the registry says, or fails its SHA-256.
+    """
     digest = hashlib.sha256()
     written = 0
     try:
-        with archive.open(entry_name(card, file)) as source, part.open("wb") as target:
+        with archive.open(entry_name(card, file)) as source:
             while chunk := source.read(_CHUNK_BYTES):
                 written += len(chunk)
                 if written > file.size:
                     raise BundleInvalidError("an entry is larger than it declares")
                 digest.update(chunk)
-                target.write(chunk)
+                sink(chunk)
     except zipfile.BadZipFile:
-        part.unlink(missing_ok=True)
         raise BundleInvalidError("an entry is damaged") from None
-    except BaseException:
-        part.unlink(missing_ok=True)
-        raise
     if written != file.size or digest.hexdigest() != file.sha256:
-        part.unlink(missing_ok=True)
         raise BundleInvalidError("an entry does not match its SHA-256")
-    return part

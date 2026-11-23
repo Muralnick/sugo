@@ -263,6 +263,17 @@ class TestStore:
         assert store.find(TWO) is None
         assert not any(store.file_valid(TWO, file) for file in TWO.files)
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="POSIX symbolic links")
+    def test_a_linked_models_folder_is_refused(self, tmp_path: Path) -> None:
+        # The right file, but the whole models folder is a link out of the cache.
+        elsewhere = tmp_path / "elsewhere"
+        (elsewhere / CARD.folder).mkdir(parents=True)
+        (elsewhere / CARD.folder / "test.onnx").write_bytes(BODY)
+        store.ensure_private_dir(store.cache_dir())
+        os.symlink(elsewhere, store.models_dir())
+        assert store.find(CARD) is None
+        assert not store.file_valid(CARD, CARD.files[0])
+
     def test_the_same_files_in_plain_folders_are_found(self) -> None:
         store.prepare(TWO)
         model_file(TWO, 0).write_bytes(BODY)

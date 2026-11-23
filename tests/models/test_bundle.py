@@ -95,6 +95,17 @@ def test_hostile_bundles_install_nothing(
     assert not (tmp_path / "evil.py").exists()
 
 
+def test_an_altered_bundle_is_refused_even_when_the_model_is_installed(tmp_path: Path) -> None:
+    # The installed copy is valid, so nothing would be written; the bundle is
+    # still refused whole (ADR-070), and the installed copy is left as it was.
+    install_model()
+    path = hand_made(tmp_path / "bad.zip", {MANIFEST_NAME: manifest(), ENTRY: BODY[:-1] + b"!"})
+    with pytest.raises(BundleInvalidError, match="SHA-256"):
+        install_bundle(path)
+    assert model_file().read_bytes() == BODY
+    assert not list((tmp_path / "cache").rglob("*.part"))
+
+
 def test_a_compressed_bomb_is_refused_by_its_declared_size(tmp_path: Path) -> None:
     bomb = b"\0" * (len(BODY) * 50)
     path = hand_made(
