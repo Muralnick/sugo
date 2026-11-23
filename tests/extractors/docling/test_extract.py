@@ -43,7 +43,7 @@ def fake_worker(tmp_path: Path, body: str) -> list[str]:
             from sugo.core.models import Block, BlockType, Page, PageOrigin
             from sugo.extractors.docling.protocol import Opened, PageRead, Refused, write_message
             from sugo.extractors.worker import read_frame, write_frame
-            read_frame(sys.stdin.buffer, 10**9)  # one document (ADR-072 §3)
+            read_frame(sys.stdin.buffer, 10**9)  # one document, as a frame (ADR-072)
             out = sys.stdout.buffer
             def send(message):
                 write_message(out, message)
@@ -51,7 +51,9 @@ def fake_worker(tmp_path: Path, body: str) -> list[str]:
             page = Page(index=0, width=600, height=800, origin=PageOrigin.NATIVE, blocks=(block,))
             """
         )
-        + textwrap.dedent(body)
+        + textwrap.dedent(body),
+        # Python reads source as UTF-8; Windows would write its own code page.
+        encoding="utf-8",
     )
     return [sys.executable, str(script)]
 
@@ -171,7 +173,8 @@ def serving_worker(tmp_path: Path, fail_on: int = 0) -> list[str]:
                 write_message(out, Opened(pages=1))
                 write_message(out, PageRead(page=page))
             """
-        )
+        ),
+        encoding="utf-8",
     )
     return [sys.executable, str(script)]
 
