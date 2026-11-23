@@ -59,9 +59,20 @@ def _read_lines(markdown: str) -> list[str]:
 
 
 def _rows_intact(rows: tuple[tuple[str, ...], ...], markdown: str) -> int:
-    """Table rows whose cells all come out on one Markdown line, in any table format."""
+    """Table rows whose cells all come out on one Markdown line of their own, in order.
+
+    Rows are matched to distinct lines, each after the previous match, so a
+    table flattened onto a single line counts one row, not all of them.
+    """
     lines = [line.replace("\\", "") for line in markdown.splitlines()]
-    return sum(1 for cells in rows if any(all(cell in line for cell in cells) for line in lines))
+    intact, start = 0, 0
+    for cells in rows:
+        for index in range(start, len(lines)):
+            if all(cell in lines[index] for cell in cells):
+                intact += 1
+                start = index + 1
+                break
+    return intact
 
 
 def _bench_one(document: CorpusDocument, providers: list[str], level: str) -> dict[str, Any]:

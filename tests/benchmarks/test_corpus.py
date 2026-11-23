@@ -17,6 +17,7 @@ for _path in (_REPO_ROOT, _REPO_ROOT / "benchmarks"):
 import pytest  # noqa: E402
 from _text import character_error_rate  # type: ignore[import-not-found] # noqa: E402
 from corpus import CorpusDocument, synthetic_documents  # type: ignore[import-not-found] # noqa: E402
+from corpus_bench import _rows_intact  # type: ignore[import-not-found] # noqa: E402
 from corpus_eur_lex import (  # type: ignore[import-not-found] # noqa: E402
     CORPUS_DIR,
     eur_lex_documents,
@@ -77,3 +78,18 @@ def test_eur_lex_documents_are_empty_without_the_external_corpus(
 ) -> None:
     monkeypatch.setattr("corpus_eur_lex.CORPUS_DIR", tmp_path / "missing")
     assert eur_lex_documents() == []
+
+
+@pytest.mark.parametrize(
+    ("markdown", "intact"),
+    [
+        ("A|1\nB|2\nC|3", 3),
+        ("A 1 B 2 C 3", 1),  # flattened onto one line: one row, not all (#129 review)
+        ("C|3\nA|1\nB|2", 2),  # out of order
+        ("A\nB\nC\n1\n2\n3", 0),  # read column by column
+        ("A: 1.\nB: 2.\nC: 3.", 3),  # one sentence per row
+    ],
+)
+def test_rows_intact_needs_one_line_per_row_in_order(markdown: str, intact: int) -> None:
+    rows = (("A", "1"), ("B", "2"), ("C", "3"))
+    assert _rows_intact(rows, markdown) == intact
