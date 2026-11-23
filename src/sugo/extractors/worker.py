@@ -92,9 +92,13 @@ def _installed_in_user_site() -> bool:
 
 
 class WorkerProcess:
-    """A worker process reading one input, its frames read with a timeout."""
+    """A worker process reading one input, its frames read with a timeout.
 
-    def __init__(self, command: Sequence[str], data: bytes, *, max_frame_bytes: int) -> None:
+    With ``data`` None, inputs are sent later with ``send``, each as one frame,
+    so one process can read several of them in turn (ADR-072).
+    """
+
+    def __init__(self, command: Sequence[str], data: bytes | None, *, max_frame_bytes: int) -> None:
         # No shell: the command is a fixed list of arguments.
         self._process = subprocess.Popen(  # noqa: S603
             list(command),
@@ -105,7 +109,10 @@ class WorkerProcess:
         )
         self._max_frame_bytes = max_frame_bytes
         self._frames: queue.Queue[bytes | object] = queue.Queue(maxsize=_READ_AHEAD)
-        self._writer = threading.Thread(target=self._write, args=(data,), daemon=True)
+        self._inputs: queue.Queue[bytes | None] = queue.Queue()
+        target = self._write_frames if data is None else self._write
+        args = () if data is None else (data,)
+        self._writer = threading.Thread(target=target, args=args, daemon=True)
         self._reader = threading.Thread(target=self._read, daemon=True)
         self._writer.start()
         self._reader.start()
@@ -130,8 +137,17 @@ class WorkerProcess:
             raise WorkerError
         return item
 
+    def send(self, data: bytes) -> None:
+        """Send one more input, as a frame; only for a worker started without ``data``."""
+        self._inputs.put(data)
+
+    def alive(self) -> bool:
+        """Whether the worker process still runs."""
+        return self._process.poll() is None
+
     def close(self) -> None:
         """Stop the worker if it still runs and wait for both threads."""
+        self._inputs.put(None)
         if self._process.poll() is None:
             self._process.kill()
         self._process.wait()
@@ -154,6 +170,18 @@ class WorkerProcess:
             stdin.close()
         except OSError:
             pass  # The worker exited early; its output tells the reason.
+
+    def _write_frames(self) -> None:
+        stdin = self._process.stdin
+        if stdin is None:
+            return
+        try:
+            while (data := self._inputs.get()) is not None:
+                write_frame(stdin, data)
+        except OSError:
+            pass  # The worker exited; its output tells the reason.
+        with contextlib.suppress(OSError):
+            stdin.close()
 
     def _read(self) -> None:
         stdout = self._process.stdout

@@ -332,6 +332,29 @@ def asked_levels(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 
 
 @pytest.mark.usefixtures("workdir")
+@pytest.mark.parametrize(("files", "warm"), [(["report.pdf"], False), (["report.pdf"] * 2, True)])
+def test_several_files_keep_docling_loaded(
+    monkeypatch: pytest.MonkeyPatch, files: list[str], warm: bool
+) -> None:
+    # ADR-072: only a run on several files keeps the worker between them.
+    from sugo.core import pipeline
+    from sugo.extractors.docling import extract
+
+    seen: list[object] = []
+    real = pipeline.convert
+
+    def spy(*args: object, **kwargs: object) -> object:
+        seen.append(extract._shared_worker())
+        return real(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(pipeline, "convert", spy)
+    extra = ["-o", "out"] if len(files) > 1 else []
+    assert run(*files, *extra).exit_code == ExitCode.OK
+    assert [item is not None for item in seen] == [warm] * len(files)
+    assert extract._shared_worker() is None
+
+
+@pytest.mark.usefixtures("workdir")
 def test_level_comes_from_the_option_then_the_configuration(
     monkeypatch: pytest.MonkeyPatch, asked_levels: list[str]
 ) -> None:

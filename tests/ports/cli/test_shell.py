@@ -221,6 +221,29 @@ def test_an_unknown_level_is_a_notice(
 
 
 @pytest.mark.usefixtures("workdir")
+def test_docling_stays_loaded_for_the_session(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # ADR-072: the shell keeps one Docling worker between documents.
+    from sugo.core import pipeline
+    from sugo.extractors.docling import extract
+
+    seen: list[object] = []
+    real = pipeline.convert_file
+
+    def spy(*args: object, **kwargs: object) -> object:
+        seen.append(extract._shared_worker())
+        return real(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(pipeline, "convert_file", spy)
+    run(capsys, "second.pdf", "second.pdf")
+    assert len(seen) == 2
+    assert seen[0] is not None
+    assert seen[0] is seen[1]
+    assert extract._shared_worker() is None
+
+
+@pytest.mark.usefixtures("workdir")
 def test_chunks_and_receipt_switch_on_for_the_next_files(
     workdir: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

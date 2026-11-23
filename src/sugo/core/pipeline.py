@@ -58,6 +58,10 @@ from sugo.extractors.docling.extract import (
     docling_installed,
     extract_docling,
 )
+from sugo.extractors.docling.extract import (
+    # For the ports that keep Docling loaded between documents (ADR-072).
+    warm_docling as warm_docling,
+)
 from sugo.extractors.image.extract import extract_page
 from sugo.extractors.image.loader import UnsupportedImageError, detect_format
 from sugo.extractors.image.ocr_engine import (

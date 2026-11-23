@@ -725,6 +725,14 @@ def run_shell(lines: Iterable[str] | None = None) -> None:
         cli._require_lite()
     state = State(settings)
     _banner()
+    from sugo.core import pipeline
+
+    # Docling stays loaded while the shell is in use (ADR-072).
+    with pipeline.warm_docling():
+        _read_lines(state, lines)
+
+
+def _read_lines(state: State, lines: Iterable[str] | None) -> None:
     if lines is not None:
         for line in lines:
             try:

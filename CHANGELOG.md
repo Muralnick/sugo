@@ -9,6 +9,14 @@ still change, with notice, before 1.0).
 
 ### Added
 
+- A warm Docling worker (ADR-072): at `normal`, the shell, `sugo ui` and
+  `sugo convert` on several files keep Docling loaded between PDFs instead
+  of starting it for each one, about twice as fast on a run of small PDFs
+  (5 table PDFs: 35 s instead of about 73 s). The worker is replaced after
+  any failure and every 20 documents, and stops after 5 minutes without
+  work, returning its memory. The MCP server keeps a fresh worker per
+  document, so no file can affect another's result.
+
 - Choosing the `normal` level (ADR-071 §4): `level` in `[general]` (until
   now reserved) and `SUGO_LEVEL` take `lite` or `normal`;
   `sugo convert` and `sugo stats` take `--level` / `-l`; the shell has
