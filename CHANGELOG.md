@@ -7,7 +7,13 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-23
+
 ### Added
+
+- `langchain-sugo` 0.1.2 and `llama-index-readers-sugo` 0.1.2: no change in
+  the loaders; they accept `sugo-cli` 0.3 (`>=0.2.1,<0.4`), which 0.1.1
+  excluded (`<0.3`).
 
 - A warm Docling worker (ADR-072): at `normal`, the shell, `sugo ui` and
   `sugo convert` on several files keep Docling loaded between PDFs instead
@@ -36,10 +42,11 @@ still change, with notice, before 1.0).
   adds Docling with PyTorch for the CPU. With its models
   (`sugo models pull normal`), PDF pages with a text layer are read by
   Docling, which rebuilds tables; scanned pages are read as in `lite`.
-  Docling runs in its own process with no network. Office files stay with
+  Docling runs in its own process with downloads, telemetry and remote
+  services off, reading its models only from Sugo's folder. Office files stay with
   Sugo's own reader for now.
 
-- The models of the coming `normal` level (ADR-071): `sugo models pull normal`
+- The models of the `normal` level (ADR-071): `sugo models pull normal`
   downloads Docling's layout model and table model (384 MB, from Hugging Face,
   pinned to a commit and checked by SHA-256). A model can now have several
   files; they are kept in the folder layout Docling reads.
