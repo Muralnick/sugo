@@ -12,7 +12,8 @@ settings come as one header each, checked against the known values; the
 server keeps nothing between conversions and writes nothing to disk. The
 file's name, never a path, may come percent-encoded in ``X-Sugo-Name``: it
 names the receipt's ``source`` and is never logged (ADR-059).
-``X-Sugo-Cache: off`` converts without the page cache. ``/api/doctor`` runs
+``X-Sugo-Cache: off`` converts without the page cache; ``X-Sugo-Level``
+picks the engine level, ``lite`` or ``normal`` (ADR-071 §4). ``/api/doctor`` runs
 the read-only installation checks of ``sugo doctor``; it is a POST with an
 empty body, because browsers send ``Origin`` with POST but not always with a
 same-origin GET. ``/api/verify`` takes a receipt and its document in one
@@ -101,6 +102,9 @@ RECEIPT_HEADER = "X-Sugo-Receipt"
 NAME_HEADER = "X-Sugo-Name"
 # Only "off": the page can turn the cache off, never on against the configuration.
 CACHE_HEADER = "X-Sugo-Cache"
+# ADR-071 §4: "lite" or "normal"; absent, the configured level.
+LEVEL_HEADER = "X-Sugo-Level"
+_LEVELS = ("lite", "normal")
 # How many bytes at the start of a verify request are the receipt.
 RECEIPT_LENGTH_HEADER = "X-Sugo-Receipt-Length"
 _BOOLEANS = {"true": True, "false": False}
@@ -127,6 +131,8 @@ class Options:
     source: str | None = None
     # False keeps no page cache on disk for this conversion (as --no-cache).
     cache: bool = True
+    # The engine level; None uses the configured one (ADR-071 §4).
+    level: str | None = None
 
 
 # Turns a file's bytes into the JSON the page shows.
@@ -387,6 +393,9 @@ class _Handler(BaseHTTPRequestHandler):
         cache = self._single(CACHE_HEADER)
         if cache is not None and cache != "off":
             raise _Refused(HTTPStatus.BAD_REQUEST)
+        level = self._single(LEVEL_HEADER)
+        if level is not None and level not in _LEVELS:
+            raise _Refused(HTTPStatus.BAD_REQUEST)
         return Options(
             language=language,
             languages=languages,
@@ -397,6 +406,7 @@ class _Handler(BaseHTTPRequestHandler):
             receipt=receipt is not None and _BOOLEANS[receipt],
             source=None if name is None else _file_name(name),
             cache=cache is None,
+            level=level,
         )
 
     def _single(self, name: str) -> str | None:
@@ -514,8 +524,8 @@ def converter(settings: Settings) -> Converter:
                 strip_tracking_urls=options.strip_tracking_urls,
                 receipt=options.receipt,
                 source=options.source,
-                # The configured level (ADR-071 §4); the page has no control for it yet.
-                level=settings.general.level,
+                # The page's choice, else the configured level (ADR-071 §4).
+                level=options.level or settings.general.level,
             )
         estimate = estimate_savings(data, conversion, list_providers())
         # Kind, pages and token counts come from the estimate.

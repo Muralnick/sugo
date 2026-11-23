@@ -153,6 +153,11 @@ _TEXTS = {
     "text_languages": N_("Languages of your documents"),
     "text_languages_help": N_("Sugo applies their text rules when cleaning. Choose at least one."),
     "strip_tracking": N_("Remove tracking parameters from links (utm_source and similar)"),
+    "level": N_("Engine level"),
+    "level_lite": N_("lite: fast, for most files"),
+    "level_normal": N_(
+        "normal: Docling for PDF layouts and tables; slower, needs sugo-cli[normal]"
+    ),
     "make_chunks": N_("Also split into chunks for RAG"),
     "keep_cache": N_(
         "Keep a cache on disk: faster next time, but it holds the text of converted documents"
@@ -303,6 +308,7 @@ def defaults(settings: Settings, language: str) -> dict[str, Any]:
         "ui_language": language,
         "languages": list(settings.languages),
         "strip_tracking_urls": settings.cleaning.strip_tracking_urls,
+        "level": settings.general.level,
         "chunks": False,
         "receipt": False,
         "cache": settings.storage.cache == "persistent",

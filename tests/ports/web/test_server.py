@@ -4,6 +4,7 @@ Requests are written by hand on a raw socket, so the tests can send what a
 browser never would: a wrong ``Host``, two tokens, no ``Content-Length``.
 """
 
+import dataclasses
 import json
 import logging
 import re
@@ -30,6 +31,7 @@ from sugo.ports.web.server import (
     DOCTOR_PATH,
     LANGUAGE_HEADER,
     LANGUAGES_HEADER,
+    LEVEL_HEADER,
     NAME_HEADER,
     RECEIPT_HEADER,
     RECEIPT_LENGTH_HEADER,
@@ -262,12 +264,15 @@ def test_texts_reach_the_page_escaped_in_every_language() -> None:
 
 
 def test_the_page_starts_from_the_users_configuration() -> None:
-    settings = Settings(general=General(languages=("de", "it")), chunking=Chunking(max_tokens=256))
+    settings = Settings(
+        general=General(languages=("de", "it"), level="normal"), chunking=Chunking(max_tokens=256)
+    )
     data = page_data(render_page(settings, "en"))
     assert data["defaults"] == {
         "ui_language": "en",
         "languages": ["de", "it"],
         "strip_tracking_urls": True,
+        "level": "normal",
         "chunks": False,
         "chunk_tokens": 256,
         "receipt": False,
@@ -605,6 +610,9 @@ def test_the_page_settings_reach_the_conversion(server: WebServer, recorder: Rec
         (CACHE_HEADER, "on"),
         (CACHE_HEADER, "OFF"),
         (CACHE_HEADER, ""),
+        (LEVEL_HEADER, "quality"),
+        (LEVEL_HEADER, "Normal"),
+        (LEVEL_HEADER, ""),
     ],
 )
 def test_an_unknown_setting_is_refused(
@@ -819,6 +827,36 @@ def test_the_page_can_turn_the_cache_off(server: WebServer, recorder: Recorder) 
     assert request(server, "POST", CONVERT_PATH, headers=headers, body=body).status == 200
     assert upload(server).status == 200
     assert [options.cache for options in recorder.options] == [False, True]
+
+
+def test_the_page_can_choose_the_level(server: WebServer, recorder: Recorder) -> None:
+    body = b"%PDF"
+    for level in ("normal", "lite"):
+        headers = [*api_headers(server, body), (LEVEL_HEADER, level)]
+        assert request(server, "POST", CONVERT_PATH, headers=headers, body=body).status == 200
+    assert upload(server).status == 200
+    assert [options.level for options in recorder.options] == ["normal", "lite", None]
+
+
+def test_the_page_level_wins_over_the_configured_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sugo.core import pipeline
+
+    asked: list[str] = []
+    real = pipeline.convert
+
+    def spy(*args: object, level: str, **kwargs: object) -> object:
+        asked.append(level)
+        return real(*args, level="lite", **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setenv(CACHE_DIR_ENV, str(tmp_path / "cache"))
+    monkeypatch.setattr(pipeline, "convert", spy)
+    settings = Settings(general=General(level="normal"))
+    options = Options(language="en", languages=("en",), strip_tracking_urls=True, chunk_tokens=None)
+    converter(settings)(NOTE, dataclasses.replace(options, level="lite"))
+    converter(settings)(NOTE, options)
+    assert asked == ["lite", "normal"]
 
 
 def test_without_cache_nothing_is_written(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
