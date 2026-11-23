@@ -49,7 +49,7 @@ def test_convert_signature_is_the_contract() -> None:
         ("max_tokens", inspect.Parameter.KEYWORD_ONLY, None),
         ("receipt", inspect.Parameter.KEYWORD_ONLY, False),
         ("cache", inspect.Parameter.KEYWORD_ONLY, "ephemeral"),
-        ("level", inspect.Parameter.KEYWORD_ONLY, "lite"),
+        ("level", inspect.Parameter.KEYWORD_ONLY, None),
     ]
 
 
@@ -146,6 +146,75 @@ def test_invalid_settings_raise_config_invalid(
     assert caught.value.code == "CONFIG_INVALID"
 
 
+class TestLevel:
+    @pytest.fixture
+    def asked(self, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+        from sugo.core import pipeline
+
+        levels: list[str] = []
+        real = pipeline.convert
+
+        def spy(*args: object, level: str, **kwargs: object) -> object:
+            levels.append(level)
+            return real(*args, level="lite", **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(pipeline, "convert", spy)
+        return levels
+
+    def test_lite_by_default(self, report: Path, asked: list[str]) -> None:
+        sugo.convert(report)
+        assert asked == ["lite"]
+
+    def test_none_follows_the_configuration(
+        self, report: Path, asked: list[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SUGO_LEVEL", "normal")
+        sugo.convert(report)
+        assert asked == ["normal"]
+
+    def test_the_argument_wins_over_the_configuration(
+        self, report: Path, asked: list[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SUGO_LEVEL", "normal")
+        sugo.convert(report, level="lite")
+        monkeypatch.setenv("SUGO_LEVEL", "lite")
+        sugo.convert(report, level="normal")
+        assert asked == ["lite", "normal"]
+
+    def test_normal_without_its_models_says_what_to_pull(
+        self, report: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from sugo.core import pipeline
+        from sugo.models.errors import ModelMissingError
+
+        def no_models() -> None:
+            raise ModelMissingError("normal")
+
+        monkeypatch.setattr(pipeline, "_docling_reader", no_models)
+        with pytest.raises(SugoError) as caught:
+            sugo.convert(report, level="normal")
+        assert caught.value.code == "MODEL_MISSING"
+        assert caught.value.hint == "sugo models pull normal"
+
+    def test_normal_without_the_extra_says_what_to_install(self, report: Path) -> None:
+        # The development environment has no ``normal`` extra, as in CI.
+        from importlib.util import find_spec
+
+        if find_spec("docling") is not None:
+            pytest.skip("the normal extra is installed here")
+        with pytest.raises(SugoError) as caught:
+            sugo.convert(report, level="normal")
+        assert caught.value.code == "LEVEL_MISSING"
+        assert caught.value.hint == 'pip install "sugo-cli[normal]"'
+
+    def test_a_file_that_is_not_a_pdf_needs_nothing_more_at_normal(self) -> None:
+        # Docling reads only PDF pages; other files are read as in lite (ADR-071 §5).
+        result = sugo.convert(
+            b"<note><to>Ann</to><body>See you at noon.</body></note>", name="n.xml", level="normal"
+        )
+        assert "noon" in result.markdown
+
+
 def test_a_missing_path_raises_os_error(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         sugo.convert(tmp_path / "missing.pdf")
@@ -159,7 +228,7 @@ def test_a_missing_path_raises_os_error(tmp_path: Path) -> None:
         ({"source": b"x", "chunks": True, "max_tokens": 1}, ValueError),
         ({"source": b"x", "chunks": True, "max_tokens": 1_000_000}, ValueError),
         ({"source": b"x", "cache": "disk"}, ValueError),
-        ({"source": b"x", "level": "normal"}, ValueError),
+        ({"source": b"x", "level": "quality"}, ValueError),
     ],
 )
 def test_wrong_arguments_fail_before_any_work(arguments: dict[str, object], error: type) -> None:

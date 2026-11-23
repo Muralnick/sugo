@@ -23,9 +23,9 @@ if TYPE_CHECKING:
 _log = logging.getLogger(__name__)
 
 CacheMode = Literal["ephemeral", "user"]
-Level = Literal["lite"]
+Level = Literal["lite", "normal"]
 _CACHE_MODES = ("ephemeral", "user")
-_LEVELS = ("lite",)
+_LEVELS = ("lite", "normal")
 
 
 class SugoError(Exception):
@@ -101,7 +101,7 @@ def convert(
     max_tokens: int | None = None,
     receipt: bool = False,
     cache: CacheMode = "ephemeral",
-    level: Level = "lite",
+    level: Level | None = None,
 ) -> Result:
     """Convert one file into compact Markdown, and into chunks if asked.
 
@@ -116,7 +116,10 @@ def convert(
         cache: "ephemeral" uses a temporary page cache deleted after the call,
             so no document text stays on disk; "user" uses the user's
             persistent page cache, like the CLI, which is faster on repeated loads.
-        level: The engine level; only "lite" exists in this version.
+        level: The engine level (ADR-071): "lite", or "normal" to read PDF
+            text pages with Docling, which needs ``sugo-cli[normal]`` and
+            ``sugo models pull normal``. None uses the configured level
+            (``general.level``, ``SUGO_LEVEL``), "lite" by default.
 
     Raises:
         SugoError: If Sugo refuses the file or the settings are not valid.
@@ -127,7 +130,13 @@ def convert(
     _check_arguments(source, chunks=chunks, max_tokens=max_tokens, cache=cache, level=level)
     try:
         return _convert(
-            source, name=name, chunks=chunks, max_tokens=max_tokens, receipt=receipt, cache=cache
+            source,
+            name=name,
+            chunks=chunks,
+            max_tokens=max_tokens,
+            receipt=receipt,
+            cache=cache,
+            level=level,
         )
     except (SugoError, OSError):
         raise
@@ -139,11 +148,11 @@ def convert(
 
 
 def _check_arguments(
-    source: object, *, chunks: bool, max_tokens: int | None, cache: str, level: str
+    source: object, *, chunks: bool, max_tokens: int | None, cache: str, level: str | None
 ) -> None:
     if not isinstance(source, str | os.PathLike | bytes):
         raise TypeError(f"source must be a path or bytes, not {type(source).__name__}")
-    if level not in _LEVELS:
+    if level is not None and level not in _LEVELS:
         raise ValueError(f"level must be one of {_LEVELS}, not {level!r}")
     if cache not in _CACHE_MODES:
         raise ValueError(f"cache must be one of {_CACHE_MODES}, not {cache!r}")
@@ -164,6 +173,7 @@ def _convert(
     max_tokens: int | None,
     receipt: bool,
     cache: CacheMode,
+    level: Level | None,
 ) -> Result:
     from sugo.chunkers.sections import document_id
     from sugo.core import pipeline
@@ -186,6 +196,7 @@ def _convert(
             languages=settings.languages,
             strip_tracking_urls=settings.cleaning.strip_tracking_urls,
             receipt=receipt,
+            level=level or settings.general.level,
         )
     return Result(
         markdown=conversion.markdown,

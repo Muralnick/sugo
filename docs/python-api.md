@@ -66,6 +66,21 @@ except sugo.SugoError as error:
 
 `SugoError.code` is the same stable code the CLI and the MCP server use, such as `PDF_ENCRYPTED` or `INPUT_UNSUPPORTED`. Match on the code: the message may be translated. A path that cannot be read raises `OSError`, and wrong arguments raise `ValueError` or `TypeError`.
 
+## Engine level
+
+```python
+result = sugo.convert("annual-report.pdf", level="normal")
+```
+
+`level="normal"` reads PDF pages that have a text layer with Docling, which rebuilds layout and tables; scanned pages and other files are read as in `lite`. It needs the extra and its models, once:
+
+```bash
+pip install "sugo-cli[normal]"
+sugo models pull normal
+```
+
+Without the extra, `convert` raises `SugoError` with code `LEVEL_MISSING`; without the models, `MODEL_MISSING`. Leaving `level` out uses the configured level (`level` in `[general]`, or `SUGO_LEVEL`), which is `lite` unless you change it.
+
 ## Settings and cache
 
 - `convert` uses the same settings as the `sugo` command: your user configuration file, a `sugo.toml` in the current folder, and `SUGO_*` environment variables. Arguments override them.
