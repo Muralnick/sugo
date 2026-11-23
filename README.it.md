@@ -239,7 +239,7 @@ Misure sulla macchina di riferimento (Intel i5-10300H, 4 core, senza GPU), su PD
 | Tempo per PDF | 0,3–0,4 s | 9–16 s per un file; circa 7 s l'uno se ne converti diversi insieme |
 | Memoria | circa 0,4 GB | circa 1,8 GB mentre Docling è caricato |
 
-`normal` è lento di proposito: usalo dove la struttura conta. La shell, la pagina web e le conversioni di più file tengono Docling caricato tra un PDF e l'altro e lo spengono dopo 5 minuti senza lavoro. Il server MCP usa il livello configurato, con un Docling nuovo per ogni documento, così nessun file può influire sul risultato di un altro. Docling gira in un processo separato e senza rete, e il suo OCR è spento: pagine scansionate, immagini e file Office si leggono come a `lite`.
+`normal` è lento di proposito: usalo dove la struttura conta. La shell, la pagina web e le conversioni di più file tengono Docling caricato tra un PDF e l'altro e lo spengono dopo 5 minuti senza lavoro. Il server MCP usa il livello configurato, con un Docling nuovo per ogni documento, così nessun file può influire sul risultato di un altro. Docling gira in un processo separato con download, telemetria e servizi remoti spenti, e legge i modelli solo dalla cartella di Sugo (il processo in sé non è isolato dalla rete); il suo OCR è spento: pagine scansionate, immagini e file Office si leggono come a `lite`.
 
 ### Usarlo da un agente AI (MCP)
 

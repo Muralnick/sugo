@@ -242,7 +242,7 @@ Measured on the reference machine (Intel i5-10300H, 4 cores, no GPU) on PDFs in 
 | Time per PDF | 0.3–0.4 s | 9–16 s for one file; about 7 s each when several are converted together |
 | Memory | about 0.4 GB | about 1.8 GB while Docling is loaded |
 
-`normal` is slow on purpose: use it where structure matters. The shell, the web page and multi-file runs keep Docling loaded between PDFs and stop it after 5 minutes without work. The MCP server uses the configured level, with a fresh Docling for each document, so no file can affect another's result. Docling runs in its own process with no network, and its OCR is off: scanned pages, images and Office files are read as at `lite`.
+`normal` is slow on purpose: use it where structure matters. The shell, the web page and multi-file runs keep Docling loaded between PDFs and stop it after 5 minutes without work. The MCP server uses the configured level, with a fresh Docling for each document, so no file can affect another's result. Docling runs in its own process with its downloads, telemetry and remote services turned off, and reads its models only from Sugo's folder (the process itself is not cut off from the network); its OCR is off: scanned pages, images and Office files are read as at `lite`.
 
 ### Use it from an AI agent (MCP)
 
