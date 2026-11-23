@@ -346,10 +346,14 @@ def test_level_comes_from_the_option_then_the_configuration(
 
 @pytest.mark.usefixtures("workdir")
 @pytest.mark.parametrize("command", [["report.pdf"], ["stats", "report.pdf"]])
-def test_an_unknown_level_is_a_usage_error(command: list[str], asked_levels: list[str]) -> None:
+def test_an_unknown_level_is_a_usage_error(
+    command: list[str], asked_levels: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("COLUMNS", "200")  # Rich would wrap the error box.
     result = run(*command, "--level", "quality")
     assert result.exit_code == ExitCode.USAGE
-    assert "unknown level quality; choose from lite, normal" in result.stderr
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", result.stderr)  # Rich colours in CI.
+    assert "unknown level quality; choose from lite, normal" in plain
     assert asked_levels == []
 
 

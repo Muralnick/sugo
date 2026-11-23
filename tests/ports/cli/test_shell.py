@@ -172,10 +172,32 @@ def asked_levels(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 def test_level_switches_for_the_next_files(
     capsys: pytest.CaptureFixture[str], asked_levels: list[str]
 ) -> None:
-    output = run(capsys, "/level", "second.pdf", "/level normal", "second.pdf", "/level LITE")
+    output = run(
+        capsys, "/level", "second.pdf", "/level normal", "second.pdf", "/level LITE", "second.pdf"
+    )
     assert "Level: lite" in output
     assert "Level: normal" in output
-    assert asked_levels == ["lite", "normal"]
+    assert asked_levels == ["lite", "normal", "lite"]
+
+
+@pytest.mark.usefixtures("workdir")
+def test_explain_converts_again_at_the_files_level(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # /explain makes a receipt by converting again: at the level the file was
+    # converted at, even if /level changed since (#126 review).
+    from sugo.core import pipeline
+
+    asked: list[str] = []
+    real = pipeline.convert
+
+    def spy(*args: object, level: str, **kwargs: object) -> object:
+        asked.append(level)
+        return real(*args, level="lite", **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(pipeline, "convert", spy)
+    run(capsys, "/level normal", "second.pdf", "/level lite", "/explain")
+    assert asked == ["normal", "normal"]
 
 
 @pytest.mark.usefixtures("workdir")
