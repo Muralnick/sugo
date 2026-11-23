@@ -90,6 +90,8 @@ class Result:
     conversion: "Conversion"
     # The clipboard image's bytes; a file is read again when needed.
     data: bytes | None = None
+    # The engine level it was converted at, reused when /explain converts again.
+    level: str = "lite"
 
 
 @dataclass
@@ -249,7 +251,7 @@ def _convert_files(state: State, names: list[str]) -> None:
                     raise
                 cli._say_error(failure, source=source)
                 continue
-            result = Result(source, path, conversion)
+            result = Result(source, path, conversion, level=state.level)
             _show(result)
             results.append(result)
     if results:
@@ -463,8 +465,9 @@ def _with_receipt(state: State, result: Result) -> Result:
             languages=settings.languages,
             strip_tracking_urls=settings.cleaning.strip_tracking_urls,
             receipt=True,
+            level=result.level,
         )
-    updated = Result(result.source, result.path, conversion, result.data)
+    updated = Result(result.source, result.path, conversion, result.data, result.level)
     state.last = [updated if item is result else item for item in state.last]
     return updated
 
