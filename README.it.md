@@ -115,7 +115,7 @@ Limiti da tenere presenti: il corpus è piccolo e per lo più sintetico, ed è s
 | Funziona oggi | In arrivo |
 |---|---|
 | PDF nativi, DOCX, XLSX, PPTX, XML | v0.3.x: file Office letti da Docling a livello `normal`, dopo averlo misurato su file reali |
-| Immagini e screenshot con OCR locale (PNG, JPEG, WEBP) | v0.3.x: un'immagine container pubblicata; il motore PDF scelto da un test su file reali |
+| Immagini e screenshot con OCR locale (PNG, JPEG, WEBP) | v0.3.x: un'immagine container pubblicata |
 | Scansioni: scrittura a mano segnata, carta intestata ripetuta tolta | v0.4: cartelle, archivi ed email; configurazione guidata; profili di lavoro; un unico motore condiviso da tutte le interfacce |
 | Il livello `normal`: tabelle e impaginazioni dei PDF con Docling (installazione facoltativa) | v0.5: livello di motore `quality` (modello di visione, GPU) |
 | Riconoscimento di screenshot di chat e di codice | Più avanti: EPUB e pagine web, servizio in background, controllo delle cartelle |
