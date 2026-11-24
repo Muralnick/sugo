@@ -59,15 +59,18 @@ severity the default is still to wait; the maintainer decides.
 
 1. The advisory names the version as fixed, or the upstream project says
    so in its release notes.
-2. The release comes from the project's usual source: the same PyPI
-   project and publisher, a matching tag in the upstream repository, and
-   its usual attestations or signatures if it publishes them.
+2. The release comes from the project's usual source, checked against
+   the index recorded for the package in `uv.lock`, not PyPI alone: the
+   same project and publisher on that index (PyPI for most packages, the
+   PyTorch index for `torch` and `torchvision` on Linux, ADR-071), a
+   matching tag in the upstream repository, and its usual attestations or
+   signatures if it publishes them.
 3. The changes from the version in `uv.lock` are reviewed: they contain
    the fix and nothing unexpected (new install-time code, new network
    access, obfuscated or binary-only changes without source).
 4. The licence is unchanged and still on the allow-list.
 
-**Scope.** Only the named package, and only up to the fixed release: the
+**Scope.** Only the named package, and only the checked release. The
 exception is a timestamp just after that release's upload time, in
 `pyproject.toml`:
 
@@ -78,7 +81,13 @@ exclude-newer-package = { pymupdf = "2026-11-24T12:00:00Z" }
 ```
 
 uv records it in `uv.lock` (`[options.exclude-newer-package]`), so the
-exception is visible in review. Newer releases of that package, and its
+exception is visible in review. The timestamp filters by upload time, not
+by version number: it also admits any other release of that package
+uploaded in the last 14 days (for example a newer major version uploaded
+before a backported fix). The pull request therefore shows that `uv.lock`
+resolves exactly the checked version; when it does not, the version is
+pinned too (`constraint-dependencies = ["pymupdf==1.2.3"]` under
+`[tool.uv]`), and the pin is removed with the timestamp. Newer releases of that package, and its
 other dependencies, still wait 14 days; if the fix needs a new version of
 another package, that package goes through the same checks. If a later
 advisory hits the same package while the entry is still there, its fix is

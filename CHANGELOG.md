@@ -12,7 +12,9 @@ still change, with notice, before 1.0).
 - Dependency policy (ADR-035 amendment): a release that fixes a published
   vulnerability affecting Sugo may skip the 14-day minimum age, for that
   package and release only, after checking its source and its changes;
-  `exclude-newer-package` in `pyproject.toml` records the exception.
+  `exclude-newer-package` in `pyproject.toml` records the exception, and
+  `uv.lock` must resolve exactly the checked version. For a low severity,
+  waiting stays the default; the maintainer decides.
 
 - MCP `estimate_savings`: its description now says that a first call may
   take longer than `convert_document`, which tokenizer it counts with, that
