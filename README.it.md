@@ -17,6 +17,7 @@
   <img src="https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-3776ab" alt="Python 3.12, 3.13 and 3.14">
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-b23a22" alt="AGPL-3.0-or-later">
   <img src="https://img.shields.io/badge/runs-100%25%20offline-2f7d4f" alt="Funziona 100% offline">
+  <a href="https://glama.ai/mcp/servers/Muralnick/sugo"><img src="https://glama.ai/mcp/servers/Muralnick/sugo/badges/score.svg" alt="Muralnick/sugo MCP server"></a>
 </p>
 
 <p align="center">
