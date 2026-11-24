@@ -59,7 +59,7 @@ Ids, digests, versions and counts are excluded from the text sent to the embeddi
 | `on_secret` | `"skip"` | Files with credentials (passwords or keys in XML, a private key written in the text): `"skip"`, `"include"` or `"raise"` |
 | `cache` | `"ephemeral"` | `"user"` keeps Sugo's page cache, much faster when you reload files |
 
-Files that hold credentials are skipped by default, the same files the Sugo MCP server never sends to an agent: a RAG pipeline usually sends text to an embedding service and stores it where other people and agents can read it. `reader.skipped` lists every file left out, with a code such as `CONTENT_EXCLUDED`.
+Files that hold credentials are skipped by default, the same files the Sugo MCP server never sends to an agent: a RAG pipeline usually sends text to an embedding service and stores it where other people and agents can read it. `reader.skipped` lists the files the last `load_data` call left out, with a code such as `CONTENT_EXCLUDED`. Under `SimpleDirectoryReader` each file is a separate call, so it holds only the last file's result; to see every skip there, call `SugoReader.load_data` on the list of files yourself.
 
 Sugo reads local files only: passing a remote `fs` raises an error.
 
@@ -67,7 +67,7 @@ Sugo reads local files only: passing a remote `fs` raises an error.
 
 The reader and Sugo open no network connection, and Sugo sends nothing anywhere. LlamaIndex itself can: for example its default LLM and embedding settings call online services, and some features download data. The tests of this package build an index with network access blocked. Once you have the documents, where your pipeline sends them is your choice.
 
-Log messages never contain file names or document text. `SimpleDirectoryReader` prints the name of a file it fails to load; that message comes from LlamaIndex.
+Log messages never contain file names or document text. Warnings go to the `sugo.llama_index` logger, which has no output of its own: a skipped file shows up on stderr only if your application configures logging (for example `logging.basicConfig()`); it is listed in `reader.skipped` (see above for `SimpleDirectoryReader`). `SimpleDirectoryReader` prints the name of a file it fails to load; that message comes from LlamaIndex.
 
 ## Licence
 

@@ -3,6 +3,8 @@
 import ast
 import logging
 import socket
+import subprocess
+import sys
 from collections.abc import Callable
 from pathlib import Path
 
@@ -110,6 +112,35 @@ def test_skipped_files_are_not_named_in_the_log(
     with caplog.at_level(logging.WARNING):
         SugoLoader(secret).load()
     assert caplog.messages == ["a file was left out: CONTENT_EXCLUDED"]
+
+
+def test_without_logging_configured_a_skip_prints_nothing(write: Write) -> None:
+    # An application that never configures logging gets no stray warning on
+    # stderr (Python's last-resort handler); the skip is still in ``skipped``.
+    # The child process blocks the network too, like every other test here.
+    secret = write("payroll-settings.xml", SECRET_XML)
+    script = (
+        "import socket, sys\n"
+        "sys.path.insert(0, sys.argv[2])\n"
+        "from loader_helpers import blocked\n"
+        "socket.socket.connect = socket.socket.connect_ex = blocked\n"
+        "socket.create_connection = socket.getaddrinfo = blocked\n"
+        "from langchain_sugo import SugoLoader\n"
+        "loader = SugoLoader(sys.argv[1])\n"
+        "loader.load()\n"
+        'sys.stdout.write(",".join(s.code for s in loader.skipped))\n'
+    )
+    result = subprocess.run(  # noqa: S603 - fixed arguments, no shell
+        [sys.executable, "-c", script, str(secret), str(Path(__file__).parent)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "a file was left out" not in result.stderr
+    assert result.stdout == "CONTENT_EXCLUDED"
 
 
 @pytest.mark.parametrize(

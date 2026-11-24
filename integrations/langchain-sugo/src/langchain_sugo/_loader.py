@@ -14,7 +14,8 @@ import sugo
 from langchain_core.document_loaders import BaseLoader
 from langchain_core.documents import Document
 
-_log = logging.getLogger(__name__)
+# Under the `sugo` logger (ADR-068), whose NullHandler leaves output to the app.
+_log = logging.getLogger("sugo.langchain")
 
 Mode = Literal["chunks", "document"]
 OnError = Literal["raise", "skip"]
