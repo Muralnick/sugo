@@ -36,14 +36,22 @@ still change, with notice, before 1.0).
   of the answer means; the `providers` schema lists the valid names
   (ADR-049 amendment).
 
+## langchain-sugo 0.1.3 and llama-index-readers-sugo 0.1.3 - 2026-11-24
+
+Only the two loaders; `sugo-cli` is unchanged (0.3.0), and the loaders still
+accept `sugo-cli` `>=0.2.1,<0.4`.
+
 ### Fixed
 
-- `langchain-sugo` and `llama-index-readers-sugo`: the loaders now log under
-  the `sugo` logger as ADR-068 says (`sugo.langchain`, `sugo.llama_index`;
-  before, `langchain_sugo._loader` and `llama_index.readers.sugo._reader`).
-  Its `NullHandler` (ADR-067) applies, so an application that does not
-  configure logging no longer gets a stray "a file was left out" warning on
-  stderr. Skipped files are still listed in `skipped`.
+- The loaders now log under the `sugo` logger as ADR-068 says
+  (`sugo.langchain`, `sugo.llama_index`; before, `langchain_sugo._loader`
+  and `llama_index.readers.sugo._reader`). Its `NullHandler` (ADR-067)
+  applies, so an application that does not configure logging no longer gets
+  a stray "a file was left out" warning on stderr. Skipped files are still
+  listed in `skipped`.
+- The READMEs no longer say that `skipped` lists every file left out: it
+  holds the last load only, and under LlamaIndex's `SimpleDirectoryReader`
+  only the last file.
 
 ## [0.3.0] - 2026-11-23
 
