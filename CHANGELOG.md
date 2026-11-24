@@ -15,6 +15,15 @@ still change, with notice, before 1.0).
   of the answer means; the `providers` schema lists the valid names
   (ADR-049 amendment).
 
+### Fixed
+
+- `langchain-sugo` and `llama-index-readers-sugo`: the loaders now log under
+  the `sugo` logger as ADR-068 says (`sugo.langchain`, `sugo.llama_index`;
+  before, `langchain_sugo._loader` and `llama_index.readers.sugo._reader`).
+  Its `NullHandler` (ADR-067) applies, so an application that does not
+  configure logging no longer gets a stray "a file was left out" warning on
+  stderr. Skipped files are still listed in `skipped`.
+
 ## [0.3.0] - 2026-11-23
 
 ### Added

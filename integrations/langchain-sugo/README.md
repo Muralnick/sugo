@@ -54,7 +54,7 @@ Files that hold credentials are skipped by default, the same files the Sugo MCP 
 
 The loader and Sugo open no network connection, and Sugo sends nothing anywhere. LangChain itself can: LangSmith tracing starts only if you set its environment variables. Once you have the documents, where your pipeline sends them (an embedding API, a database) is your choice.
 
-Log messages never contain file names or document text.
+Log messages never contain file names or document text. Warnings go to the `sugo.langchain` logger, which has no output of its own: a skipped file shows up on stderr only if your application configures logging (for example `logging.basicConfig()`); it is always listed in `loader.skipped`.
 
 ## Licence
 

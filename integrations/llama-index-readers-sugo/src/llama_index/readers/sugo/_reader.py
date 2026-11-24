@@ -15,7 +15,8 @@ from llama_index.core.schema import Document
 
 import sugo
 
-_log = logging.getLogger(__name__)
+# Under the `sugo` logger (ADR-068), whose NullHandler leaves output to the app.
+_log = logging.getLogger("sugo.llama_index")
 
 Mode = Literal["chunks", "document"]
 OnError = Literal["raise", "skip"]

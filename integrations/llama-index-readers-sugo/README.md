@@ -67,7 +67,7 @@ Sugo reads local files only: passing a remote `fs` raises an error.
 
 The reader and Sugo open no network connection, and Sugo sends nothing anywhere. LlamaIndex itself can: for example its default LLM and embedding settings call online services, and some features download data. The tests of this package build an index with network access blocked. Once you have the documents, where your pipeline sends them is your choice.
 
-Log messages never contain file names or document text. `SimpleDirectoryReader` prints the name of a file it fails to load; that message comes from LlamaIndex.
+Log messages never contain file names or document text. Warnings go to the `sugo.llama_index` logger, which has no output of its own: a skipped file shows up on stderr only if your application configures logging (for example `logging.basicConfig()`); it is always listed in `reader.skipped`. `SimpleDirectoryReader` prints the name of a file it fails to load; that message comes from LlamaIndex.
 
 ## Licence
 
