@@ -31,7 +31,7 @@ Sugo is a local, offline-first Python application that converts documents, scree
 - Never fill unreadable content with guesses; mark it as illegible.
 - Model files: only ONNX, safetensors or GGUF; pinned revisions; SHA-256 verified; no `trust_remote_code`.
 - Parse XML only with `defusedxml`.
-- New dependency versions must be at least 14 days old.
+- New dependency versions must be at least 14 days old. The one exception is a fix for a published vulnerability, under the checks of the ADR-035 amendment (2026-11-24).
 - Respect the memory budget: the reference machine has 8 GB RAM and 4 cores; Sugo's default budget is 2.5 GB.
 
 ## Terminology

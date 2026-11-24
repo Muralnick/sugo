@@ -16,6 +16,20 @@ still change, with notice, before 1.0).
   vulnerability unfixed for over 30 days, or no PyMuPDF release for 12
   months; or a licence change.
 
+- Governance (ADR-074): users can decide on new features and changes
+  through an official poll in GitHub Discussions. A poll opens with 10
+  supporters; under 20 votes nothing changes, 20 to 99 votes need two
+  thirds, 100 or more a simple majority. The licence, the principles and
+  the security rules are never put to a poll; the maintainer may refuse an
+  off-topic proposal with a detailed public explanation.
+
+- Dependency policy (ADR-035 amendment): a release that fixes a published
+  vulnerability affecting Sugo may skip the 14-day minimum age, for that
+  package and release only, after checking its source and its changes;
+  `exclude-newer-package` in `pyproject.toml` records the exception, and
+  `uv.lock` must resolve exactly the checked version. For a low severity,
+  waiting stays the default; the maintainer decides.
+
 - MCP `estimate_savings`: its description now says that a first call may
   take longer than `convert_document`, which tokenizer it counts with, that
   the provider comparison is for images only, and what each top-level field
