@@ -4,7 +4,7 @@
 **Date:** 2026-11-24
 **Deciders:** project author
 **Closes:** the "PDF engine decision" item of the roadmap (v0.1.x, carried to v0.3.x)
-**Builds on:** ADR-001 (per-page routing), ADR-010 (licences), ADR-031 (hardening), ADR-035 (dependency rules), ADR-043 (PDF extractor in an isolated worker), ADR-071 (`normal` level with Docling)
+**Builds on:** ADR-001 (per-page routing), ADR-010 (licences), ADR-031 (hardening), ADR-035 (dependency rules), ADR-043 (PDF extractor in an isolated worker), ADR-071 (`normal` level with Docling), ADR-074 (community polls)
 
 ## Context
 
@@ -47,16 +47,14 @@ The question is reopened, with a new ADR, when **any one** of these happens:
    - speed within 1.5 times PyMuPDF's on large files, and memory within the 2.5 GB budget;
    - a better security record: fewer advisories reachable by opening a file, or faster fixes, over the last 24 months, counted from public advisories;
    - verified provenance of the PDFium binaries that `pypdfium2` ships.
-2. **Users ask for it.** Requests count once per different user, in GitHub issues or discussions; a company or funder that needs PDFium to use or support Sugo counts as condition 2 as well.
-   - **At least 20 users**, and PDFium's speed is within 1.5 times PyMuPDF's on large files.
-   - **At least 100 users**, even if PDFium is slower.
+2. **Users decide it.** A community poll under ADR-074 approves the move: it opens when 10 users support the proposal, and passes with two thirds of 20 to 99 votes, or a simple majority of 100 votes or more. A company or funder that needs PDFium to use or support Sugo is a reason for the maintainer to open the poll early.
 3. **PyMuPDF gets worse.** Any one of:
    - a vulnerability that Sugo reaches by opening a file stays without a fixed PyMuPDF release for more than 30 days after it is public;
    - no PyMuPDF release at all for 12 months (a project that has stopped, while MuPDF bugs keep being found);
    - Artifex changes PyMuPDF's licence or distribution in a way that conflicts with Sugo's licence or principles.
 4. **Sugo's licence changes** to a permissive or dual licence that PyMuPDF's AGPL does not allow.
 
-Whatever the reason, two things are never traded away: the move happens only once hidden-text detection is at least as good as today's on the tests of ADR-043 (a protection against prompt injection, THREAT_MODEL.md B), and no text that PyMuPDF reads is lost.
+Whatever the reason, a poll included, two things are never traded away: the move happens only once hidden-text detection is at least as good as today's on the tests of ADR-043 (a protection against prompt injection, THREAT_MODEL.md B), and no text that PyMuPDF reads is lost.
 
 The security record and binary provenance are checked again at each minor release of Sugo, together with the PyMuPDF advisories (ADR-043).
 
