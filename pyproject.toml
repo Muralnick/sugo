@@ -80,6 +80,8 @@ build-backend = "uv_build"
 # Relative durations in exclude-newer need uv 0.13 (ADR-035).
 required-version = ">=0.13.0"
 # Enforces the 14-day minimum age for every dependency (CLAUDE.md, ADR-035).
+# A security fix may skip it for one package with exclude-newer-package and a
+# timestamp, after the checks of the ADR-035 amendment (2026-11-24).
 exclude-newer = "14 days"
 
 # PyTorch's CPU build: PyPI's Linux wheel is the CUDA one, with gigabytes of

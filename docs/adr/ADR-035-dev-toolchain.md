@@ -39,3 +39,55 @@ Deferred to later steps, each with its own entry here when added: pytest-cov and
 
 - `uv_build` supports pure-Python packages only; a native extension would need a new ADR.
 - Upgrading a tool is a lockfile change reviewed like code.
+
+## Amendment (2026-11-24): security fixes may skip the 14-day wait
+
+The 14-day minimum age protects against malicious releases (a hijacked
+maintainer account, a poisoned build), which are usually found and pulled
+within days. Its cost is that a release fixing a known vulnerability also
+waits 14 days, with the vulnerability open in Sugo. Before this amendment
+the only exception was `sugo-cli` itself in the release pipeline
+(ADR-033). Maintainer decision: a security fix may skip the wait, under
+these conditions.
+
+**When.** A published advisory (GitHub Security Advisory, OSV entry or
+CVE) for a dependency, runtime or development, that affects Sugo: Sugo
+reaches the vulnerable code, or that cannot be ruled out. For a low
+severity the default is still to wait; the maintainer decides.
+
+**Checks before adopting the version**, written in the pull request:
+
+1. The advisory names the version as fixed, or the upstream project says
+   so in its release notes.
+2. The release comes from the project's usual source: the same PyPI
+   project and publisher, a matching tag in the upstream repository, and
+   its usual attestations or signatures if it publishes them.
+3. The changes from the version in `uv.lock` are reviewed: they contain
+   the fix and nothing unexpected (new install-time code, new network
+   access, obfuscated or binary-only changes without source).
+4. The licence is unchanged and still on the allow-list.
+
+**Scope.** Only the named package, and only up to the fixed release: the
+exception is a timestamp just after that release's upload time, in
+`pyproject.toml`:
+
+```toml
+[tool.uv]
+exclude-newer = "14 days"
+exclude-newer-package = { pymupdf = "2026-11-24T12:00:00Z" }
+```
+
+uv records it in `uv.lock` (`[options.exclude-newer-package]`), so the
+exception is visible in review. Newer releases of that package, and its
+other dependencies, still wait 14 days; if the fix needs a new version of
+another package, that package goes through the same checks. If a later
+advisory hits the same package while the entry is still there, its fix is
+a new exception: the same checks again on the new release, then the
+timestamp moves forward to it, never to "any release". The entry is
+removed once the last release it admits is 14 days old, at the latest
+with the next dependency update.
+
+**Record.** A `Security` entry in `CHANGELOG.md` with the advisory
+identifier, and, if a Sugo release ships the fix, the emergency release
+process of ADR-031. The pull request is approved by the maintainer like
+any other.

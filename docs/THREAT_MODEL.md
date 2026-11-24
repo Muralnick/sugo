@@ -106,7 +106,7 @@ v0.1 web UI (`sugo ui`, ADR-055):
 
 | Threat | Mitigation |
 |---|---|
-| Malicious dependency release | Pinned versions and hashes; **14-day cooldown** before adopting new versions |
+| Malicious dependency release | Pinned versions and hashes; **14-day cooldown** before adopting new versions; a security fix may skip it only for that package and release, after source and diff checks (ADR-035 amendment) |
 | Known vulnerabilities | `pip-audit`, OSV |
 | Swapped model | Pinned revision + SHA-256 (download interception becomes irrelevant) |
 | Code execution on model load | ONNX, safetensors, GGUF only |
