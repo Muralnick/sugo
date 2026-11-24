@@ -12,8 +12,9 @@ still change, with notice, before 1.0).
 - PDF engine decided (ADR-073): `lite` keeps PyMuPDF, which gave cleaner text
   and was 2 to 5 times faster on large files in the test on 73 real PDFs.
   The ADR names the conditions for moving to PDFium: better on a new
-  measurement; approved by a community poll (ADR-074); an unfixed PyMuPDF vulnerability for over 30 days or
-  no PyMuPDF release for 12 months; or a licence change.
+  measurement; approved by a community poll (ADR-074); a PyMuPDF
+  vulnerability unfixed for over 30 days, or no PyMuPDF release for 12
+  months; or a licence change.
 
 - MCP `estimate_savings`: its description now says that a first call may
   take longer than `convert_document`, which tokenizer it counts with, that
