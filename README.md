@@ -118,7 +118,7 @@ Fair caveats: the corpus is small and mostly synthetic, and it was built by the 
 | Works today | Coming next |
 |---|---|
 | Native PDFs, DOCX, XLSX, PPTX, XML | v0.3.x: Office files through Docling at `normal`, once measured on real files |
-| Images and screenshots with local OCR (PNG, JPEG, WEBP) | v0.3.x: a published container image; the PDF engine chosen by a test on real files |
+| Images and screenshots with local OCR (PNG, JPEG, WEBP) | v0.3.x: a published container image |
 | Scans: handwriting marked, repeated letterheads removed | v0.4: folders, archives and emails; guided setup; work profiles; one shared engine for every port |
 | The `normal` level: PDF tables and layouts with Docling (optional install) | v0.5: `quality` engine level (vision model, GPU) |
 | Chat and code screenshot detection | Later: EPUB and web pages, background service, folder watcher |

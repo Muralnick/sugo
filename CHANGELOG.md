@@ -9,6 +9,13 @@ still change, with notice, before 1.0).
 
 ### Changed
 
+- PDF engine decided (ADR-073): `lite` keeps PyMuPDF, which gave cleaner text
+  and was 2 to 5 times faster on large files in the test on 73 real PDFs.
+  The ADR names the conditions for moving to PDFium: better on a new
+  measurement; approved by a community poll (ADR-074); a PyMuPDF
+  vulnerability unfixed for over 30 days, or no PyMuPDF release for 12
+  months; or a licence change.
+
 - Governance (ADR-074): users can decide on new features and changes
   through an official poll in GitHub Discussions. A poll opens with 10
   supporters; under 20 votes nothing changes, 20 to 99 votes need two
