@@ -74,3 +74,4 @@
 | [070](ADR-070-model-download.md) | Safe model download, first version, and Korean | Accepted |
 | [071](ADR-071-normal-level-docling.md) | The `normal` level with Docling | Accepted |
 | [072](ADR-072-warm-docling-worker.md) | A warm Docling worker, the first step of the shared engine | Accepted |
+| [074](ADR-074-community-polls.md) | Community polls for proposals | Accepted |

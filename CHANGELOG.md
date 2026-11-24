@@ -9,6 +9,13 @@ still change, with notice, before 1.0).
 
 ### Changed
 
+- Governance (ADR-074): users can decide on new features and changes
+  through an official poll in GitHub Discussions. A poll opens with 10
+  supporters; under 20 votes nothing changes, 20 to 99 votes need two
+  thirds, 100 or more a simple majority. The licence, the principles and
+  the security rules are never put to a poll; the maintainer may refuse an
+  off-topic proposal with a detailed public explanation.
+
 - Dependency policy (ADR-035 amendment): a release that fixes a published
   vulnerability affecting Sugo may skip the 14-day minimum age, for that
   package and release only, after checking its source and its changes;
