@@ -1,6 +1,6 @@
 [project]
 name = "langchain-sugo"
-version = "0.1.2"
+version = "0.1.3"
 description = "LangChain document loader for Sugo: local, compact Markdown chunks from PDF, Office files and images."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
