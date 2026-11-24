@@ -80,10 +80,22 @@ class EstimateSavings(_Arguments):
 
     path: FilePath
     providers: Annotated[
-        list[Annotated[str, Field(max_length=MCP_MAX_PATH_CHARS)]] | None,
+        list[
+            Annotated[
+                str,
+                # Published as an enum so agents see the valid names; the
+                # handler still refuses unknown ones, since strict mode does
+                # not check a schema-only enum.
+                Field(
+                    max_length=MCP_MAX_PATH_CHARS,
+                    json_schema_extra={"enum": list_providers()},
+                ),
+            ]
+        ]
+        | None,
         Field(
-            description="LLM providers whose image cost to compare (claude, gemini, openai); "
-            "all if omitted."
+            description="LLM providers whose image billing to compare against the Markdown. "
+            "Used only when the file is an image; all bundled providers if omitted."
         ),
     ] = None
 
@@ -109,11 +121,17 @@ TOOLS: dict[str, tuple[type[_Arguments], str]] = {
     ),
     "estimate_savings": (
         EstimateSavings,
-        "Measure the tokens Sugo saves on a file, without returning its text: raw against "
-        "cleaned text and, for an image, against sending the image to each LLM provider. Use it "
-        "to decide whether converting pays off; to read the content, use convert_document. "
-        "Returns JSON with baseline_tokens, result_tokens, saved_tokens and saved_percent for "
-        "the text and for each provider.",
+        "Measure how many tokens Sugo saves on one file, without returning its text. Use it to "
+        "decide whether converting pays off; to read the content, use convert_document. It "
+        "converts the file locally and also renders the raw text to count it, so a first call "
+        "may take longer than convert_document. Text tokens are counted with the o200k_base "
+        "tokenizer. Returns one JSON object: source, the file's path; kind, its file type "
+        "(pdf, image, docx, xlsx, pptx, xml); pages, its page count; text, comparing the raw "
+        "extracted text (baseline) with the cleaned Markdown (result); images, for an image "
+        "file only (empty otherwise), one entry per provider comparing what it bills to read "
+        "the image with the Markdown, plus its tier and whether the billing formula is "
+        "verified; rejected_by, the providers that would refuse the image. Each comparison has "
+        "baseline_tokens, result_tokens, saved_tokens and saved_percent.",
     ),
 }
 

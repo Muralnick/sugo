@@ -16,6 +16,7 @@ from typer.testing import CliRunner
 
 from sugo.config.settings import Settings
 from sugo.core import pipeline
+from sugo.metrics.providers import list_providers
 from sugo.metrics.tokenizer import count_tokens
 from sugo.ports.cli import app as cli
 from sugo.ports.mcp import server as mcp_server
@@ -97,6 +98,12 @@ def test_tools_are_listed_with_schemas_from_the_models(server: Server) -> None:
     # Each description tells the agent when to use the other tool instead.
     assert "estimate_savings" in tools["convert_document"]["description"]
     assert "convert_document" in tools["estimate_savings"]["description"]
+    # The valid provider names are in the schema, taken from the bundled data.
+    providers = tools["estimate_savings"]["inputSchema"]["properties"]["providers"]
+    assert providers["anyOf"][0]["items"]["enum"] == list_providers()
+    # The description names every input kind the answer's "kind" can hold.
+    for kind in pipeline.InputKind:
+        assert kind.value in tools["estimate_savings"]["description"]
 
 
 def test_long_document_comes_in_parts_joined_by_cursors(server: Server) -> None:
