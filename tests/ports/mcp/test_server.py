@@ -101,6 +101,9 @@ def test_tools_are_listed_with_schemas_from_the_models(server: Server) -> None:
     # The valid provider names are in the schema, taken from the bundled data.
     providers = tools["estimate_savings"]["inputSchema"]["properties"]["providers"]
     assert providers["anyOf"][0]["items"]["enum"] == list_providers()
+    # The description names every input kind the answer's "kind" can hold.
+    for kind in pipeline.InputKind:
+        assert kind.value in tools["estimate_savings"]["description"]
 
 
 def test_long_document_comes_in_parts_joined_by_cursors(server: Server) -> None:

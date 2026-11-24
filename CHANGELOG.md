@@ -9,10 +9,11 @@ still change, with notice, before 1.0).
 
 ### Changed
 
-- MCP `estimate_savings`: its description now says that it converts the
-  file first, which tokenizer it counts with, that the provider comparison
-  is for images only, and what each field of the answer means; the
-  `providers` schema lists the valid names (ADR-049 amendment).
+- MCP `estimate_savings`: its description now says that a first call may
+  take longer than `convert_document`, which tokenizer it counts with, that
+  the provider comparison is for images only, and what each top-level field
+  of the answer means; the `providers` schema lists the valid names
+  (ADR-049 amendment).
 
 ## [0.3.0] - 2026-11-23
 

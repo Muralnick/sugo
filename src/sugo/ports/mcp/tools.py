@@ -123,13 +123,15 @@ TOOLS: dict[str, tuple[type[_Arguments], str]] = {
         EstimateSavings,
         "Measure how many tokens Sugo saves on one file, without returning its text. Use it to "
         "decide whether converting pays off; to read the content, use convert_document. It "
-        "converts the file locally, so a first call takes as long as convert_document, and "
-        "counts tokens with the o200k_base tokenizer. Returns one JSON object: kind, pages; "
-        "text, comparing the raw extracted text (baseline) with the cleaned Markdown (result); "
-        "images, for an image file only (empty otherwise), one entry per provider comparing "
-        "what it bills to read the image with the Markdown, plus its tier and whether the "
-        "billing formula is verified; rejected_by, the providers that would refuse the image. "
-        "Each comparison has baseline_tokens, result_tokens, saved_tokens and saved_percent.",
+        "converts the file locally and also renders the raw text to count it, so a first call "
+        "may take longer than convert_document. Text tokens are counted with the o200k_base "
+        "tokenizer. Returns one JSON object: source, the file's path; kind, its file type "
+        "(pdf, image, docx, xlsx, pptx, xml); pages, its page count; text, comparing the raw "
+        "extracted text (baseline) with the cleaned Markdown (result); images, for an image "
+        "file only (empty otherwise), one entry per provider comparing what it bills to read "
+        "the image with the Markdown, plus its tier and whether the billing formula is "
+        "verified; rejected_by, the providers that would refuse the image. Each comparison has "
+        "baseline_tokens, result_tokens, saved_tokens and saved_percent.",
     ),
 }
 
