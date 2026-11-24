@@ -30,7 +30,7 @@ The `lite` level reads PDFs with MuPDF through PyMuPDF, in an isolated worker (A
 - **Licence.** PyMuPDF is AGPL-3.0 (Artifex sells a commercial licence). PDFium is BSD-3-Clause; `pypdfium2` declares BSD-3-Clause and Apache-2.0, plus the licences of what it bundles. While Sugo is AGPL, PyMuPDF's licence costs nothing. A closed or permissive Sugo would need Artifex's commercial licence or another engine. The maintainer's direction on 2026-11-24 is to stay AGPL.
 - **Security record.** MuPDF had many memory-safety fixes in 2026 (ADR-043). PDFium runs in every Chrome browser and is fuzzed continuously by Google, so it is probably the more robust parser, but this ADR has not counted and compared the advisories of the two engines.
 - **Where the binaries come from.** `pypdfium2` ships PDFium binaries built, with some patches of its own, by a separate one-maintainer project (`pdfium-binaries`), not by Google. That project publishes GitHub build provenance attestations, so the binaries can be checked against its source; Sugo has not checked them yet.
-- **PDFium is already in Sugo.** Docling, at the `normal` level (ADR-071), depends on `pypdfium2` (5.14.0 in `uv.lock`). Moving `lite` to PDFium would add no new package. The provenance question already applies to `normal` today.
+- **PDFium is already in Sugo's lock.** Docling, at the `normal` level (ADR-071), depends on `pypdfium2` (5.14.0 in `uv.lock`), installed only with the optional `normal` extra. Moving `lite` to PDFium would add no package to the lock, but would add `pypdfium2` to installs that use `lite` only. The provenance question already applies to `normal` today.
 - **Isolation.** Whatever the engine, it runs in an isolated worker with memory and time limits (ADR-043). This limits the damage of a parser bug; it does not remove it.
 
 ## Decision
@@ -47,9 +47,16 @@ The question is reopened, with a new ADR, when **any one** of these happens:
    - speed within 1.5 times PyMuPDF's on large files, and memory within the 2.5 GB budget;
    - a better security record: fewer advisories reachable by opening a file, or faster fixes, over the last 24 months, counted from public advisories;
    - verified provenance of the PDFium binaries that `pypdfium2` ships.
-2. **Users ask for it.** At least 10 different users ask for PDFium, in GitHub issues or discussions, or a company or funder needs it to use or support Sugo. The maintainer may decide with fewer requests if the reasons are strong.
-3. **PyMuPDF gets worse.** A vulnerability that Sugo reaches by opening a file stays without a fixed PyMuPDF release for more than 30 days after it is public, or Artifex changes PyMuPDF's licence or distribution in a way that conflicts with Sugo's licence or principles.
+2. **Users ask for it.** Requests count once per different user, in GitHub issues or discussions; a company or funder that needs PDFium to use or support Sugo counts as condition 2 as well.
+   - **At least 20 users**, and PDFium's speed is within 1.5 times PyMuPDF's on large files.
+   - **At least 100 users**, even if PDFium is slower.
+3. **PyMuPDF gets worse.** Any one of:
+   - a vulnerability that Sugo reaches by opening a file stays without a fixed PyMuPDF release for more than 30 days after it is public;
+   - no PyMuPDF release at all for 12 months (a project that has stopped, while MuPDF bugs keep being found);
+   - Artifex changes PyMuPDF's licence or distribution in a way that conflicts with Sugo's licence or principles.
 4. **Sugo's licence changes** to a permissive or dual licence that PyMuPDF's AGPL does not allow.
+
+Whatever the reason, two things are never traded away: the move happens only once hidden-text detection is at least as good as today's on the tests of ADR-043 (a protection against prompt injection, THREAT_MODEL.md B), and no text that PyMuPDF reads is lost.
 
 The security record and binary provenance are checked again at each minor release of Sugo, together with the PyMuPDF advisories (ADR-043).
 
@@ -75,7 +82,7 @@ Not at once: PDFium first as a second engine for `lite`, chosen by a setting and
 | Permissive licence: keeps every licensing option open | Words and lines must be rebuilt from character positions: new code, new tests |
 | Probably a more robust parser (Chromium's engine, continuous fuzzing), still to be confirmed | 2–5 times slower on large files today |
 | Lower memory | Hidden-text detection must be redone: PDFium reports clipping on every text object |
-| Already in `uv.lock` through Docling | Binaries built and patched by a third party; provenance attestations exist but are not yet verified |
+| Already in `uv.lock` through Docling (installed today only with `normal`) | Binaries built and patched by a third party; provenance attestations exist but are not yet verified |
 | Opened every file of the corpus | Text worse on several files of the corpus today |
 
 ## Alternatives considered
