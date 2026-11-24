@@ -48,13 +48,13 @@ Every value is a string, an integer or a boolean, so every vector store accepts 
 | `on_secret` | `"skip"` | Files with credentials (passwords or keys in XML, a private key written in the text): `"skip"`, `"include"` or `"raise"` |
 | `cache` | `"ephemeral"` | `"user"` keeps Sugo's page cache, much faster when you reload files |
 
-Files that hold credentials are skipped by default, the same files the Sugo MCP server never sends to an agent: a RAG pipeline usually sends text to an embedding service and stores it where other people and agents can read it. `loader.skipped` lists every file left out, with a code such as `CONTENT_EXCLUDED`.
+Files that hold credentials are skipped by default, the same files the Sugo MCP server never sends to an agent: a RAG pipeline usually sends text to an embedding service and stores it where other people and agents can read it. `loader.skipped` lists every file the last `load()` left out, with a code such as `CONTENT_EXCLUDED`.
 
 ## Privacy and network
 
 The loader and Sugo open no network connection, and Sugo sends nothing anywhere. LangChain itself can: LangSmith tracing starts only if you set its environment variables. Once you have the documents, where your pipeline sends them (an embedding API, a database) is your choice.
 
-Log messages never contain file names or document text. Warnings go to the `sugo.langchain` logger, which has no output of its own: a skipped file shows up on stderr only if your application configures logging (for example `logging.basicConfig()`); it is always listed in `loader.skipped`.
+Log messages never contain file names or document text. Warnings go to the `sugo.langchain` logger, which has no output of its own: a skipped file shows up on stderr only if your application configures logging (for example `logging.basicConfig()`); it is listed in `loader.skipped`.
 
 ## Licence
 
