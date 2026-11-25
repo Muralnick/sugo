@@ -111,8 +111,21 @@ Decision (maintainer, 2026-11-25, refined the same day after code review):
 - **Without the render free of text, the rule does not apply**, because the page's own words would count as a drawing; the page is read as before. Pages whose images cover half the page are scans as before.
 - Blank pages, pages with only a page number and pages with only invisible text stay native. A page with almost no text and a chart or a photo now has the words in it read with OCR: they are content.
 
-Not changed here, found by the same review: the letterhead analyzer (ADR-064) compares font sizes on OCR pages, and a mixed page's native blocks measure theirs in points, not render pixels, so they can look small; at worst a short repeated native line is marked removed with a reason. Rotated pages mark native text hidden by mistake (box coordinates are not rotated), a separate pre-existing issue.
+Not changed here, found by the same review: the letterhead analyzer (ADR-064) compares font sizes on OCR pages, and a mixed page's native blocks measure theirs in points, not render pixels, so they can look small; at worst a short repeated native line is marked removed with a reason. Rotated pages marked native text hidden by mistake (box coordinates were not rotated): fixed separately, see the next amendment.
 
 **Known limit, for a follow-up:** a page with 20 or more visible characters is never checked. Exporters often turn the body into curves but keep headers and footers as text, so such a page still loses its drawn body silently. Recognising drawn letters on pages that also have text needs a finer test than "something is drawn" (otherwise every page with a table or a logo would go to OCR) and its own measurement.
 
 Measured: the synthetic benchmark corpus gives the same tokens, removals and content checks as on 2026-11-23 (no page in it has fewer than 20 visible characters and a drawing). The check runs only on pages that have almost no text, on bands of 64 rows, stopping at the threshold. The real EUR-Lex sample and the original file 49 were not available locally; file 49 was lost with the old system, so the cause there is likely but not proven.
+
+## Amendment, 2026-11-25: rotated pages
+
+MuPDF gives text and image boxes in the coordinates of the unrotated page, but the visibility checks compare them with the page as shown: `page.rect` and the renders, which follow `/Rotate`. On a page turned by 90, 180 or 270 degrees every check looked at the wrong place, so visible text was marked hidden and removed with a reason by `HiddenTextCleaner`: a landscape page lost all its text from the Markdown. Found by the review of the 2026-11-25 amendment; present since the first version.
+
+Decision: every text box (`_span`) and image box (`_image_coverage`) is turned with the page's rotation matrix before any check, so boxes, renders and normalised `bbox` values are all of the page as shown, like OCR boxes. Reading order then follows the page as a reader sees it. For a `/Rotate` that is not a quarter turn (45), MuPDF shows the page turned while PyMuPDF reports rotation 0, an identity matrix and text boxes already in the shown page's coordinates, so the checks stay consistent there too. Every visibility test of the worker, including the near-invisible cases (F3) and the one without the second render, runs at `/Rotate` 0, 90, 180, 270 and 45.
+
+Two faults of the render without text (amendment of 2026-11-07), found by the review of this fix and present since then, are fixed with it:
+
+- **`/Rotate` values that are not quarter turns** (45, 135): MuPDF shows such a page turned while PyMuPDF reads its rotation as 0, so restoring "the rotation" after the redaction wrote 0 and rendered the page the other way round. The shapes differed, the check was skipped, and a faint instruction over a picture passed as visible. The raw `/Rotate` value is now saved and written back.
+- **Boxes that do not start at the origin:** the redaction area was the media box, but redaction areas are measured from the crop box, so part of the text could stay. That text then "changed nothing" and was marked hidden, or made the page look like a drawing. The area is now far larger than any page.
+
+Known limit: a page whose text is written sideways or upside down as shown (the content not turned with `/Rotate`) keeps all its text now, but its layout is poor (lines in reverse order, or merged into one block at 90 and 270 degrees). Using MuPDF's line direction would fix it; not done here.

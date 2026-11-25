@@ -44,6 +44,15 @@ still change, with notice, before 1.0).
   it now keeps its real text exactly and has only the drawn part read with
   OCR (ADR-043 amendment). Known limit: a page with 20 or more real
   characters, such as a footer, and a drawn body is not yet detected.
+- On a PDF page shown rotated (`/Rotate` 90, 180 or 270 degrees, as
+  landscape pages often are), every visible line was marked hidden and
+  removed from the Markdown with the reason "hidden text": text boxes were
+  not turned with the page they were checked against (ADR-043 amendment).
+- Two faults in the check that renders a PDF page without its text: on a
+  page with a `/Rotate` value that is not a quarter turn (45) the check was
+  skipped, so a faint instruction over a picture could pass as visible text;
+  on a page whose boxes do not start at the origin part of the text stayed,
+  so visible text could be marked hidden (ADR-043 amendment).
 
 ## langchain-sugo 0.1.3 and llama-index-readers-sugo 0.1.3 - 2026-11-24
 
