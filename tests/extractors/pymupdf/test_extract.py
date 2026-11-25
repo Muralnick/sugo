@@ -268,6 +268,24 @@ def test_small_logo_beside_a_page_number_keeps_the_number(
     assert "Page 3" in [b.text for b in read.blocks]
 
 
+@pytest.mark.parametrize("rotation", [90, 180, 270])
+def test_landscape_page_is_read_upright_in_order(rotation: int) -> None:
+    # A page shown turned (/Rotate) with its text written upright as shown,
+    # as landscape tables often are.
+    document = pymupdf.open()
+    page = document.new_page()
+    page.set_rotation(rotation)
+    for number, text in enumerate(["First line", "Second line", "Third line"]):
+        point = pymupdf.Point(72, 72 + 30 * number) * page.derotation_matrix
+        page.insert_text(point, text, fontsize=12, rotate=rotation)
+    (read,) = extract_pdf(document.tobytes())
+    assert [(b.text, b.flags) for b in read.blocks] == [
+        ("First line", ()),
+        ("Second line", ()),
+        ("Third line", ()),
+    ]
+
+
 def test_native_pdf_never_loads_the_ocr_engine() -> None:
     def refuse() -> OcrEngine:
         raise AssertionError("OCR engine loaded for a native page")

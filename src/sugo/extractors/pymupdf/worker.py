@@ -342,7 +342,9 @@ def _read_page(page: pymupdf.Page, index: int) -> tuple[Message, bytes | None]:
     lines = [
         line
         for raw_line in raw_lines
-        for line in _split_line(raw_line, rect, (rendered, textless), scale, faint)
+        for line in _split_line(
+            raw_line, rect, (rendered, textless), scale, faint, page.rotation_matrix
+        )
     ]
     visible_chars = sum(len("".join(line.text.split())) for line in lines if not line.hidden)
     hidden = [line for line in lines if line.hidden]
@@ -390,18 +392,22 @@ def _textless_pixels(page: pymupdf.Page, dpi: int) -> Pixels | None:
         with pymupdf.open() as copy:
             copy.insert_pdf(page.parent, from_page=page.number, to_page=page.number)
             blank = copy[0]
-            rotation = blank.rotation
-            # Redaction areas are in unrotated coordinates; the whole media box
-            # covers every character, wherever the crop box puts the page.
-            blank.set_rotation(0)
-            blank.add_redact_annot(blank.mediabox, fill=False)
+            # Redaction areas are in unrotated coordinates measured from the
+            # crop box, so a fixed media box can miss text when the boxes do not
+            # start at the origin; an area far larger than any page covers all.
+            # The raw /Rotate is put back afterwards: MuPDF shows values that
+            # are not quarter turns (45) turned, while ``rotation`` reads 0,
+            # so restoring ``rotation`` would render a different page.
+            rotate = copy.xref_get_key(blank.xref, "Rotate")
+            copy.xref_set_key(blank.xref, "Rotate", "0")
+            blank.add_redact_annot(_EVERYWHERE, fill=False)
             # PyMuPDF's type stubs lack the redaction constants.
             blank.apply_redactions(
                 images=pymupdf.PDF_REDACT_IMAGE_NONE,  # type: ignore[attr-defined]
                 graphics=pymupdf.PDF_REDACT_LINE_ART_NONE,  # type: ignore[attr-defined]
                 text=pymupdf.PDF_REDACT_TEXT_REMOVE,  # type: ignore[attr-defined]
             )
-            blank.set_rotation(rotation)
+            copy.xref_set_key(blank.xref, "Rotate", rotate[1] if rotate[0] != "null" else "null")
             pixmap = blank.get_pixmap(dpi=dpi, alpha=False, colorspace=pymupdf.csRGB)
             return _pixels(pixmap).copy()
     except Exception:  # noqa: BLE001 - a hostile page must not stop the visibility checks
@@ -437,6 +443,7 @@ def _split_line(
     rendered: tuple[Pixels, Pixels | None],
     scale: float,
     faint: set[int] = frozenset(),  # type: ignore[assignment]
+    rotation: pymupdf.Matrix | None = None,
 ) -> list[NativeLine]:
     """Split a MuPDF line into runs of visible and hidden spans.
 
@@ -447,7 +454,9 @@ def _split_line(
     runs: list[list[_Span]] = []
     hidden: list[bool | None] = []  # per run; None while it holds only spaces
     for raw in line["spans"]:
-        span = _span(raw, rect, rendered, scale, faint_over_text=id(raw) in faint)
+        span = _span(
+            raw, rect, rendered, scale, faint_over_text=id(raw) in faint, rotation=rotation
+        )
         blank = not span.text.strip()
         if runs and (blank or hidden[-1] is None or hidden[-1] == span.hidden):
             runs[-1].append(span)
@@ -466,8 +475,14 @@ def _span(
     scale: float,
     *,
     faint_over_text: bool = False,
+    rotation: pymupdf.Matrix | None = None,
 ) -> _Span:
-    x0, y0, x1, y1 = (float(value) for value in raw["bbox"])
+    # MuPDF gives text boxes in the unrotated page's coordinates; the render
+    # and ``rect`` are of the page as shown, so a rotated page's boxes turn too.
+    box = pymupdf.Rect(raw["bbox"])
+    if rotation is not None:
+        box = box * rotation
+    x0, y0, x1, y1 = (float(value) for value in (box.x0, box.y0, box.x1, box.y1))
     bbox = (x0, y0, x1, y1)
     char_flags = int(raw.get("char_flags", _FILLED))
     alpha = int(raw.get("alpha", 255))
@@ -580,7 +595,8 @@ def _normalise(run: list[_Span], rect: pymupdf.Rect) -> BBox | None:
 def _image_coverage(page: pymupdf.Page, rect: pymupdf.Rect) -> float:
     """Share of the page covered by images, overlaps counted once per image."""
     area = rect.width * rect.height
-    covered = sum(abs(pymupdf.Rect(info["bbox"]) & rect) for info in page.get_image_info())
+    turn = page.rotation_matrix
+    covered = sum(abs((pymupdf.Rect(info["bbox"]) * turn) & rect) for info in page.get_image_info())
     return min(1.0, covered / area) if area > 0 else 0.0
 
 
@@ -678,6 +694,10 @@ def _blank_text_areas(textless: Pixels, shown: Pixels) -> None:
     background = np.median(textless[::4, ::4].reshape(-1, 3), axis=0).astype(np.uint8)
     textless[grown] = background
 
+
+# Redaction area covering every character of any page (PDF limits pages to
+# 14 400 points a side, wherever their boxes start).
+_EVERYWHERE = pymupdf.Rect(-1e6, -1e6, 1e6, 1e6)
 
 # Pixels added around the text's area before it is painted over (OCR DPI).
 _TEXT_AREA_MARGIN = 2
