@@ -22,7 +22,9 @@ Checks before any page is interpreted:
   dictionaries were checked by the parent before this process started.
 
 Each page is either native, with every text line marked visible or hidden, or
-a scan, rendered for OCR. Text is hidden when a reader cannot see it on the
+a scan, rendered for OCR. A page is a scan when it has almost no visible text
+but shows something else: images covering half of it, or any drawing, such
+as words drawn as curves. Text is hidden when a reader cannot see it on the
 rendered page: drawn invisible or clipped away, smaller than
 ``PDF_MIN_VISIBLE_FONT_SIZE``, outside the page, the same colour as what is
 drawn around it (white on white), almost transparent without an outline, or
@@ -53,6 +55,7 @@ from sugo.core.constants import (
     PDF_OCR_MAX_PIXELS,
     PDF_SCAN_MAX_VISIBLE_CHARS,
     PDF_SCAN_MIN_IMAGE_COVERAGE,
+    PDF_SCAN_MIN_MARK_PIXELS,
     PDF_VISIBILITY_DPI,
     PDF_WORKER_MEMORY_BYTES,
 )
@@ -341,9 +344,9 @@ def _read_page(page: pymupdf.Page, index: int) -> tuple[Message, bytes | None]:
         for line in _split_line(raw_line, rect, (rendered, textless), scale, faint)
     ]
     visible_chars = sum(len("".join(line.text.split())) for line in lines if not line.hidden)
-    if (
+    if visible_chars < PDF_SCAN_MAX_VISIBLE_CHARS and (
         _image_coverage(page, rect) >= PDF_SCAN_MIN_IMAGE_COVERAGE
-        and visible_chars < PDF_SCAN_MAX_VISIBLE_CHARS
+        or _has_marks(rendered if textless is None else textless)
     ):
         return _scan(page, index, [line for line in lines if line.hidden])
     return NativePage(index=index, lines=tuple(lines)), None
@@ -569,6 +572,26 @@ def _image_coverage(page: pymupdf.Page, rect: pymupdf.Rect) -> float:
     area = rect.width * rect.height
     covered = sum(abs(pymupdf.Rect(info["bbox"]) & rect) for info in page.get_image_info())
     return min(1.0, covered / area) if area > 0 else 0.0
+
+
+def _has_marks(pixels: Pixels) -> bool:
+    """Whether something is drawn on the page besides its text.
+
+    ``pixels`` is the page rendered without its text, when MuPDF could remove
+    it. Text drawn as curves or as images is not text to MuPDF, so a page
+    showing words can still have no characters (ADR-043 amendment
+    2026-11-25). A pixel counts when it differs from the page's background,
+    its median colour, as much as visible text does. Works one channel at a
+    time in bytes, so a very large page needs little memory beyond its render.
+    """
+    background = np.median(pixels[::4, ::4].reshape(-1, 3), axis=0)
+    marked = np.zeros(pixels.shape[:2], dtype=bool)
+    for channel in range(3):
+        values = pixels[:, :, channel]
+        level = np.uint8(background[channel])
+        difference = np.maximum(values, level) - np.minimum(values, level)
+        marked |= difference >= PDF_MIN_TEXT_CONTRAST
+    return int(np.count_nonzero(marked)) >= PDF_SCAN_MIN_MARK_PIXELS
 
 
 def _scan(page: pymupdf.Page, index: int, hidden: list[NativeLine]) -> tuple[Message, bytes | None]:

@@ -178,6 +178,18 @@ def test_scanned_page_is_read_with_ocr_and_its_layer_is_hidden(
     assert all(b.type is not BlockType.UI_CHROME for b in page.blocks)
 
 
+def test_words_drawn_as_curves_are_read_with_ocr(
+    drawn_text_pdf: Callable[[list[str]], bytes], ocr_engine: OcrEngine
+) -> None:
+    (page,) = extract_pdf(
+        drawn_text_pdf(["Invoice number 4521", "Total due 1250 EUR"]), ocr=lambda: ocr_engine
+    )
+    assert page.origin is PageOrigin.OCR
+    text = render([b for b in page.blocks if BlockFlag.HIDDEN not in b.flags])
+    assert "4521" in text
+    assert "1250" in text
+
+
 def test_native_pdf_never_loads_the_ocr_engine() -> None:
     def refuse() -> OcrEngine:
         raise AssertionError("OCR engine loaded for a native page")

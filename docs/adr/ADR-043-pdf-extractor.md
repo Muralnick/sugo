@@ -60,7 +60,7 @@ Licence: AGPL-3.0 (dual-licensed by Artifex), on the allow-list (ADR-010). The w
 
 - **Native page:** text lines with font size, bold and monospace; reading order by the XY-cut shared with the image extractor (`sugo.extractors.reading_order`, which also holds the shared code-indentation and box helpers). Paragraphs split on style changes and bullets. Block types: heading (font ≥ 1.2 × the page's body size, ≤ 3 lines; levels by size rank on the page, sizes within 10% of each other sharing a level), list item (bullet `•◦▪‣●○■·` dropped; dashes are not bullets), code (all monospaced; indentation rebuilt from position and leading spaces), paragraph.
 - **Hidden text:** a span is hidden when it is drawn invisible (render mode 3, zero alpha, clipped away), smaller than 2 pt, outside the page, or does not stand out on the page rendered at 72 DPI (its colour is within 32 levels of the background, or nothing at all is drawn in its box, as for text under an opaque shape), or changes nothing on the page when the page's text is removed, or is almost transparent (opacity below 64 of 255) over another span with text (amendment of 2026-11-07, below). Hidden spans are split from visible ones on the same line; a run's visibility is set by its first span with text, so a hidden space cannot carry a hidden word into visible text. A page's hidden lines form **one block flagged `hidden`**, after the visible blocks. The new `HiddenTextCleaner` proposes removing it with a reason; the core applies it as a soft deletion (principle 3).
-- **Scanned page:** images cover ≥ 50% of the page and fewer than 20 visible characters exist. The page is rendered at 200 DPI (less for very large pages) and read by the image OCR pipeline, with screenshot rules (chat, status bar) switched off. **Its own text layer is not trusted:** it may differ from what the page shows. It is kept as a hidden block.
+- **Scanned page:** fewer than 20 visible characters exist and images cover ≥ 50% of the page, or anything else is drawn on it (amendment of 2026-11-25, below). The page is rendered at 200 DPI (less for very large pages) and read by the image OCR pipeline, with screenshot rules (chat, status bar) switched off. **Its own text layer is not trusted:** it may differ from what the page shows. It is kept as a hidden block.
 
 ### Measured
 
@@ -99,3 +99,15 @@ Decision:
 - If MuPDF cannot redact a page, the second render is skipped and the earlier checks apply.
 
 Measured: the synthetic PDFs of the benchmark corpus and a 50-page text PDF give the same lines and the same visibility as before; reading costs about 16 ms more per page (50 pages: 1.0 s → 1.8 s). The real EUR-Lex sample was not available locally for this measurement.
+
+## Amendment, 2026-11-25: words drawn as curves
+
+A PDF can show words without containing a single character: some exporters, design programs and "copy-protected" files draw each letter as a curve. Such a page has no text layer and no image, so it was not a scan by the rule above: it was read as a native page with no text. The document converted to empty Markdown with status `ok`, a silent loss (principle 3). Seen on a real PDF exported from Word (file 49 of the 2026-11-13 test on real PDFs) and reproduced with a synthetic page.
+
+Decision (maintainer, 2026-11-25):
+
+- **A page with fewer than 20 visible characters is also a scan when something is drawn on it besides its text.** The page rendered without its text (the second render of the 2026-11-07 amendment; the normal render if MuPDF cannot redact the page) is compared with its background, its median colour. When at least 20 pixels differ from it by 32 levels or more, the same contrast that makes text visible, the page goes to OCR. One letter of 11 pt text is 14 to 31 such pixels at 72 DPI.
+- Blank pages, pages with only a page number and pages with only invisible text stay native: nothing goes to OCR that was not drawn.
+- A page with only a chart or a photo and almost no text is now read with OCR, so the words in it reach the output. That is content, and costs about one OCR pass for such pages only.
+
+Measured: the synthetic benchmark corpus gives the same tokens, removals and content checks as on 2026-11-23 (no page in it has fewer than 20 visible characters and a drawing). The check runs only on pages that have almost no text. The real EUR-Lex sample and the original file 49 were not available locally; file 49 was lost with the old system, so the cause there is likely but not proven.

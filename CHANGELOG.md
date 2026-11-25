@@ -7,6 +7,14 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+### Fixed
+
+- A PDF page whose words are drawn as curves, with no characters and no
+  images inside, gave empty Markdown with status `ok`: the words were lost
+  without a trace. Such pages are now read with OCR, like scans (ADR-043
+  amendment). A page with almost no text and only a chart or a photo is now
+  read with OCR too.
+
 ### Changed
 
 - PDF engine decided (ADR-073): `lite` keeps PyMuPDF, which gave cleaner text

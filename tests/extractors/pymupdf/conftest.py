@@ -78,3 +78,21 @@ def scanned_pdf() -> Callable[[list[str], str], bytes]:
         return document.tobytes()
 
     return build
+
+
+@pytest.fixture
+def drawn_text_pdf() -> Callable[[list[str]], bytes]:
+    """A one-page PDF showing ``lines`` drawn as curves: no characters, no images.
+
+    Some exporters and "copy-protected" PDFs draw words this way.
+    """
+
+    def build(lines: list[str]) -> bytes:
+        source = pymupdf.open()
+        page = source.new_page()
+        for number, line in enumerate(lines):
+            page.insert_text((72, 100 + 30 * number), line, fontsize=14)
+        svg = page.get_svg_image(text_as_path=True)
+        return pymupdf.open("svg", svg.encode()).convert_to_pdf()
+
+    return build

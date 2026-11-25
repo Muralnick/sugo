@@ -192,6 +192,41 @@ def test_scan_is_rendered_with_its_text_layer_hidden(
     assert [(line.text, line.hidden) for line in scan.hidden_lines] == [("invisible layer", True)]
 
 
+def test_page_of_words_drawn_as_curves_is_read_as_a_scan(
+    drawn_text_pdf: Callable[[list[str]], bytes],
+) -> None:
+    # No characters and no images: before the 2026-11-25 amendment to ADR-043
+    # the page was native and its words were lost without a trace.
+    data = drawn_text_pdf(["Rent is 650 euro a month"])
+    assert pymupdf.open("pdf", data)[0].get_text().strip() == ""
+    page, pixels = list(run(data, 0))[1]
+    assert isinstance(page, ScanPage)
+    assert pixels is not None
+
+
+@pytest.mark.parametrize(
+    "draw",
+    [
+        pytest.param(lambda page: None, id="blank"),
+        pytest.param(lambda page: page.insert_text((300, 800), "7", fontsize=10), id="page-number"),
+        pytest.param(
+            lambda page: page.insert_text((72, 72), "invisible", fontsize=11, render_mode=3),
+            id="invisible-text",
+        ),
+    ],
+)
+def test_page_with_nothing_else_drawn_stays_native(draw: Callable[[pymupdf.Page], object]) -> None:
+    assert isinstance(messages(one_page(draw))[1], NativePage)
+
+
+def test_page_with_a_few_words_and_a_drawing_is_read_as_a_scan() -> None:
+    def draw(page: pymupdf.Page) -> None:
+        page.insert_text((300, 800), "7", fontsize=10)
+        page.draw_rect(pymupdf.Rect(72, 72, 300, 200), color=(0, 0, 0), width=2)
+
+    assert isinstance(messages(one_page(draw))[1], ScanPage)
+
+
 def test_content_stream_claiming_to_be_an_image_is_still_checked(raw_pdf: RawPdf) -> None:
     # "/Subtype /Image" is written by the attacker; MuPDF runs /Contents anyway.
     content = b"q BI /W 1 /H 1 /CS /G /BPC 8 /F /Br ID x EI Q"
