@@ -24,6 +24,7 @@ from sugo.extractors.pymupdf.extract import (
     is_failed_page,
     read_pdf_file,
 )
+from sugo.extractors.pymupdf.layout import ENGINE_NAME
 from sugo.serializers.markdown import render
 
 RawPdf = Callable[..., bytes]
@@ -188,6 +189,33 @@ def test_words_drawn_as_curves_are_read_with_ocr(
     text = render([b for b in page.blocks if BlockFlag.HIDDEN not in b.flags])
     assert "4521" in text
     assert "1250" in text
+
+
+def test_page_number_beside_a_rule_is_kept_exactly(ocr_engine: OcrEngine) -> None:
+    # Review finding: the whole page went to OCR, which lost the "7".
+    document = pymupdf.open()
+    page = document.new_page()
+    page.insert_text((300, 800), "7", fontsize=10)
+    page.draw_line((72, 72), (520, 72), color=(0, 0, 0), width=0.5)
+    (read,) = extract_pdf(document.tobytes(), ocr=lambda: ocr_engine)
+    assert [b.text for b in read.blocks] == ["7"]
+    assert read.blocks[0].origin_engine == ENGINE_NAME
+
+
+def test_drawn_words_and_real_words_are_read_together_in_order(
+    drawn_text_pdf: Callable[[list[str]], bytes], ocr_engine: OcrEngine
+) -> None:
+    drawn = pymupdf.open("pdf", drawn_text_pdf(["", "Invoice number 4521"]))
+    drawn[0].insert_text((72, 70), "Page 1", fontsize=12)
+    drawn[0].insert_text((72, 200), "End", fontsize=12)
+    (read,) = extract_pdf(drawn.tobytes(), ocr=lambda: ocr_engine)
+    assert read.origin is PageOrigin.OCR
+    texts = [b.text for b in read.blocks]
+    assert texts[0] == "Page 1"
+    assert texts[-1] == "End"
+    assert any("4521" in text for text in texts[1:-1])
+    assert [b.reading_order for b in read.blocks] == list(range(len(texts)))
+    assert len({b.id for b in read.blocks}) == len(texts)
 
 
 def test_native_pdf_never_loads_the_ocr_engine() -> None:

@@ -23,8 +23,9 @@ Checks before any page is interpreted:
 
 Each page is either native, with every text line marked visible or hidden, or
 a scan, rendered for OCR. A page is a scan when it has almost no visible text
-but shows something else: images covering half of it, or any drawing, such
-as words drawn as curves. Text is hidden when a reader cannot see it on the
+and images cover half of it. A page with almost no visible text and any
+drawing, such as words drawn as curves, keeps its text and has only the rest
+read with OCR, from a render without its text. Text is hidden when a reader cannot see it on the
 rendered page: drawn invisible or clipped away, smaller than
 ``PDF_MIN_VISIBLE_FONT_SIZE``, outside the page, the same colour as what is
 drawn around it (white on white), almost transparent without an outline, or
@@ -344,11 +345,15 @@ def _read_page(page: pymupdf.Page, index: int) -> tuple[Message, bytes | None]:
         for line in _split_line(raw_line, rect, (rendered, textless), scale, faint)
     ]
     visible_chars = sum(len("".join(line.text.split())) for line in lines if not line.hidden)
-    if visible_chars < PDF_SCAN_MAX_VISIBLE_CHARS and (
-        _image_coverage(page, rect) >= PDF_SCAN_MIN_IMAGE_COVERAGE
-        or _has_marks(rendered if textless is None else textless)
-    ):
-        return _scan(page, index, [line for line in lines if line.hidden])
+    hidden = [line for line in lines if line.hidden]
+    if visible_chars < PDF_SCAN_MAX_VISIBLE_CHARS:
+        if _image_coverage(page, rect) >= PDF_SCAN_MIN_IMAGE_COVERAGE:
+            return _scan(page, index, hidden)
+        # Only a render without the page's text tells drawings from text.
+        if textless is not None and _has_marks(textless):
+            drawn = _drawn_scan(page, index, lines)
+            if drawn is not None:
+                return drawn
     return NativePage(index=index, lines=tuple(lines)), None
 
 
@@ -375,6 +380,12 @@ def _render_without_text(page: pymupdf.Page, shape: tuple[int, ...]) -> Pixels |
     images and drawings as they are. None if MuPDF cannot do it: the other
     visibility checks still apply.
     """
+    pixels = _textless_pixels(page, PDF_VISIBILITY_DPI)
+    return pixels if pixels is not None and pixels.shape == shape else None
+
+
+def _textless_pixels(page: pymupdf.Page, dpi: int) -> Pixels | None:
+    """The page at ``dpi`` with all its text redacted; None if MuPDF cannot do it."""
     try:
         with pymupdf.open() as copy:
             copy.insert_pdf(page.parent, from_page=page.number, to_page=page.number)
@@ -391,11 +402,10 @@ def _render_without_text(page: pymupdf.Page, shape: tuple[int, ...]) -> Pixels |
                 text=pymupdf.PDF_REDACT_TEXT_REMOVE,  # type: ignore[attr-defined]
             )
             blank.set_rotation(rotation)
-            pixmap = blank.get_pixmap(dpi=PDF_VISIBILITY_DPI, alpha=False, colorspace=pymupdf.csRGB)
-            pixels = _pixels(pixmap).copy()
+            pixmap = blank.get_pixmap(dpi=dpi, alpha=False, colorspace=pymupdf.csRGB)
+            return _pixels(pixmap).copy()
     except Exception:  # noqa: BLE001 - a hostile page must not stop the visibility checks
         return None
-    return pixels if pixels.shape == shape else None
 
 
 def _faint_over_text(spans: list[dict[str, Any]]) -> set[int]:
@@ -581,17 +591,24 @@ def _has_marks(pixels: Pixels) -> bool:
     it. Text drawn as curves or as images is not text to MuPDF, so a page
     showing words can still have no characters (ADR-043 amendment
     2026-11-25). A pixel counts when it differs from the page's background,
-    its median colour, as much as visible text does. Works one channel at a
-    time in bytes, so a very large page needs little memory beyond its render.
+    its median colour, as much as visible text does. Works on bands of rows
+    and stops at the threshold, so a very large page needs little memory
+    beyond its render.
     """
-    background = np.median(pixels[::4, ::4].reshape(-1, 3), axis=0)
-    marked = np.zeros(pixels.shape[:2], dtype=bool)
-    for channel in range(3):
-        values = pixels[:, :, channel]
-        level = np.uint8(background[channel])
-        difference = np.maximum(values, level) - np.minimum(values, level)
-        marked |= difference >= PDF_MIN_TEXT_CONTRAST
-    return int(np.count_nonzero(marked)) >= PDF_SCAN_MIN_MARK_PIXELS
+    background = np.median(pixels[::4, ::4].reshape(-1, 3), axis=0).astype(np.int16)
+    found = 0
+    for top in range(0, pixels.shape[0], _MARK_BAND_ROWS):
+        band = pixels[top : top + _MARK_BAND_ROWS].astype(np.int16)
+        contrast = np.abs(band - background).max(axis=2)
+        found += int(np.count_nonzero(contrast >= PDF_MIN_TEXT_CONTRAST))
+        if found >= PDF_SCAN_MIN_MARK_PIXELS:
+            return True
+    return False
+
+
+# Rows of a render compared at once by ``_has_marks``: a few MB even on the
+# largest pages.
+_MARK_BAND_ROWS = 64
 
 
 def _scan(page: pymupdf.Page, index: int, hidden: list[NativeLine]) -> tuple[Message, bytes | None]:
@@ -607,6 +624,28 @@ def _scan(page: pymupdf.Page, index: int, hidden: list[NativeLine]) -> tuple[Mes
         hidden_lines=tuple(hidden),
     )
     return message, _pixels(pixmap).tobytes()
+
+
+def _drawn_scan(
+    page: pymupdf.Page, index: int, lines: list[NativeLine]
+) -> tuple[Message, bytes | None] | None:
+    """A page whose words are drawn: its visible text kept, the rest read with OCR.
+
+    The pixels are the page without its text, so OCR reads only what is drawn
+    and never repeats, or replaces, the text the page really has (ADR-043
+    amendment 2026-11-25). None if MuPDF cannot remove the text at that size.
+    """
+    pixels = _textless_pixels(page, _ocr_dpi(float(page.rect.width), float(page.rect.height)))
+    if pixels is None:
+        return None
+    message = ScanPage(
+        index=index,
+        pixel_width=pixels.shape[1],
+        pixel_height=pixels.shape[0],
+        hidden_lines=tuple(line for line in lines if line.hidden),
+        visible_lines=tuple(line for line in lines if not line.hidden),
+    )
+    return message, pixels.tobytes()
 
 
 def _ocr_dpi(page_width: float, page_height: float) -> int:

@@ -219,12 +219,31 @@ def test_page_with_nothing_else_drawn_stays_native(draw: Callable[[pymupdf.Page]
     assert isinstance(messages(one_page(draw))[1], NativePage)
 
 
-def test_page_with_a_few_words_and_a_drawing_is_read_as_a_scan() -> None:
+def test_page_with_a_few_words_and_a_drawing_keeps_its_words() -> None:
     def draw(page: pymupdf.Page) -> None:
         page.insert_text((300, 800), "7", fontsize=10)
-        page.draw_rect(pymupdf.Rect(72, 72, 300, 200), color=(0, 0, 0), width=2)
+        page.insert_text((72, 60), "gone", fontsize=11, render_mode=3)
+        page.draw_line((72, 72), (520, 72), color=(0, 0, 0), width=0.5)
 
-    assert isinstance(messages(one_page(draw))[1], ScanPage)
+    page, pixels = list(run(one_page(draw), 0))[1]
+    assert isinstance(page, ScanPage)
+    assert [line.text.strip() for line in page.visible_lines] == ["7"]
+    assert [line.text.strip() for line in page.hidden_lines] == ["gone"]
+    assert pixels is not None
+    assert len(pixels) == page.pixel_bytes
+
+
+@pytest.mark.parametrize("text", ["12", "The End"])
+def test_without_the_second_render_a_page_of_few_words_stays_native(
+    monkeypatch: pytest.MonkeyPatch, text: str
+) -> None:
+    # Without a render free of text, the page's own words would count as a drawing.
+    monkeypatch.setattr(worker, "_render_without_text", lambda _page, _shape: None)
+
+    def draw(page: pymupdf.Page) -> None:
+        page.insert_text((300, 800), text, fontsize=10)
+
+    assert isinstance(messages(one_page(draw))[1], NativePage)
 
 
 def test_content_stream_claiming_to_be_an_image_is_still_checked(raw_pdf: RawPdf) -> None:

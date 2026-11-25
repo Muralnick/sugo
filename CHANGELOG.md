@@ -7,14 +7,6 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
-### Fixed
-
-- A PDF page whose words are drawn as curves, with no characters and no
-  images inside, gave empty Markdown with status `ok`: the words were lost
-  without a trace. Such pages are now read with OCR, like scans (ADR-043
-  amendment). A page with almost no text and only a chart or a photo is now
-  read with OCR too.
-
 ### Changed
 
 - PDF engine decided (ADR-073): `lite` keeps PyMuPDF, which gave cleaner text
@@ -43,6 +35,15 @@ still change, with notice, before 1.0).
   the provider comparison is for images only, and what each top-level field
   of the answer means; the `providers` schema lists the valid names
   (ADR-049 amendment).
+
+### Fixed
+
+- A PDF page whose words are drawn as curves, with no characters and no
+  images inside, gave empty Markdown with status `ok`: the words were lost
+  without a trace. A page with almost no real text and something drawn on
+  it now keeps its real text exactly and has only the drawn part read with
+  OCR (ADR-043 amendment). Known limit: a page with 20 or more real
+  characters, such as a footer, and a drawn body is not yet detected.
 
 ## langchain-sugo 0.1.3 and llama-index-readers-sugo 0.1.3 - 2026-11-24
 

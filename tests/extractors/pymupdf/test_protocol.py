@@ -92,3 +92,25 @@ def test_line_of_only_spaces_is_refused() -> None:
     # Layout reads the first visible character; a compromised worker must not crash it.
     with pytest.raises(ValueError, match="pattern"):
         NativeLine(text="   ", bbox=None, font_size=11, bold=False, monospace=False, hidden=False)
+
+
+def _scan_payload(hidden: bool, field: str) -> bytes:
+    line = (
+        b'{"text": "x", "bbox": null, "font_size": 11, "bold": false, '
+        b'"monospace": false, "hidden": %s}' % (b"true" if hidden else b"false")
+    )
+    return (
+        b'{"kind": "scan", "index": 0, "pixel_width": 1, "pixel_height": 1, '
+        b'"hidden_lines": [], "%s": [%s]}' % (field.encode(), line)
+    )
+
+
+@pytest.mark.parametrize(
+    ("hidden", "field"),
+    [(False, "hidden_lines"), (True, "visible_lines")],
+    ids=["visible-line-sent-as-hidden", "hidden-line-sent-as-visible"],
+)
+def test_scan_with_lines_in_the_wrong_list_is_refused(hidden: bool, field: str) -> None:
+    # A compromised worker must not pass hidden text off as the page's visible text.
+    with pytest.raises(ProtocolError, match="invalid message"):
+        parse_message(_scan_payload(hidden, field))
