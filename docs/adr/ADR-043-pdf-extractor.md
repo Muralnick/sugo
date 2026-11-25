@@ -121,7 +121,7 @@ Measured: the synthetic benchmark corpus gives the same tokens, removals and con
 
 MuPDF gives text and image boxes in the coordinates of the unrotated page, but the visibility checks compare them with the page as shown: `page.rect` and the renders, which follow `/Rotate`. On a page turned by 90, 180 or 270 degrees every check looked at the wrong place, so visible text was marked hidden and removed with a reason by `HiddenTextCleaner`: a landscape page lost all its text from the Markdown. Found by the review of the 2026-11-25 amendment; present since the first version.
 
-Decision: every text box (`_span`) and image box (`_image_coverage`) is turned with the page's rotation matrix before any check, so boxes, renders and normalised `bbox` values are all of the page as shown, like OCR boxes. Reading order then follows the page as a reader sees it. Tests run every visibility case at 0, 90, 180 and 270 degrees.
+Decision: every text box (`_span`) and image box (`_image_coverage`) is turned with the page's rotation matrix before any check, so boxes, renders and normalised `bbox` values are all of the page as shown, like OCR boxes. Reading order then follows the page as a reader sees it. For a `/Rotate` that is not a quarter turn (45), MuPDF shows the page turned while PyMuPDF reports rotation 0, an identity matrix and text boxes already in the shown page's coordinates, so the checks stay consistent there too. Every visibility test of the worker, including the near-invisible cases (F3) and the one without the second render, runs at `/Rotate` 0, 90, 180, 270 and 45.
 
 Two faults of the render without text (amendment of 2026-11-07), found by the review of this fix and present since then, are fixed with it:
 
