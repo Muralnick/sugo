@@ -7,6 +7,8 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-25
+
 ### Changed
 
 - PDF engine decided (ADR-073): `lite` keeps PyMuPDF, which gave cleaner text
