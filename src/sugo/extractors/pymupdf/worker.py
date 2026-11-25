@@ -633,11 +633,19 @@ def _drawn_scan(
 
     The pixels are the page without its text, so OCR reads only what is drawn
     and never repeats, or replaces, the text the page really has (ADR-043
-    amendment 2026-11-25). None if MuPDF cannot remove the text at that size.
+    amendment 2026-11-25). Removing the text also uncovers what the text was
+    covering, which no reader can see, so every pixel the text changes is
+    painted with the background first (review 2026-11-25). None if MuPDF
+    cannot remove the text at that size.
     """
-    pixels = _textless_pixels(page, _ocr_dpi(float(page.rect.width), float(page.rect.height)))
+    dpi = _ocr_dpi(float(page.rect.width), float(page.rect.height))
+    pixels = _textless_pixels(page, dpi)
     if pixels is None:
         return None
+    shown = _pixels(page.get_pixmap(dpi=dpi, alpha=False, colorspace=pymupdf.csRGB))
+    if shown.shape != pixels.shape:
+        return None
+    _blank_text_areas(pixels, shown)
     message = ScanPage(
         index=index,
         pixel_width=pixels.shape[1],
@@ -646,6 +654,33 @@ def _drawn_scan(
         visible_lines=tuple(line for line in lines if not line.hidden),
     )
     return message, pixels.tobytes()
+
+
+def _blank_text_areas(textless: Pixels, shown: Pixels) -> None:
+    """Paint over, in ``textless``, every pixel the page's text changes in ``shown``.
+
+    What is left is what a reader sees outside the text: drawings, never what
+    text glyphs hide. The area grows by ``_TEXT_AREA_MARGIN`` pixels for
+    anti-aliased edges. Works on bands of rows to bound memory.
+    """
+    changed = np.zeros(textless.shape[:2], dtype=bool)
+    for top in range(0, textless.shape[0], _MARK_BAND_ROWS):
+        rows = slice(top, top + _MARK_BAND_ROWS)
+        changed[rows] = (textless[rows] != shown[rows]).any(axis=2)
+    grown = changed.copy()
+    for shift in range(1, _TEXT_AREA_MARGIN + 1):
+        grown[shift:] |= changed[:-shift]
+        grown[:-shift] |= changed[shift:]
+    changed = grown.copy()
+    for shift in range(1, _TEXT_AREA_MARGIN + 1):
+        grown[:, shift:] |= changed[:, :-shift]
+        grown[:, :-shift] |= changed[:, shift:]
+    background = np.median(textless[::4, ::4].reshape(-1, 3), axis=0).astype(np.uint8)
+    textless[grown] = background
+
+
+# Pixels added around the text's area before it is painted over (OCR DPI).
+_TEXT_AREA_MARGIN = 2
 
 
 def _ocr_dpi(page_width: float, page_height: float) -> int:
