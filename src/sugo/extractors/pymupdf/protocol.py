@@ -13,9 +13,9 @@ Pickle is never used: unpickling data from a compromised process would run
 its code inside Sugo.
 """
 
-from typing import IO, Annotated, Literal
+from typing import IO, Annotated, Literal, Self
 
-from pydantic import Field, TypeAdapter
+from pydantic import Field, TypeAdapter, model_validator
 
 from sugo.core.constants import MAX_PDF_PAGES, PDF_MAX_MESSAGE_BYTES, PDF_OCR_MAX_PIXELS
 from sugo.core.models import BBox, NonEmptyStr, _Model
@@ -87,6 +87,11 @@ class ScanPage(_Model):
 
     ``hidden_lines`` is the page's own text layer, kept but flagged: Sugo reads
     what is visible instead of trusting an invisible layer (ADR-043).
+
+    ``visible_lines`` is empty for a scan. For a page whose words are drawn
+    rather than written, it holds the page's visible text, kept exactly, and
+    the pixels show the page with all its text removed, so OCR reads only
+    what is drawn (ADR-043 amendment 2026-11-25).
     """
 
     kind: Literal["scan"] = "scan"
@@ -94,6 +99,15 @@ class ScanPage(_Model):
     pixel_width: Annotated[int, Field(ge=1)]
     pixel_height: Annotated[int, Field(ge=1)]
     hidden_lines: tuple[NativeLine, ...]
+    visible_lines: tuple[NativeLine, ...] = ()
+
+    @model_validator(mode="after")
+    def _check_visibility(self) -> Self:
+        if not all(line.hidden for line in self.hidden_lines):
+            raise ValueError("hidden_lines must all be hidden")
+        if any(line.hidden for line in self.visible_lines):
+            raise ValueError("visible_lines must all be visible")
+        return self
 
     @property
     def pixel_bytes(self) -> int:

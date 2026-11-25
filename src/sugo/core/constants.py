@@ -227,11 +227,15 @@ PDF_MIN_TEXT_ALPHA: Final = 64
 # Measured 2026-11-07: visible text changes 20 to 35% of its box.
 PDF_MIN_VISIBLE_SHARE: Final = 0.02
 
-# Pages are read with OCR when images cover at least this share of the page
-# and less than this many characters of visible text exist: a scan, possibly
-# with a stamp or page number in native text.
+# Pages are read with OCR when less than this many characters of visible text
+# exist and either images cover at least this share of the page (a scan,
+# possibly with a stamp or page number in native text) or at least this many
+# pixels of the page rendered without its text stand out from the background
+# (words drawn as curves, a chart: ADR-043 amendment 2026-11-25). At 72 DPI
+# one letter of 11 pt text is 14 to 31 such pixels (measured 2026-11-25).
 PDF_SCAN_MIN_IMAGE_COVERAGE: Final = 0.5
 PDF_SCAN_MAX_VISIBLE_CHARS: Final = 20
+PDF_SCAN_MIN_MARK_PIXELS: Final = 20
 
 # Resolution used to render scanned pages for OCR (ADR-018 adaptive DPI: an
 # A4 page at 200 DPI is about 12 MB), lowered when a page is large so the

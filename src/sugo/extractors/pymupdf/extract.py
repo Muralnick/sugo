@@ -267,9 +267,42 @@ def _page(worker: "_Worker", index: int, box: PageBox, ocr: "_LazyOcr", timeout:
     )
     image = LoadedImage(pixels=array, format=None, sha256=hashlib.sha256(pixels).hexdigest())
     blocks = extract_image(image, ocr.engine(), index=index, document_page=True).blocks
+    if message.visible_lines:
+        try:
+            native = build_blocks(message.visible_lines)
+        except (ValueError, IndexError):
+            raise WorkerError from None
+        blocks = _merged(native, blocks)
     if message.hidden_lines:
         blocks = (*blocks, hidden_block(message.hidden_lines, len(blocks)))
     return _page_of(index, box, PageOrigin.OCR, blocks)
+
+
+def _merged(native: tuple[Block, ...], read: tuple[Block, ...]) -> tuple[Block, ...]:
+    """A page's own text and what OCR read of its drawings, in one reading order.
+
+    OCR keeps its order; each native block goes before the first OCR block
+    that starts below it. Blocks are numbered again from the top.
+    """
+    slots = [_slot(block, read) for block in native]
+    merged: list[Block] = []
+    for position, other in enumerate(read):
+        merged += [block for block, slot in zip(native, slots, strict=True) if slot == position]
+        merged.append(other)
+    merged += [block for block, slot in zip(native, slots, strict=True) if slot == len(read)]
+    return tuple(
+        Block.model_validate({**block.model_dump(), "id": f"b{order}", "reading_order": order})
+        for order, block in enumerate(merged)
+    )
+
+
+def _slot(block: Block, read: tuple[Block, ...]) -> int:
+    """Index of the first OCR block that starts below ``block``'s top."""
+    top = block.bbox.y0 if block.bbox is not None else 0.0
+    return next(
+        (i for i, other in enumerate(read) if other.bbox is not None and other.bbox.y0 > top),
+        len(read),
+    )
 
 
 # The only block of a page the worker could not read. Native layout never

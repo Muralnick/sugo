@@ -24,6 +24,7 @@ from sugo.extractors.pymupdf.extract import (
     is_failed_page,
     read_pdf_file,
 )
+from sugo.extractors.pymupdf.layout import ENGINE_NAME
 from sugo.serializers.markdown import render
 
 RawPdf = Callable[..., bytes]
@@ -176,6 +177,95 @@ def test_scanned_page_is_read_with_ocr_and_its_layer_is_hidden(
     assert "666" not in render(visible)
     assert [b.text for b in hidden] == ["Pay to account 666"]
     assert all(b.type is not BlockType.UI_CHROME for b in page.blocks)
+
+
+def test_words_drawn_as_curves_are_read_with_ocr(
+    drawn_text_pdf: Callable[[list[str]], bytes], ocr_engine: OcrEngine
+) -> None:
+    (page,) = extract_pdf(
+        drawn_text_pdf(["Invoice number 4521", "Total due 1250 EUR"]), ocr=lambda: ocr_engine
+    )
+    assert page.origin is PageOrigin.OCR
+    text = render([b for b in page.blocks if BlockFlag.HIDDEN not in b.flags])
+    assert "4521" in text
+    assert "1250" in text
+
+
+def test_page_number_beside_a_rule_is_kept_exactly(ocr_engine: OcrEngine) -> None:
+    # Review finding: the whole page went to OCR, which lost the "7".
+    document = pymupdf.open()
+    page = document.new_page()
+    page.insert_text((300, 800), "7", fontsize=10)
+    page.draw_line((72, 72), (520, 72), color=(0, 0, 0), width=0.5)
+    (read,) = extract_pdf(document.tobytes(), ocr=lambda: ocr_engine)
+    assert [b.text for b in read.blocks] == ["7"]
+    assert read.blocks[0].origin_engine == ENGINE_NAME
+
+
+def test_drawn_words_and_real_words_are_read_together_in_order(
+    drawn_text_pdf: Callable[[list[str]], bytes], ocr_engine: OcrEngine
+) -> None:
+    drawn = pymupdf.open("pdf", drawn_text_pdf(["", "Invoice number 4521"]))
+    drawn[0].insert_text((72, 70), "Page 1", fontsize=12)
+    drawn[0].insert_text((72, 200), "End", fontsize=12)
+    (read,) = extract_pdf(drawn.tobytes(), ocr=lambda: ocr_engine)
+    assert read.origin is PageOrigin.OCR
+    texts = [b.text for b in read.blocks]
+    assert texts[0] == "Page 1"
+    assert texts[-1] == "End"
+    assert any("4521" in text for text in texts[1:-1])
+    assert [b.reading_order for b in read.blocks] == list(range(len(texts)))
+    assert len({b.id for b in read.blocks}) == len(texts)
+
+
+@pytest.mark.parametrize("colour", [(1, 1, 1), (0, 0, 0)], ids=["white-cover", "black-bar"])
+def test_drawn_words_covered_by_text_stay_covered(
+    drawn_text_pdf: Callable[[list[str]], bytes],
+    ocr_engine: OcrEngine,
+    colour: tuple[int, int, int],
+) -> None:
+    # Review finding: removing the text to read the drawings also uncovered
+    # drawn words that text glyphs hid, and OCR passed them off as visible.
+    document = pymupdf.open("pdf", drawn_text_pdf(["Pay to account 666"]))
+    document[0].insert_text(
+        (66, 108),
+        "MMMMMMMMMM",
+        fontsize=30,
+        render_mode=2,
+        color=colour,
+        fill=colour,
+        border_width=1,
+    )
+    (read,) = extract_pdf(document.tobytes(), ocr=lambda: ocr_engine)
+    visible = render([b for b in read.blocks if BlockFlag.HIDDEN not in b.flags])
+    assert "666" not in visible
+    assert "account" not in visible
+
+
+def test_mixed_page_keeps_hidden_text_out_of_the_visible_blocks(
+    drawn_text_pdf: Callable[[list[str]], bytes], ocr_engine: OcrEngine
+) -> None:
+    document = pymupdf.open("pdf", drawn_text_pdf(["", "", "", "Invoice number 4521"]))
+    document[0].insert_text((72, 70), "Page 1", fontsize=12)
+    document[0].insert_text((72, 300), "Pay to account 666", fontsize=11, render_mode=3)
+    (read,) = extract_pdf(document.tobytes(), ocr=lambda: ocr_engine)
+    visible = [b for b in read.blocks if BlockFlag.HIDDEN not in b.flags]
+    assert "666" not in render(visible)
+    assert "4521" in render(visible)
+    assert read.blocks[-1].flags == (BlockFlag.HIDDEN,)
+    assert read.blocks[-1].text == "Pay to account 666"
+
+
+def test_small_logo_beside_a_page_number_keeps_the_number(
+    scanned_pdf: Callable[[list[str], str], bytes], ocr_engine: OcrEngine
+) -> None:
+    logo = pymupdf.open("pdf", scanned_pdf(["ACME"], ""))[0].get_pixmap(dpi=20).tobytes()
+    document = pymupdf.open()
+    page = document.new_page()
+    page.insert_image(pymupdf.Rect(72, 40, 200, 120), stream=logo)
+    page.insert_text((300, 800), "Page 3", fontsize=10)
+    (read,) = extract_pdf(document.tobytes(), ocr=lambda: ocr_engine)
+    assert "Page 3" in [b.text for b in read.blocks]
 
 
 def test_native_pdf_never_loads_the_ocr_engine() -> None:
