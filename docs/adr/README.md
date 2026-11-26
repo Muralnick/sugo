@@ -76,3 +76,4 @@
 | [072](ADR-072-warm-docling-worker.md) | A warm Docling worker, the first step of the shared engine | Accepted |
 | [073](ADR-073-pdf-engine.md) | The PDF engine stays PyMuPDF, with conditions for moving to PDFium | Accepted |
 | [074](ADR-074-community-polls.md) | Community polls for proposals | Accepted |
+| [075](ADR-075-published-container-images.md) | Signed container images on GitHub Container Registry | Accepted |
