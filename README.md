@@ -255,7 +255,18 @@ claude mcp add sugo -- sugo mcp --root ~/Documents
 
 The agent gets two tools: `convert_document` and `estimate_savings`. Sugo is also listed in the official MCP Registry as `io.github.Muralnick/sugo`, so clients that read the registry can install it from there.
 
-The server runs on the same computer as the agent, which starts it and talks to it directly: your documents never leave that computer. To keep it in a container instead, the repository has a `Dockerfile` (ADR-065); no image is published yet.
+The server runs on the same computer as the agent, which starts it and talks to it directly: your documents never leave that computer. To keep it in a container instead, use the signed image on GitHub Container Registry, for Linux on Intel/AMD and on ARM, Apple Silicon included (from Sugo 0.3.2, ADR-075). Mount only the folder the agent may read, read-only, and give the container no network, since conversion never needs one:
+
+```bash
+claude mcp add sugo -- docker run -i --rm --network none \
+  --user "$(id -u):$(id -g)" -v ~/Documents:/data:ro ghcr.io/muralnick/sugo:0.3.2
+```
+
+For a setup that cannot change under you, use the image's digest (`ghcr.io/muralnick/sugo@sha256:…`) instead of the version. To check that an image was built by Sugo's release pipeline from this repository, and to see its inventory of components:
+
+```bash
+gh attestation verify oci://ghcr.io/muralnick/sugo:0.3.2 --repo Muralnick/sugo
+```
 
 ### Uninstall
 

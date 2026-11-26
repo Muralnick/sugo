@@ -1,0 +1,21 @@
+# Base image updates for the Dockerfile (ADR-075). Dependabot opens a pull
+# request; CI checks it on both architectures and the maintainer merges it.
+version: 2
+updates:
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    # The 14-day minimum age (ADR-035). A fix for a published vulnerability
+    # may skip it by hand, under the ADR-035 amendment (2026-11-24).
+    cooldown:
+      default-days: 14
+    ignore:
+      # Python 3.12 patch releases only: another Python is a decision.
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # uv moves together with CI and pyproject.toml, by hand.
+      - dependency-name: "*astral-sh/uv"
+    commit-message:
+      prefix: chore
+    open-pull-requests-limit: 2

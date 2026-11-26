@@ -106,3 +106,53 @@ def test_the_probe_accepts_sugos_mcp_server(
 
 def test_the_probe_rejects_a_server_that_does_not_answer() -> None:
     assert load_probe().probe([sys.executable, "-c", "pass"]) is not None
+
+
+def workflow(name: str) -> str:
+    return (ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8")
+
+
+def job(text: str, name: str) -> str:
+    """One job's block of a workflow: from its key to the next job's key."""
+    body = text.split(f"\n  {name}:\n", 1)[1]
+    return re.split(r"\n  [\w-]+:\n", body, maxsplit=1)[0]
+
+
+def test_the_release_pins_its_build_tools_by_digest() -> None:
+    build = job(workflow("release.yml"), "image-build")
+    for key in ("BUILDKIT_IMAGE", "SBOM_SCANNER"):
+        pin = re.search(rf"^\s+{key}: (\S+)$", build, flags=re.MULTILINE)
+        assert pin is not None, key
+        assert re.fullmatch(r"[\w./-]+:[\w.-]+@sha256:[0-9a-f]{64}", pin.group(1)), key
+
+
+def test_images_are_built_and_checked_on_both_architectures() -> None:
+    for text, name in ((workflow("release.yml"), "image-build"), (workflow("ci.yml"), "container")):
+        rows = re.findall(r"- arch: (\S+)\n\s+runner: (\S+)", job(text, name))
+        assert set(rows) == {("amd64", "ubuntu-24.04"), ("arm64", "ubuntu-24.04-arm")}
+        assert "runs-on: ${{ matrix.runner }}" in job(text, name)
+
+
+def test_only_the_approved_publish_job_can_write_packages() -> None:
+    release = workflow("release.yml")
+    assert release.count("packages: write") == 1
+    publish = job(release, "image-publish")
+    assert "packages: write" in publish
+    assert "environment: release\n" in publish
+    assert "if: github.event_name == 'push'\n" in publish
+    assert "\npermissions:\n  contents: read\n" in release
+
+
+def test_dependabot_keeps_the_base_image_rules() -> None:
+    config = (ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8")
+    assert "package-ecosystem: docker\n    directory: /\n" in config
+    days = re.search(r"default-days: (\d+)", config)
+    assert days is not None
+    assert int(days.group(1)) >= 14
+    # Python 3.12 patch releases only; uv's image moves with CI's uv version
+    # (test_uv_is_the_version_ci_uses), so Dependabot leaves it alone.
+    assert (
+        '- dependency-name: python\n        update-types: ["version-update:semver-major", '
+        '"version-update:semver-minor"]\n' in config
+    )
+    assert '- dependency-name: "*astral-sh/uv"\n' in config

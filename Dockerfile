@@ -1,4 +1,5 @@
-# Sugo's MCP server in a container (ADR-065).
+# Sugo's MCP server in a container (ADR-065). Each release publishes it,
+# signed, for amd64 and arm64 as ghcr.io/muralnick/sugo (ADR-075).
 #
 #   docker build -t sugo .
 #   docker run -i --rm --network none --user "$(id -u):$(id -g)" \
