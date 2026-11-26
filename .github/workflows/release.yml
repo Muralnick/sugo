@@ -1,6 +1,7 @@
-# Signed, verifiable release pipeline (ADR-033, roadmap step 9), scoped to
-# PyPI only for v0.1 — see ADR-033's 2026-11-04 amendment for what is
-# deferred (Docker/GHCR, other channels, the mirror) and why.
+# Signed, verifiable release pipeline (ADR-033, roadmap step 9): PyPI for
+# every project, and for sugo-cli also the container image on GHCR
+# (ADR-075). Other channels and the mirror are still deferred (ADR-033's
+# 2026-11-04 amendment).
 #
 # Triggered by pushing a stable version tag: vX.Y.Z for sugo-cli,
 # langchain-sugo-vX.Y.Z and llama-index-readers-sugo-vX.Y.Z for the loaders
@@ -220,3 +221,218 @@ jobs:
         run: rm -f dist/sbom.cdx.json
 
       - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+
+  # The container image (ADR-075): sugo-cli releases only. Each architecture
+  # is built on its own runner, without emulation, from the Dockerfile CI
+  # checks (ADR-065), as an OCI archive with BuildKit's SBOM of the image.
+  # The probe runs that very archive; only probed archives reach the registry.
+  image-build:
+    name: image (${{ matrix.arch }})
+    needs: target
+    if: needs.target.outputs.name == 'sugo-cli'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      ARCH: ${{ matrix.arch }}
+      # Pinned by digest and at least 14 days old (ADR-035); Dependabot does
+      # not read workflows, so these move by hand.
+      BUILDKIT_IMAGE: moby/buildkit:v0.34.2@sha256:c5f8862f52499773af85bc07695b2379ef08e8002352b0df2c4864c91d78dabe
+      SBOM_SCANNER: docker/buildkit-syft-scanner:1.12.1@sha256:873a7458c3c8ac8e32c7b796c10e1600b07b963d2aa000a72a2d97aaaa2d6315
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # SOURCE_DATE_EPOCH (the commit's time) and rewrite-timestamp keep the
+      # time of the build out of the image.
+      - name: Build the image as an OCI archive
+        run: |
+          SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          export SOURCE_DATE_EPOCH
+          docker buildx create --name sugo --driver docker-container \
+            --driver-opt "image=${BUILDKIT_IMAGE}" --bootstrap --use
+          docker buildx build --platform "linux/${ARCH}" --provenance=false \
+            --attest "type=sbom,generator=${SBOM_SCANNER}" \
+            --output "type=oci,dest=sugo-${ARCH}.tar,name=sugo:probe,rewrite-timestamp=true" \
+            .
+
+      # docker load cannot read an archive that holds an attestation next to
+      # the image; skopeo copies the runner's platform image out of it.
+      - name: MCP introspection of that archive
+        run: |
+          skopeo --version
+          skopeo copy "oci-archive:sugo-${ARCH}.tar" docker-daemon:sugo:probe
+          python3 scripts/container/mcp_probe.py docker run -i --rm --network none sugo:probe
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-${{ matrix.arch }}
+          path: sugo-${{ matrix.arch }}.tar
+          retention-days: 7
+          # The layers inside are already compressed.
+          compression-level: 0
+
+  # Both archives in one multi-platform index, checked with skopeo. Runs in
+  # dry runs too, so a release cannot be the first time this step runs.
+  image-merge:
+    name: image index
+    needs: image-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      digest: ${{ steps.merge.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: image-*
+          path: images
+          merge-multiple: true
+
+      - id: merge
+        name: Merge into one multi-platform index
+        run: >-
+          python3 scripts/release/merge_oci_images.py oci-sugo
+          amd64=images/sugo-amd64.tar arm64=images/sugo-arm64.tar >> "$GITHUB_OUTPUT"
+
+      - name: Check the index with skopeo
+        env:
+          DIGEST: ${{ steps.merge.outputs.digest }}
+        run: |
+          skopeo inspect --raw oci:oci-sugo:sugo | sha256sum | grep -qx "${DIGEST#sha256:}  -"
+          skopeo inspect --raw oci:oci-sugo:sugo | python3 -m json.tool
+
+  # The CycloneDX SBOM attested to the image: the same generator as the
+  # release SBOM (Python packages and bundled models, ADR-033), run on an
+  # environment installed from uv.lock exactly as the Dockerfile installs it,
+  # not on a fresh resolution of the wheel's dependencies.
+  image-sbom:
+    name: image SBOM
+    needs: target
+    if: needs.target.outputs.name == 'sugo-cli'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.13.0"
+          enable-cache: true
+
+      - name: Install the image's environment from the lock
+        env:
+          UV_PROJECT_ENVIRONMENT: .venv-image
+        run: uv sync --locked --no-dev --no-editable
+
+      - name: Generate the CycloneDX SBOM
+        run: |
+          mkdir -p dist
+          uv run python scripts/release/generate_sbom.py \
+            "$(pwd)/.venv-image/bin/python" \
+            "$(pwd)/dist/sbom-image.cdx.json"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-image
+          path: dist/sbom-image.cdx.json
+
+  image-publish:
+    name: publish image to GHCR
+    if: github.event_name == 'push'
+    # After the PyPI upload: an image is never public for a release PyPI
+    # does not have.
+    needs: [image-merge, image-sbom, publish]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # The release environment, approved a second time once PyPI is done.
+    # Only this job can write packages, with its own GITHUB_TOKEN.
+    environment: release
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    env:
+      IMAGE: ghcr.io/muralnick/sugo
+      DIGEST: ${{ needs.image-merge.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: image-*
+          path: images
+          merge-multiple: true
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sbom-image
+          path: dist
+
+      - name: Merge again and check it is the index checked above
+        run: |
+          python3 scripts/release/merge_oci_images.py oci-sugo \
+            amd64=images/sugo-amd64.tar arm64=images/sugo-arm64.tar > merged.txt
+          test "$(cat merged.txt)" = "digest=${DIGEST}"
+
+      # Signed before anything is pushed: the attestations need only the
+      # digest, and are stored in the repository's attestations, where
+      # gh attestation verify looks. No tag ever points at an unsigned image.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ env.DIGEST }}
+
+      # The CycloneDX SBOM from the lock (Python packages and models);
+      # BuildKit's SBOM of the image's Debian and Python packages is already
+      # inside the index, one per architecture.
+      - uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ env.DIGEST }}
+          sbom-path: dist/sbom-image.cdx.json
+
+      # X.Y.Z always; X.Y and latest only when this release is the highest
+      # of its line and of all releases, so a backport never moves them back.
+      - name: Pick the tags
+        env:
+          TAG: ${{ github.ref_name }}
+        run: git ls-remote --tags origin | python3 scripts/release/image_tags.py "${TAG#v}" > tags.txt
+
+      # skopeo reads the login docker writes.
+      - name: Log in to GHCR
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      # --preserve-digests pushes the index byte for byte, so the registry
+      # serves the digest signed above. Pushed once; the other tags are then
+      # copied inside the registry, where every blob already is.
+      - name: Push the index and its tags
+        run: |
+          version="$(head -n 1 tags.txt)"
+          skopeo copy --all --preserve-digests oci:oci-sugo:sugo "docker://${IMAGE}:${version}"
+          skopeo inspect --raw "docker://${IMAGE}:${version}" | sha256sum | grep -qx "${DIGEST#sha256:}  -"
+          tail -n +2 tags.txt | while read -r tag; do
+            skopeo copy --all --preserve-digests "docker://${IMAGE}@${DIGEST}" "docker://${IMAGE}:${tag}"
+          done
+
+      - name: Log out
+        if: always()
+        run: docker logout ghcr.io

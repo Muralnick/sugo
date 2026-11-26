@@ -29,7 +29,7 @@ Facts checked on 2026-11-26:
 ### 1. Where and under which names
 
 - `ghcr.io/muralnick/sugo` (GHCR requires lowercase), public.
-- Each `sugo-cli` release `vX.Y.Z` publishes the tags `X.Y.Z`, `X.Y` and `latest`. Tags are a convenience; the documentation tells users to pin the digest (`ghcr.io/muralnick/sugo@sha256:…`), which is the only name that cannot move.
+- Each `sugo-cli` release `vX.Y.Z` tags its image `X.Y.Z`. It also moves `X.Y` when it is the highest release of that minor line, and `latest` when it is the highest release of all, so a backport never takes them back to an older line. Tags are a convenience; the documentation tells users to pin the digest (`ghcr.io/muralnick/sugo@sha256:…`), which is the only name that cannot move.
 - A loader release (`langchain-sugo-v…`, `llama-index-readers-sugo-v…`) publishes no image.
 
 ### 2. The same Dockerfile, built natively per architecture
@@ -40,23 +40,23 @@ Facts checked on 2026-11-26:
 - Each job runs the MCP probe of ADR-065 (`scripts/container/mcp_probe.py`, `--network none`) on the image it just built, on its own architecture, and fails the release if the probe fails. An image that was not probed is never pushed.
 - Builds use the `docker` CLI and `buildx` already installed on GitHub's runners. No third-party Docker actions are added: the login reads the job's `GITHUB_TOKEN` from standard input.
 
-### 3. Publishing behind the same approval as PyPI
+### 3. Publishing after PyPI, behind the release approval
 
-- The push job runs only for `vX.Y.Z` tags, after both probes pass, in the `release` environment, so the maintainer's approval covers PyPI and the image together.
+- The push job runs only for `vX.Y.Z` tags, after both probes pass and after the PyPI upload succeeds, so an image is never public for a release PyPI does not have. It runs in the `release` environment: the maintainer approves it a second time, once PyPI is done.
 - Only the push job has `packages: write`; every other job keeps the read-only default. The token is the job's own `GITHUB_TOKEN`: no personal token, no stored secret.
-- The job pushes each architecture's image by digest, then creates the multi-platform index and its three tags. It checks that each pushed image has the same config digest (image ID) as the image that passed the probe.
+- The job merges the two probed archives into one multi-platform index again, and stops unless its digest is the one checked in the earlier job. It pushes that index once, byte for byte (`skopeo copy --all --preserve-digests`), checks the digest the registry serves, and then adds the other tags inside the registry.
 - `workflow_dispatch` dry runs build and probe the images but never push them, as for PyPI.
 
 ### 4. Signature and provenance
 
-- `actions/attest-build-provenance`, the action the release already uses (ADR-033), signs a Sigstore provenance attestation for the image index digest, stored in GHCR next to the image (`push-to-registry`) and in the repository's attestations.
+- `actions/attest-build-provenance`, the action the release already uses (ADR-033), signs a Sigstore provenance attestation for the image index digest, stored in the repository's attestations. It runs before anything is pushed, so no tag ever points at an unsigned image.
 - Anyone can verify an image with `gh attestation verify oci://ghcr.io/muralnick/sugo:X.Y.Z --repo Muralnick/sugo`. The README gives this command next to the `docker run` command.
 
 ### 5. Inventory (SBOM): decision D
 
 ADR-033 requires a CycloneDX SBOM that includes the models. The release already makes one for the wheel (Python packages, the two bundled OCR models, the tokenizer vocabulary). An image also contains Debian packages from the base image, and vulnerability reports for images are mostly about those.
 
-- **(1, chosen)** Two inventories attached to the image: the release's existing CycloneDX SBOM (same `uv.lock`, models included), attested to the image digest with `actions/attest-sbom` (GitHub's own action); and the Debian and Python packages actually in the image, from BuildKit's built-in SBOM generator, its scanner image pinned by digest. Complete, no third-party action, two documents to explain.
+- **(1, chosen)** Two inventories attached to the image: a CycloneDX SBOM made by the release's SBOM generator (models included) from an environment installed with `uv.lock`, as the image is, attested to the image digest with `actions/attest-sbom` (GitHub's own action); and the Debian and Python packages actually in the image, from BuildKit's built-in SBOM generator, its scanner image pinned by digest. Complete, no third-party action, two documents to explain.
 - **(2)** Only the release's existing SBOM attested to the image. Simpler; the Debian layer is described only by the base image digest, so a user who wants the Debian package list must scan the image themselves.
 
 ### 6. Automatic base image updates
@@ -72,7 +72,7 @@ The `container` CI job of ADR-065 runs on `ubuntu-24.04` and `ubuntu-24.04-arm`,
 
 ### 8. One-time manual steps for the maintainer
 
-- After the first push, in the package settings on GitHub: make the package public and link it to the repository (GHCR creates new packages private).
+- After the first push, in the package settings on GitHub: make the package public (GHCR creates new packages private). The Dockerfile's `org.opencontainers.image.source` label links it to the repository by itself.
 - Enable Dependabot version updates in the repository settings, if not already on.
 
 ### 9. Not done here
@@ -101,3 +101,12 @@ The `container` CI job of ADR-065 runs on `ubuntu-24.04` and `ubuntu-24.04-arm`,
 - Base image updates arrive as reviewable pull requests; the release checklist no longer has a manual digest refresh.
 - GitHub's arm64 runners are relatively new; if they become unavailable, arm64 falls back to QEMU emulation on amd64, at the cost of speed.
 - Residual: Dependabot is documented to update an image pinned as `tag@sha256:…` when a newer tag appears; whether it also proposes a new digest when Debian rebuilds the same tag is to be confirmed in the first weeks. If it does not, a small scheduled check is added in a follow-up.
+
+## Amendment (2026-11-26): implementation notes
+
+- Each architecture's build writes an OCI archive (`--output type=oci`) holding the image and BuildKit's SBOM attestation. The probe runs that archive's image, copied into Docker with `skopeo`: `docker load` cannot read an archive with an attestation next to the image.
+- `scripts/release/merge_oci_images.py` (standard library only) puts the two archives' images and attestations in one OCI index. It checks every blob's SHA-256 while copying, one Linux image per archive, no architecture twice, and that each attestation belongs to its archive's image. It runs in dry runs too, and again in the push job, which stops if the digest differs from the one checked earlier.
+- The push job logs in with `docker login` (token on standard input) and pushes with `skopeo copy --all --preserve-digests`, so the registry serves the index digest that is attested. `skopeo` is preinstalled on both GitHub runners (1.13.3 on 2026-11-26), like `docker` and `buildx`: no tool is downloaded for this.
+- The BuildKit image (`moby/buildkit`, v0.34.2) and the SBOM scanner (`docker/buildkit-syft-scanner`, 1.12.1) are pinned by digest in `release.yml`, at least 14 days old. Dependabot reads only the `Dockerfile`, so these two move by hand.
+- After code review, the Decision text above was corrected in place: PyPI first, then a second approval for the image; attestations before any push, kept in the repository's attestations (not pushed to GHCR); `X.Y` and `latest` moved only by the highest release (`scripts/release/image_tags.py`, reading the repository's tags); the image's CycloneDX SBOM made from `uv.lock` in its own job, since the release SBOM resolves the wheel's dependencies afresh and could name other versions than the image holds; the merge checks each image's configuration against its label and the architecture it was built for.
+- The Dockerfile's `org.opencontainers.image.source` label names this repository, so GHCR links the package to it on the first push; making the package public stays a manual step (point 8).
