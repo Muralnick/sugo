@@ -707,8 +707,9 @@ def _fill_from_surroundings(pixels: Pixels, area: npt.NDArray[np.bool_]) -> None
     text's shape, however thick the text. OpenCV's distance transform finds
     the nearest outside pixel (5 x 5 chamfer distance) in one pass, within
     the box around ``area`` plus one pixel: that ring is outside ``area`` and
-    nearer than anything beyond it. A page that is all text has nothing
-    outside to copy and takes one colour, the median of how it is shown.
+    nearer than anything beyond it. Only an area that fills its whole box
+    (text covering the entire render) has nothing outside to copy; it takes
+    one colour, the median of that box.
     """
     rows = np.flatnonzero(area.any(axis=1))
     if rows.size == 0:
