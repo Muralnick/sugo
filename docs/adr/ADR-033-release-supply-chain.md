@@ -92,3 +92,7 @@ proven, rather than building all of them at once.
   repository, workflow and environment: with one shared environment, the
   first loader uploads were matched to `sugo-cli`'s publisher and refused
   ("Non-user identities cannot create new projects"). Nothing was published.
+
+## Amendment (2026-11-26): container images on GHCR (ADR-075)
+
+The Docker/GHCR channel deferred above is built by ADR-075: each `sugo-cli` release publishes `ghcr.io/muralnick/sugo` for `linux/amd64` and `linux/arm64` (`lite` only), from the same release run and the same `release` environment as PyPI, after the PyPI upload and a second approval. The image is probed before it is pushed and signed before it is tagged: a Sigstore provenance attestation and two SBOMs (the release generator's CycloneDX from `uv.lock`, with the models; BuildKit's list of the image's Debian and Python packages). First published with v0.3.3 on 2026-11-26. Other channels and the mirror stay deferred.

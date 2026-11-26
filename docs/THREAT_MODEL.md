@@ -58,7 +58,7 @@ Method: assets → attackers → trust boundaries → threats per surface → mi
 
 | Mitigation | Detail |
 |---|---|
-| Invisible text removal | White-on-white, tiny fonts, off-page text, text under opaque shapes, invisible render modes: flagged `hidden` by the PDF extractor and removed with a reason; the text layer of a scanned page is never trusted, the page is read with OCR (ADR-043) |
+| Invisible text removal | White-on-white, tiny fonts, off-page text, text under opaque shapes, invisible render modes: flagged `hidden` by the PDF extractor and removed with a reason; the text layer of a scanned page is never trusted, the page is read with OCR (ADR-043). On a page with a few words and a drawing, OCR reads the page rendered without its text, every pixel the text changed filled with the colour of the nearest pixel a reader sees, so hidden text leaves no shape to read (ADR-043 amendment 2026-11-26, fixed in 0.3.2) |
 | Deceptive characters | Zero-width characters, bidi overrides ("Trojan Source"), homoglyphs removed or flagged (also saves tokens) |
 | Suspicious instruction detector | Imperative phrases addressed to an AI are **flagged**, not removed (principle 3) |
 | MCP delimiting | Content wrapped and labelled as document data, not instructions |
@@ -126,7 +126,7 @@ Risk: false sense of security. Mitigations: coverage statistics, review mode, ne
 | GitHub account takeover | Passkey or hardware key, offline recovery codes |
 | Malicious PR | Protected `main`, required CI, CODEOWNERS review for principles, security and invariants |
 | CI secret theft | No secrets for fork PRs, actions pinned by SHA, least-privilege tokens |
-| Forged release | Trusted Publishing, Sigstore attestations, reproducible builds |
+| Forged release | Trusted Publishing, Sigstore attestations, reproducible builds; the container image is signed (provenance and SBOM) before it is pushed, after the release approval (ADR-075) |
 | **Vulnerabilities in AI-written code** | Bandit and Semgrep on every change, invariant tests, full security review before each release |
 
 ### K. Availability
