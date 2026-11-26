@@ -113,20 +113,21 @@ Fair caveats: the corpus is small and mostly synthetic, and it was built by the 
 ## Status
 
 > [!NOTE]
-> **v0.3.1 is out**, on [PyPI](https://pypi.org/project/sugo-cli/) as `sugo-cli` and in the official [MCP Registry](https://registry.modelcontextprotocol.io/) as `io.github.Muralnick/sugo`. See the [changelog](https://github.com/Muralnick/sugo/blob/main/CHANGELOG.md) for what changed. It is still 0.x: contracts may change, with notice, before 1.0. Releases are built reproducibly, with an SBOM, Sigstore attestations and PyPI Trusted Publishing.
+> **v0.3.2 is out**, on [PyPI](https://pypi.org/project/sugo-cli/) as `sugo-cli` and in the official [MCP Registry](https://registry.modelcontextprotocol.io/) as `io.github.Muralnick/sugo`. See the [changelog](https://github.com/Muralnick/sugo/blob/main/CHANGELOG.md) for what changed. It is still 0.x: contracts may change, with notice, before 1.0. Releases are built reproducibly, with an SBOM, Sigstore attestations and PyPI Trusted Publishing.
 
 | Works today | Coming next |
 |---|---|
 | Native PDFs, DOCX, XLSX, PPTX, XML | v0.3.x: Office files through Docling at `normal`, once measured on real files |
-| Images and screenshots with local OCR (PNG, JPEG, WEBP) | v0.3.x: a published container image |
-| Scans: handwriting marked, repeated letterheads removed | v0.4: folders, archives and emails; guided setup; work profiles; one shared engine for every port |
-| The `normal` level: PDF tables and layouts with Docling (optional install) | v0.5: `quality` engine level (vision model, GPU) |
-| Chat and code screenshot detection | Later: EPUB and web pages, background service, folder watcher |
+| Images and screenshots with local OCR (PNG, JPEG, WEBP) | v0.4: folders, archives and emails; guided setup; work profiles; one shared engine for every port |
+| Scans: handwriting marked, repeated letterheads removed | v0.5: `quality` engine level (vision model, GPU) |
+| The `normal` level: PDF tables and layouts with Docling (optional install) | Later: EPUB and web pages, background service, folder watcher |
+| Chat and code screenshot detection | |
 | Markdown, and JSON Lines chunks for vector databases; LangChain and LlamaIndex loaders | |
 | Conversion receipt, checked by `sugo verify` | |
 | Token metrics per provider (`sugo stats`) | |
 | Command line, interactive shell, MCP server for agents, local web page, Python API | |
 | Interface and text rules in English, Italian, Spanish, French, German; text rules also in Japanese, Chinese and Korean (Korean OCR model downloaded on request) | |
+| Signed container image of the MCP server, for Intel/AMD and ARM | |
 
 See the [roadmap](https://github.com/Muralnick/sugo/blob/main/docs/ROADMAP.md) for the full plan.
 
