@@ -263,9 +263,12 @@ jobs:
             --output "type=oci,dest=sugo-${ARCH}.tar,name=sugo:probe,rewrite-timestamp=true" \
             .
 
+      # docker load cannot read an archive that holds an attestation next to
+      # the image; skopeo copies the runner's platform image out of it.
       - name: MCP introspection of that archive
         run: |
-          docker load --input "sugo-${ARCH}.tar"
+          skopeo --version
+          skopeo copy "oci-archive:sugo-${ARCH}.tar" docker-daemon:sugo:probe
           python3 scripts/container/mcp_probe.py docker run -i --rm --network none sugo:probe
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
