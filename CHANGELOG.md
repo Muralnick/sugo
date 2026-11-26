@@ -25,6 +25,15 @@ still change, with notice, before 1.0).
   patch releases.
 - The CI container check also runs on arm64.
 
+### Security
+
+- On a PDF page with only a few words and a drawing, the part read with OCR
+  could contain text the page hides. Dark text on a black box, for example,
+  became white letters in the image given to OCR, so an instruction no
+  reader could see reached the Markdown as plain text (affects 0.3.1). The
+  area of the page's text now takes the colours around it, so no shape of
+  the text is left for OCR (ADR-043 amendment).
+
 ## [0.3.1] - 2026-11-25
 
 ### Changed

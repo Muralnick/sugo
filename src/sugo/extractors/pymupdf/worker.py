@@ -678,6 +678,11 @@ def _blank_text_areas(textless: Pixels, shown: Pixels) -> None:
     What is left is what a reader sees outside the text: drawings, never what
     text glyphs hide. The area grows by ``_TEXT_AREA_MARGIN`` pixels for
     anti-aliased edges. Works on bands of rows to bound memory.
+
+    Each painted pixel takes the colour around it, not one colour for the
+    whole page: painting with the page's background turned text hidden on a
+    dark box (dark on black) into a white stencil that OCR read as visible
+    text (security review 2026-11-26).
     """
     changed = np.zeros(textless.shape[:2], dtype=bool)
     for top in range(0, textless.shape[0], _MARK_BAND_ROWS):
@@ -691,8 +696,48 @@ def _blank_text_areas(textless: Pixels, shown: Pixels) -> None:
     for shift in range(1, _TEXT_AREA_MARGIN + 1):
         grown[:, shift:] |= changed[:, :-shift]
         grown[:, :-shift] |= changed[:, shift:]
-    background = np.median(textless[::4, ::4].reshape(-1, 3), axis=0).astype(np.uint8)
-    textless[grown] = background
+    _fill_from_surroundings(textless, grown)
+
+
+def _fill_from_surroundings(pixels: Pixels, area: npt.NDArray[np.bool_]) -> None:
+    """Give every pixel of ``area`` the colour of the nearest pixel outside it.
+
+    Outside ``area`` the page without text looks exactly as the reader sees
+    it, so the area takes the colours around it and keeps no trace of the
+    text's shape. Grows inwards one pixel per step; an area too thick to
+    close in ``_FILL_MAX_STEPS`` steps, or a page that is all text, takes the
+    median colour of what is left outside it for the rest.
+    """
+    remaining = area.copy()
+    for _ in range(_FILL_MAX_STEPS):
+        if not remaining.any():
+            return
+        known = ~remaining
+        filled = np.zeros_like(remaining)
+        for target, source in _NEIGHBOURS:
+            take = remaining[target] & known[source] & ~filled[target]
+            pixels[target][take] = pixels[source][take]
+            filled[target] |= take
+        remaining &= ~filled
+    if remaining.any():
+        outside = pixels[~area]
+        rest = outside if outside.size else pixels.reshape(-1, 3)
+        pixels[remaining] = np.median(rest[::16], axis=0).astype(np.uint8)
+
+
+# Each pixel and the neighbour it takes its colour from: below, above,
+# right and left.
+_ALL = slice(None)
+_NEIGHBOURS = (
+    ((slice(1, None), _ALL), (slice(None, -1), _ALL)),
+    ((slice(None, -1), _ALL), (slice(1, None), _ALL)),
+    ((_ALL, slice(1, None)), (_ALL, slice(None, -1))),
+    ((_ALL, slice(None, -1)), (_ALL, slice(1, None))),
+)
+
+# Steps after which a painted area that is still open takes one colour: at
+# the OCR resolution, strokes up to about 45 pt thick close before that.
+_FILL_MAX_STEPS = 64
 
 
 # Redaction area covering every character of any page (PDF limits pages to

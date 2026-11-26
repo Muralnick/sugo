@@ -129,3 +129,11 @@ Two faults of the render without text (amendment of 2026-11-07), found by the re
 - **Boxes that do not start at the origin:** the redaction area was the media box, but redaction areas are measured from the crop box, so part of the text could stay. That text then "changed nothing" and was marked hidden, or made the page look like a drawing. The area is now far larger than any page.
 
 Known limit: a page whose text is written sideways or upside down as shown (the content not turned with `/Rotate`) keeps all its text now, but its layout is poor (lines in reverse order, or merged into one block at 90 and 270 degrees). Using MuPDF's line direction would fix it; not done here.
+
+## Amendment, 2026-11-26: painting over text without leaving its shape (security review)
+
+The mixed pages of the 2026-11-25 amendment paint over every pixel the page's text changes before OCR. They painted with one colour, the page's background (its median colour, usually white). Text the visibility checks had marked hidden, but which still changes a few pixels, such as dark grey on a black box or almost transparent white on it, became a white stencil of its own words inside the dark box, and OCR read it as visible text. A page with a page number, a black box and "IGNORE ALL PREVIOUS" in dark grey on the box gave that instruction as plain text in the Markdown (reproduced on v0.3.1, found by the security review of the closed pull request #148). Visible light text on a dark box was read twice the same way: natively and by OCR.
+
+Decision (maintainer, 2026-11-26): **each painted pixel takes the colour of the nearest pixel outside the painted area**, which is exactly what the reader sees there. The area is filled inwards from its edges, one pixel per step, up to 64 steps at the OCR resolution (strokes up to about 45 pt thick). What a larger area still holds, or a page that is all text, takes the median colour of what is outside it. Inside a dark box the text's area becomes the box's colour: no shape of the text is left for OCR, hidden or visible.
+
+Tests: dark text on a black box, almost transparent white text on it, and visible white text on it each leave the box's pixels within the contrast threshold of black in the OCR image; the three tests fail on the previous code. The worker's other tests, including drawn words under text glyphs, pass unchanged.
