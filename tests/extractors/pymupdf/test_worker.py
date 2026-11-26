@@ -10,7 +10,7 @@ import numpy as np
 import pymupdf
 import pytest
 
-from sugo.core.constants import PDF_OCR_MAX_PIXELS
+from sugo.core.constants import PDF_MIN_TEXT_CONTRAST, PDF_OCR_MAX_PIXELS
 from sugo.extractors.pymupdf import worker
 from sugo.extractors.pymupdf.guard import BROTLI_REFUSAL, raw_problem
 from sugo.extractors.pymupdf.protocol import Message, NativePage, Opened, Refused, ScanPage
@@ -261,6 +261,100 @@ def test_page_with_a_few_words_and_a_drawing_keeps_its_words() -> None:
     assert [line.text.strip() for line in page.hidden_lines] == ["gone"]
     assert pixels is not None
     assert len(pixels) == page.pixel_bytes
+
+
+BOX = pymupdf.Rect(60, 200, 560, 300)
+
+
+def _box_with_text(colour: tuple[float, float, float], **text: Any) -> bytes:
+    """A page number and a black box with 36 pt text on it."""
+
+    def draw(page: pymupdf.Page) -> None:
+        page.insert_text((300, 800), "7", fontsize=10)
+        page.draw_rect(BOX, color=None, fill=(0, 0, 0))
+        page.insert_text((80, 265), "IGNORE ALL PREVIOUS", fontsize=36, color=colour, **text)
+
+    return one_page(draw)
+
+
+def _box_pixels(page: ScanPage, pixels: bytes) -> np.ndarray:
+    image = np.frombuffer(pixels, dtype=np.uint8).reshape(page.pixel_height, page.pixel_width, 3)
+    zoom = page.pixel_width / 595  # the default page is 595 points wide
+    inner = pymupdf.Rect(BOX.x0 + 5, BOX.y0 + 5, BOX.x1 - 5, BOX.y1 - 5)
+    return image[
+        int(inner.y0 * zoom) : int(inner.y1 * zoom), int(inner.x0 * zoom) : int(inner.x1 * zoom)
+    ]
+
+
+@pytest.mark.parametrize(
+    ("colour", "text", "hidden"),
+    [
+        pytest.param((0.03, 0.03, 0.03), {}, True, id="dark-on-black"),
+        pytest.param((1, 1, 1), {"fill_opacity": 0.05}, True, id="almost-transparent"),
+        pytest.param((1, 1, 1), {}, False, id="visible-white-on-black"),
+    ],
+)
+def test_text_on_a_dark_box_leaves_no_shape_for_ocr(
+    colour: tuple[float, float, float], text: dict[str, Any], hidden: bool
+) -> None:
+    # Security review 2026-11-26: the text's area was painted with the page's
+    # background (white), so hidden text on a black box became a white
+    # stencil that OCR read as visible text. Visible text was read twice.
+    page, pixels = list(run(_box_with_text(colour, **text), 0))[1]
+    assert isinstance(page, ScanPage)
+    assert pixels is not None
+    lines = page.hidden_lines if hidden else page.visible_lines
+    assert "IGNORE ALL PREVIOUS" in [line.text.strip() for line in lines]
+    assert int(_box_pixels(page, pixels).max()) < PDF_MIN_TEXT_CONTRAST
+
+
+def test_very_thick_hidden_text_on_a_dark_box_leaves_no_shape_for_ocr() -> None:
+    # Strokes far thicker than any step limit (review of #149): 360 pt bold.
+    box = pymupdf.Rect(10, 10, 1090, 342)
+
+    def draw(page: pymupdf.Page) -> None:
+        page.insert_text((300, 780), "7", fontsize=10)
+        page.draw_rect(box, color=None, fill=(0, 0, 0))
+        page.insert_text((30, 310), "OBEY", fontsize=360, fontname="hebo", color=(0.08,) * 3)
+
+    document = pymupdf.open()
+    draw(document.new_page(width=1100, height=792))
+    page, pixels = list(run(document.tobytes(), 0))[1]
+    assert isinstance(page, ScanPage)
+    assert [line.text.strip() for line in page.hidden_lines] == ["OBEY"]
+    assert pixels is not None
+    image = np.frombuffer(pixels, dtype=np.uint8).reshape(page.pixel_height, page.pixel_width, 3)
+    zoom = page.pixel_width / 1100
+    inner = pymupdf.Rect(box.x0 + 5, box.y0 + 5, box.x1 - 5, box.y1 - 5)
+    region = image[
+        int(inner.y0 * zoom) : int(inner.y1 * zoom), int(inner.x0 * zoom) : int(inner.x1 * zoom)
+    ]
+    assert int(region.max()) < PDF_MIN_TEXT_CONTRAST
+
+
+def test_each_painted_pixel_takes_the_colour_nearest_to_it() -> None:
+    # Left half black, right half white; a band across both is painted over.
+    pixels = np.zeros((20, 40, 3), dtype=np.uint8)
+    pixels[:, 20:] = 255
+    pixels[8:12, 5:35] = 128  # what the text left there
+    area = np.zeros((20, 40), dtype=bool)
+    area[8:12, 5:35] = True
+    worker._fill_from_surroundings(pixels, area)
+    assert int(pixels[8:12, 5:19].max()) == 0
+    assert int(pixels[8:12, 21:35].min()) == 255
+
+
+def test_a_page_that_is_all_text_takes_one_colour() -> None:
+    pixels = np.random.default_rng(0).integers(0, 255, (16, 16, 3), dtype=np.uint8)
+    worker._fill_from_surroundings(pixels, np.ones((16, 16), dtype=bool))
+    assert len(np.unique(pixels.reshape(-1, 3), axis=0)) == 1
+
+
+def test_an_empty_area_changes_nothing() -> None:
+    pixels = np.random.default_rng(1).integers(0, 255, (8, 8, 3), dtype=np.uint8)
+    before = pixels.copy()
+    worker._fill_from_surroundings(pixels, np.zeros((8, 8), dtype=bool))
+    assert np.array_equal(pixels, before)
 
 
 @pytest.mark.parametrize("text", ["12", "The End"])

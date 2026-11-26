@@ -22,6 +22,9 @@ dependencies = [
     # its layout module or pymupdf4llm.
     "pymupdf>=2.0,<2.1",
     "rapidocr==3.10.0",
+    # Already installed by rapidocr; the PDF worker uses its distance
+    # transform to paint over text before OCR (ADR-043 amendment 2026-11-26).
+    "opencv-python-headless==5.0.0.93",
     # The interactive shell's input line (ADR-062). wcwidth stays below 0.9,
     # the first release with compiled native wheels.
     "prompt_toolkit>=3.0.53,<3.1",

@@ -651,8 +651,8 @@ def _drawn_scan(
     and never repeats, or replaces, the text the page really has (ADR-043
     amendment 2026-11-25). Removing the text also uncovers what the text was
     covering, which no reader can see, so every pixel the text changes is
-    painted with the background first (review 2026-11-25). None if MuPDF
-    cannot remove the text at that size.
+    painted over first, with the colours around it (reviews 2026-11-25 and
+    2026-11-26). None if MuPDF cannot remove the text at that size.
     """
     dpi = _ocr_dpi(float(page.rect.width), float(page.rect.height))
     pixels = _textless_pixels(page, dpi)
@@ -677,7 +677,12 @@ def _blank_text_areas(textless: Pixels, shown: Pixels) -> None:
 
     What is left is what a reader sees outside the text: drawings, never what
     text glyphs hide. The area grows by ``_TEXT_AREA_MARGIN`` pixels for
-    anti-aliased edges. Works on bands of rows to bound memory.
+    anti-aliased edges. The comparison works on bands of rows to bound memory.
+
+    Each painted pixel takes the colour of the nearest pixel outside the
+    area, not one colour for the whole page: painting with the page's
+    background turned text hidden on a dark box (dark on black) into a white
+    stencil that OCR read as visible text (security review 2026-11-26).
     """
     changed = np.zeros(textless.shape[:2], dtype=bool)
     for top in range(0, textless.shape[0], _MARK_BAND_ROWS):
@@ -691,8 +696,45 @@ def _blank_text_areas(textless: Pixels, shown: Pixels) -> None:
     for shift in range(1, _TEXT_AREA_MARGIN + 1):
         grown[:, shift:] |= changed[:, :-shift]
         grown[:, :-shift] |= changed[:, shift:]
-    background = np.median(textless[::4, ::4].reshape(-1, 3), axis=0).astype(np.uint8)
-    textless[grown] = background
+    _fill_from_surroundings(textless, grown)
+
+
+def _fill_from_surroundings(pixels: Pixels, area: npt.NDArray[np.bool_]) -> None:
+    """Give every pixel of ``area`` the colour of the nearest pixel outside it.
+
+    Outside ``area`` the page without text looks exactly as the reader sees
+    it, so the area takes the colours around it and keeps no trace of the
+    text's shape, however thick the text. OpenCV's distance transform finds
+    the nearest outside pixel (5 x 5 chamfer distance) in one pass, within
+    the box around ``area`` plus one pixel: that ring is outside ``area`` and
+    nearer than anything beyond it. Only an area that fills its whole box
+    (text covering the entire render) has nothing outside to copy; it takes
+    one colour, the median of that box.
+    """
+    rows = np.flatnonzero(area.any(axis=1))
+    if rows.size == 0:
+        return
+    columns = np.flatnonzero(area.any(axis=0))
+    box = (
+        slice(max(0, int(rows[0]) - 1), int(rows[-1]) + 2),
+        slice(max(0, int(columns[0]) - 1), int(columns[-1]) + 2),
+    )
+    region = pixels[box]
+    inside = area[box]
+    if inside.all():
+        region[...] = np.median(region[::16, ::16].reshape(-1, 3), axis=0).astype(np.uint8)
+        return
+    # Imported here: only mixed pages need it, and the worker starts faster.
+    import cv2
+
+    # Zero pixels are the known ones; each gets its own label, and every
+    # pixel of the area the label of the known pixel nearest to it.
+    _, labels = cv2.distanceTransformWithLabels(
+        inside.astype(np.uint8), cv2.DIST_L2, 5, labelType=cv2.DIST_LABEL_PIXEL
+    )
+    colours = np.zeros((int(labels.max()) + 1, 3), dtype=np.uint8)
+    colours[labels[~inside]] = region[~inside]
+    region[inside] = colours[labels[inside]]
 
 
 # Redaction area covering every character of any page (PDF limits pages to
