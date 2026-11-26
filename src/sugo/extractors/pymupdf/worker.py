@@ -35,6 +35,7 @@ second time without its text (security review F3, ADR-043 update).
 """
 
 import contextlib
+import itertools
 import math
 import re
 import sys
@@ -48,6 +49,10 @@ import numpy.typing as npt
 from sugo.core.constants import (
     MAX_PDF_FILE_BYTES,
     MAX_PDF_PAGES,
+    PDF_DRAWN_GLYPH_MAX_HEIGHT,
+    PDF_DRAWN_GLYPH_MIN_HEIGHT,
+    PDF_DRAWN_TEXT_MIN_ROWS,
+    PDF_DRAWN_TEXT_MIN_SEGMENTS,
     PDF_MIN_TEXT_ALPHA,
     PDF_MIN_TEXT_CONTRAST,
     PDF_MIN_VISIBLE_FONT_SIZE,
@@ -356,6 +361,12 @@ def _read_page(page: pymupdf.Page, index: int) -> tuple[Message, bytes | None]:
             drawn = _drawn_scan(page, index, lines)
             if drawn is not None:
                 return drawn
+    # A page with real text, such as a footer, can still draw its body as
+    # curves (ADR-043 amendment 2026-11-26).
+    elif textless is not None and _has_marks(textless) and _draws_words(page):
+        drawn = _drawn_scan(page, index, lines)
+        if drawn is not None:
+            return drawn
     return NativePage(index=index, lines=tuple(lines)), None
 
 
@@ -625,6 +636,44 @@ def _has_marks(pixels: Pixels) -> bool:
 # Rows of a render compared at once by ``_has_marks``: a few MB even on the
 # largest pages.
 _MARK_BAND_ROWS = 64
+
+
+def _draws_words(page: pymupdf.Page) -> bool:
+    """Whether the page draws lines of words as filled curves.
+
+    Some exporters turn a page's body into curves and keep only headers and
+    footers as text (ADR-043 amendment 2026-11-26). A drawn letter is a small
+    filled shape: as tall as a letter, made of curves or lines, not only
+    rectangles. Enough of them, on enough rows, is drawn text. Tables, form
+    boxes and charts are outlines or rectangles; a signature, a logo or one
+    drawn title is a single row.
+    """
+    try:
+        paths = page.get_cdrawings()
+    except Exception:  # noqa: BLE001 - a hostile page must not stop its reading
+        return False
+    glyphs: list[tuple[float, float, int]] = []  # (centre, height, segments)
+    for path in paths:
+        if path.get("fill") is None:
+            continue
+        kinds = [item[0] for item in path["items"]]
+        if all(kind in _BOX_ITEMS for kind in kinds):
+            continue
+        rect = pymupdf.Rect(path["rect"])
+        if PDF_DRAWN_GLYPH_MIN_HEIGHT <= rect.height <= PDF_DRAWN_GLYPH_MAX_HEIGHT:
+            glyphs.append(((rect.y0 + rect.y1) / 2, rect.height, len(kinds)))
+    if sum(segments for _, _, segments in glyphs) < PDF_DRAWN_TEXT_MIN_SEGMENTS:
+        return False
+    # Letters of one line sit close together; a new row starts at a gap of
+    # half a letter's height.
+    gap = float(np.median([height for _, height, _ in glyphs])) / 2
+    centres = sorted(centre for centre, _, _ in glyphs)
+    rows = 1 + sum(1 for above, below in itertools.pairwise(centres) if below - above > gap)
+    return rows >= PDF_DRAWN_TEXT_MIN_ROWS
+
+
+# Path items that draw only boxes (rectangles and quads): tables, highlights.
+_BOX_ITEMS = frozenset({"re", "qu"})
 
 
 def _scan(page: pymupdf.Page, index: int, hidden: list[NativeLine]) -> tuple[Message, bytes | None]:

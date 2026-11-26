@@ -237,6 +237,17 @@ PDF_SCAN_MIN_IMAGE_COVERAGE: Final = 0.5
 PDF_SCAN_MAX_VISIBLE_CHARS: Final = 20
 PDF_SCAN_MIN_MARK_PIXELS: Final = 20
 
+# A page with more visible text than the limit above is checked for a body
+# drawn as curves (ADR-043 amendment 2026-11-26): filled shapes as tall as a
+# letter (in points), with at least this many path segments in all (one
+# drawn letter is about 14; 600 is some 40 letters) on at least this many
+# rows. Tables and form boxes are outlines or rectangles, a signature or a
+# logo is one row, so none of them counts.
+PDF_DRAWN_GLYPH_MIN_HEIGHT: Final = 2.0
+PDF_DRAWN_GLYPH_MAX_HEIGHT: Final = 40.0
+PDF_DRAWN_TEXT_MIN_SEGMENTS: Final = 600
+PDF_DRAWN_TEXT_MIN_ROWS: Final = 3
+
 # Resolution used to render scanned pages for OCR (ADR-018 adaptive DPI: an
 # A4 page at 200 DPI is about 12 MB), lowered when a page is large so the
 # image never exceeds the pixel limit below.

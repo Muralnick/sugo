@@ -25,6 +25,16 @@ still change, with notice, before 1.0).
   patch releases.
 - The CI container check also runs on arm64.
 
+### Fixed
+
+- A PDF page with real text, such as a footer, and a body drawn as curves
+  lost its body without a trace: only pages with fewer than 20 characters
+  were checked. Such a page now keeps its real text exactly and has only the
+  drawn part read with OCR. Drawn words are recognised from the page's
+  shapes: many filled shapes the size of letters, on three rows or more, so
+  tables, forms, charts, logos and signatures leave a page as it was
+  (ADR-043 amendment).
+
 ## [0.3.1] - 2026-11-25
 
 ### Changed

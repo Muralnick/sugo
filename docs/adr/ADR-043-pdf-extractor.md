@@ -129,3 +129,19 @@ Two faults of the render without text (amendment of 2026-11-07), found by the re
 - **Boxes that do not start at the origin:** the redaction area was the media box, but redaction areas are measured from the crop box, so part of the text could stay. That text then "changed nothing" and was marked hidden, or made the page look like a drawing. The area is now far larger than any page.
 
 Known limit: a page whose text is written sideways or upside down as shown (the content not turned with `/Rotate`) keeps all its text now, but its layout is poor (lines in reverse order, or merged into one block at 90 and 270 degrees). Using MuPDF's line direction would fix it; not done here.
+
+## Amendment, 2026-11-26: a drawn body under real text
+
+Closes the known limit of the 2026-11-25 amendment on words drawn as curves: a page with 20 or more visible characters, such as a footer kept as text, was never checked, so a body drawn as curves under it was lost silently.
+
+Decision (maintainer, 2026-11-26):
+
+- **A page with real text is checked for drawn words only when something besides its text is drawn on it** (the same render without text and the same threshold as for pages with almost no text). Most pages stop there.
+- **Drawn words are recognised from the page's vector paths**, not its pixels, so tables and charts do not count. A drawn letter is a filled path 2 to 40 points tall, made of curves or lines, not only rectangles or quads. The page draws words when such paths hold at least **600 path segments** in all (one letter is about 14, so some 40 letters) on at least **3 rows**. A new row starts at a gap of half the median height of those paths.
+- **What does not count**: table cells, highlights and bar charts (rectangles); form boxes, radio buttons and stroked signatures (outlines, not filled); a filled signature, a logo, a drawn title, or a drawn header with a drawn footer (one or two rows); a few drawn words (under 600 segments).
+- **Such a page is read like a mixed page** (2026-11-25): its real text kept exactly, only the drawn part read with OCR, after painting over every pixel the text changes.
+- If MuPDF cannot list the page's paths, the page stays native, as before.
+
+Measured: synthetic pages with a text footer and 3 or more drawn lines are found at every `/Rotate` value (0, 90, 180, 270 and 45, since rows are counted in the page's unrotated space); one or two drawn rows, a filled or stroked signature, a table, a form and a chart leave a text page native. The synthetic benchmark corpus gives the same tokens, removals and content checks as on 2026-11-23. No real PDF with a drawn body was available locally (file 49 of the 2026-11-13 test was lost); the thresholds come from synthetic pages, and a real one should be checked when found.
+
+**Known limits:** a page drawn as one shape per line or per word is counted the same way, by segments and rows; a page whose text runs in columns rotated inside an upright page counts its columns' letters as many rows, which errs towards OCR. A page full of small filled drawings in rows (an icon grid, a map) may be read with OCR too: its real text stays exact, and the cost is time and possibly a few stray OCR words, marked with their engine.

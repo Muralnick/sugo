@@ -263,6 +263,127 @@ def test_page_with_a_few_words_and_a_drawing_keeps_its_words() -> None:
     assert len(pixels) == page.pixel_bytes
 
 
+BODY = "The tenant pays the rent on the first day of each month"
+FOOTER = "Page 3 of 12 - Lease agreement, confidential"
+
+
+def with_footer(data: bytes, draw: Callable[[pymupdf.Page], object] | None = None) -> bytes:
+    """``data``'s page with a real text footer (and ``draw``) added."""
+    document = pymupdf.open("pdf", data)
+    page = document[0]
+    page.insert_text((72, 800), FOOTER, fontsize=9)
+    if draw is not None:
+        draw(page)
+    return document.tobytes()
+
+
+def test_a_drawn_body_under_a_text_footer_is_read_with_ocr(
+    drawn_text_pdf: Callable[[list[str]], bytes],
+) -> None:
+    # ADR-043 amendment 2026-11-26: the footer has more than 20 characters,
+    # so before it the page was native and its drawn body was lost silently.
+    data = with_footer(drawn_text_pdf([BODY] * 4))
+    page, pixels = list(run(data, 0))[1]
+    assert isinstance(page, ScanPage)
+    assert [line.text.strip() for line in page.visible_lines] == [FOOTER]
+    assert pixels is not None
+    assert len(pixels) == page.pixel_bytes
+
+
+@pytest.mark.parametrize(
+    "lines",
+    [
+        pytest.param([BODY], id="one-drawn-row"),  # a drawn title or logo
+        pytest.param([BODY] * 2, id="two-drawn-rows"),  # a drawn header and footer
+        pytest.param(["Lease"] * 4, id="few-drawn-letters"),
+    ],
+)
+def test_a_little_drawn_text_beside_real_text_stays_native(
+    drawn_text_pdf: Callable[[list[str]], bytes], lines: list[str]
+) -> None:
+    assert isinstance(messages(with_footer(drawn_text_pdf(lines)))[1], NativePage)
+
+
+def _signature(page: pymupdf.Page) -> None:
+    shape = page.new_shape()
+    points = [(100 + 3 * i, 700 + 10 * np.sin(i / 3)) for i in range(61)]
+    for start in range(0, 60, 3):
+        shape.draw_bezier(*points[start : start + 4])
+    shape.finish(fill=(0, 0, 0.5), color=None, closePath=True)
+    shape.commit()
+
+
+def _stroked_signature(page: pymupdf.Page) -> None:
+    shape = page.new_shape()
+    for row in range(6):
+        points = [(100 + 3 * i, 600 + 30 * row + 8 * np.sin(i / 2)) for i in range(61)]
+        for start in range(0, 60, 3):
+            shape.draw_bezier(*points[start : start + 4])
+    shape.finish(color=(0, 0, 0), width=1.2)
+    shape.commit()
+
+
+def _table(page: pymupdf.Page) -> None:
+    for row in range(15):
+        for column in range(5):
+            box = pymupdf.Rect(72 + 90 * column, 100 + 20 * row, 162 + 90 * column, 120 + 20 * row)
+            page.draw_rect(box, color=(0, 0, 0), fill=(0.9, 0.9, 1) if row % 2 else None)
+
+
+def _form(page: pymupdf.Page) -> None:
+    for row in range(12):
+        for column in range(6):
+            page.draw_circle((80 + 80 * column, 100 + 40 * row), 4, color=(0, 0, 0), fill=(0, 0, 0))
+            box = pymupdf.Rect(90 + 80 * column, 92 + 40 * row, 140 + 80 * column, 108 + 40 * row)
+            page.draw_rect(box, color=(0, 0, 0), radius=0.3)
+
+
+def _bar_chart(page: pymupdf.Page) -> None:
+    for bar in range(20):
+        box = pymupdf.Rect(80 + 20 * bar, 600 - 15 * bar, 95 + 20 * bar, 600)
+        page.draw_rect(box, color=None, fill=(0.2, 0.4, 0.8))
+    page.draw_sector((300, 300), (400, 300), 120, fill=(1, 0, 0))
+
+
+@pytest.mark.parametrize(
+    "draw",
+    [
+        pytest.param(_signature, id="filled-signature"),
+        pytest.param(_stroked_signature, id="stroked-signature"),
+        pytest.param(_table, id="table"),
+        pytest.param(_form, id="form"),
+        pytest.param(_bar_chart, id="chart"),
+    ],
+)
+def test_drawings_that_are_not_words_leave_a_text_page_native(
+    draw: Callable[[pymupdf.Page], object],
+) -> None:
+    def page(page: pymupdf.Page) -> None:
+        page.insert_text((72, 72), "Monthly report for the board of directors", fontsize=12)
+        page.insert_text((72, 800), FOOTER, fontsize=9)
+        draw(page)
+
+    assert isinstance(messages(one_page(page))[1], NativePage)
+
+
+@ROTATIONS
+def test_a_drawn_body_is_found_on_a_rotated_page(
+    drawn_text_pdf: Callable[[list[str]], bytes], rotation: int
+) -> None:
+    data = rotated(with_footer(drawn_text_pdf([BODY] * 4)), rotation)
+    assert isinstance(messages(data)[1], ScanPage)
+
+
+def test_a_page_whose_drawings_cannot_be_read_stays_native(
+    monkeypatch: pytest.MonkeyPatch, drawn_text_pdf: Callable[[list[str]], bytes]
+) -> None:
+    def broken(_page: pymupdf.Page) -> Any:
+        raise RuntimeError("hostile page")
+
+    monkeypatch.setattr(pymupdf.Page, "get_cdrawings", broken)
+    assert isinstance(messages(with_footer(drawn_text_pdf([BODY] * 4)))[1], NativePage)
+
+
 @pytest.mark.parametrize("text", ["12", "The End"])
 def test_without_the_second_render_a_page_of_few_words_stays_native(
     monkeypatch: pytest.MonkeyPatch, text: str
