@@ -101,3 +101,11 @@ The `container` CI job of ADR-065 runs on `ubuntu-24.04` and `ubuntu-24.04-arm`,
 - Base image updates arrive as reviewable pull requests; the release checklist no longer has a manual digest refresh.
 - GitHub's arm64 runners are relatively new; if they become unavailable, arm64 falls back to QEMU emulation on amd64, at the cost of speed.
 - Residual: Dependabot is documented to update an image pinned as `tag@sha256:…` when a newer tag appears; whether it also proposes a new digest when Debian rebuilds the same tag is to be confirmed in the first weeks. If it does not, a small scheduled check is added in a follow-up.
+
+## Amendment (2026-11-26): implementation notes
+
+- Each architecture's build writes an OCI archive (`--output type=oci`) holding the image and BuildKit's SBOM attestation. The probe runs that archive's image, copied into Docker with `skopeo`: `docker load` cannot read an archive with an attestation next to the image.
+- `scripts/release/merge_oci_images.py` (standard library only) puts the two archives' images and attestations in one OCI index. It checks every blob's SHA-256 while copying, one Linux image per archive, no architecture twice, and that each attestation belongs to its archive's image. It runs in dry runs too, and again in the push job, which stops if the digest differs from the one checked earlier.
+- The push job logs in with `docker login` (token on standard input) and pushes with `skopeo copy --all --preserve-digests`, so the registry serves the index digest that is attested. `skopeo` is preinstalled on both GitHub runners (1.13.3 on 2026-11-26), like `docker` and `buildx`: no tool is downloaded for this.
+- The BuildKit image (`moby/buildkit`, v0.34.2) and the SBOM scanner (`docker/buildkit-syft-scanner`, 1.12.1) are pinned by digest in `release.yml`, at least 14 days old. Dependabot reads only the `Dockerfile`, so these two move by hand.
+- The Dockerfile's `org.opencontainers.image.source` label names this repository, so GHCR links the package to it on the first push; making the package public stays a manual step (point 8).
