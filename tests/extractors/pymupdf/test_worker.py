@@ -308,6 +308,55 @@ def test_text_on_a_dark_box_leaves_no_shape_for_ocr(
     assert int(_box_pixels(page, pixels).max()) < PDF_MIN_TEXT_CONTRAST
 
 
+def test_very_thick_hidden_text_on_a_dark_box_leaves_no_shape_for_ocr() -> None:
+    # Strokes far thicker than any step limit (review of #149): 360 pt bold.
+    box = pymupdf.Rect(10, 10, 1090, 342)
+
+    def draw(page: pymupdf.Page) -> None:
+        page.insert_text((300, 780), "7", fontsize=10)
+        page.draw_rect(box, color=None, fill=(0, 0, 0))
+        page.insert_text((30, 310), "OBEY", fontsize=360, fontname="hebo", color=(0.08,) * 3)
+
+    document = pymupdf.open()
+    draw(document.new_page(width=1100, height=792))
+    page, pixels = list(run(document.tobytes(), 0))[1]
+    assert isinstance(page, ScanPage)
+    assert [line.text.strip() for line in page.hidden_lines] == ["OBEY"]
+    assert pixels is not None
+    image = np.frombuffer(pixels, dtype=np.uint8).reshape(page.pixel_height, page.pixel_width, 3)
+    zoom = page.pixel_width / 1100
+    inner = pymupdf.Rect(box.x0 + 5, box.y0 + 5, box.x1 - 5, box.y1 - 5)
+    region = image[
+        int(inner.y0 * zoom) : int(inner.y1 * zoom), int(inner.x0 * zoom) : int(inner.x1 * zoom)
+    ]
+    assert int(region.max()) < PDF_MIN_TEXT_CONTRAST
+
+
+def test_each_painted_pixel_takes_the_colour_nearest_to_it() -> None:
+    # Left half black, right half white; a band across both is painted over.
+    pixels = np.zeros((20, 40, 3), dtype=np.uint8)
+    pixels[:, 20:] = 255
+    pixels[8:12, 5:35] = 128  # what the text left there
+    area = np.zeros((20, 40), dtype=bool)
+    area[8:12, 5:35] = True
+    worker._fill_from_surroundings(pixels, area)
+    assert int(pixels[8:12, 5:19].max()) == 0
+    assert int(pixels[8:12, 21:35].min()) == 255
+
+
+def test_a_page_that_is_all_text_takes_one_colour() -> None:
+    pixels = np.random.default_rng(0).integers(0, 255, (16, 16, 3), dtype=np.uint8)
+    worker._fill_from_surroundings(pixels, np.ones((16, 16), dtype=bool))
+    assert len(np.unique(pixels.reshape(-1, 3), axis=0)) == 1
+
+
+def test_an_empty_area_changes_nothing() -> None:
+    pixels = np.random.default_rng(1).integers(0, 255, (8, 8, 3), dtype=np.uint8)
+    before = pixels.copy()
+    worker._fill_from_surroundings(pixels, np.zeros((8, 8), dtype=bool))
+    assert np.array_equal(pixels, before)
+
+
 @pytest.mark.parametrize("text", ["12", "The End"])
 def test_without_the_second_render_a_page_of_few_words_stays_native(
     monkeypatch: pytest.MonkeyPatch, text: str

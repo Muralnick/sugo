@@ -651,8 +651,8 @@ def _drawn_scan(
     and never repeats, or replaces, the text the page really has (ADR-043
     amendment 2026-11-25). Removing the text also uncovers what the text was
     covering, which no reader can see, so every pixel the text changes is
-    painted with the background first (review 2026-11-25). None if MuPDF
-    cannot remove the text at that size.
+    painted over first, with the colours around it (reviews 2026-11-25 and
+    2026-11-26). None if MuPDF cannot remove the text at that size.
     """
     dpi = _ocr_dpi(float(page.rect.width), float(page.rect.height))
     pixels = _textless_pixels(page, dpi)
@@ -677,12 +677,12 @@ def _blank_text_areas(textless: Pixels, shown: Pixels) -> None:
 
     What is left is what a reader sees outside the text: drawings, never what
     text glyphs hide. The area grows by ``_TEXT_AREA_MARGIN`` pixels for
-    anti-aliased edges. Works on bands of rows to bound memory.
+    anti-aliased edges. The comparison works on bands of rows to bound memory.
 
-    Each painted pixel takes the colour around it, not one colour for the
-    whole page: painting with the page's background turned text hidden on a
-    dark box (dark on black) into a white stencil that OCR read as visible
-    text (security review 2026-11-26).
+    Each painted pixel takes the colour of the nearest pixel outside the
+    area, not one colour for the whole page: painting with the page's
+    background turned text hidden on a dark box (dark on black) into a white
+    stencil that OCR read as visible text (security review 2026-11-26).
     """
     changed = np.zeros(textless.shape[:2], dtype=bool)
     for top in range(0, textless.shape[0], _MARK_BAND_ROWS):
@@ -704,40 +704,36 @@ def _fill_from_surroundings(pixels: Pixels, area: npt.NDArray[np.bool_]) -> None
 
     Outside ``area`` the page without text looks exactly as the reader sees
     it, so the area takes the colours around it and keeps no trace of the
-    text's shape. Grows inwards one pixel per step; an area too thick to
-    close in ``_FILL_MAX_STEPS`` steps, or a page that is all text, takes the
-    median colour of what is left outside it for the rest.
+    text's shape, however thick the text. OpenCV's distance transform finds
+    the nearest outside pixel (5 x 5 chamfer distance) in one pass, within
+    the box around ``area`` plus one pixel: that ring is outside ``area`` and
+    nearer than anything beyond it. A page that is all text has nothing
+    outside to copy and takes one colour, the median of how it is shown.
     """
-    remaining = area.copy()
-    for _ in range(_FILL_MAX_STEPS):
-        if not remaining.any():
-            return
-        known = ~remaining
-        filled = np.zeros_like(remaining)
-        for target, source in _NEIGHBOURS:
-            take = remaining[target] & known[source] & ~filled[target]
-            pixels[target][take] = pixels[source][take]
-            filled[target] |= take
-        remaining &= ~filled
-    if remaining.any():
-        outside = pixels[~area]
-        rest = outside if outside.size else pixels.reshape(-1, 3)
-        pixels[remaining] = np.median(rest[::16], axis=0).astype(np.uint8)
+    rows = np.flatnonzero(area.any(axis=1))
+    if rows.size == 0:
+        return
+    columns = np.flatnonzero(area.any(axis=0))
+    box = (
+        slice(max(0, int(rows[0]) - 1), int(rows[-1]) + 2),
+        slice(max(0, int(columns[0]) - 1), int(columns[-1]) + 2),
+    )
+    region = pixels[box]
+    inside = area[box]
+    if inside.all():
+        region[...] = np.median(region[::16, ::16].reshape(-1, 3), axis=0).astype(np.uint8)
+        return
+    # Imported here: only mixed pages need it, and the worker starts faster.
+    import cv2
 
-
-# Each pixel and the neighbour it takes its colour from: below, above,
-# right and left.
-_ALL = slice(None)
-_NEIGHBOURS = (
-    ((slice(1, None), _ALL), (slice(None, -1), _ALL)),
-    ((slice(None, -1), _ALL), (slice(1, None), _ALL)),
-    ((_ALL, slice(1, None)), (_ALL, slice(None, -1))),
-    ((_ALL, slice(None, -1)), (_ALL, slice(1, None))),
-)
-
-# Steps after which a painted area that is still open takes one colour: at
-# the OCR resolution, strokes up to about 45 pt thick close before that.
-_FILL_MAX_STEPS = 64
+    # Zero pixels are the known ones; each gets its own label, and every
+    # pixel of the area the label of the known pixel nearest to it.
+    _, labels = cv2.distanceTransformWithLabels(
+        inside.astype(np.uint8), cv2.DIST_L2, 5, labelType=cv2.DIST_LABEL_PIXEL
+    )
+    colours = np.zeros((int(labels.max()) + 1, 3), dtype=np.uint8)
+    colours[labels[~inside]] = region[~inside]
+    region[inside] = colours[labels[inside]]
 
 
 # Redaction area covering every character of any page (PDF limits pages to
