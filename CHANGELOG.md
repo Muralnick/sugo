@@ -14,7 +14,8 @@ still change, with notice, before 1.0).
   level (ADR-075). Each release builds it on both architectures from the
   repository's `Dockerfile`, runs the MCP probe on the exact image before
   pushing it, and publishes it after the PyPI upload and a second approval,
-  as `X.Y.Z`; `X.Y` and `latest` move only with the highest release. It is
+  as `X.Y.Z`; `X.Y` moves only with the highest release of that minor line,
+  and `latest` only with the highest release of all. It is
   signed before it is pushed, with a Sigstore provenance attestation and two
   SBOMs: a CycloneDX SBOM from `uv.lock` (Python packages and models) and
   BuildKit's list of the Debian and Python packages in the image. Check it with `gh attestation verify oci://ghcr.io/muralnick/sugo:X.Y.Z

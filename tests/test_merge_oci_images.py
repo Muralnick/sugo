@@ -125,11 +125,17 @@ def test_two_architectures_become_one_index(tmp_path: Path) -> None:
 def test_an_image_without_platform_is_read_from_its_config(tmp_path: Path) -> None:
     out = tmp_path / "out"
     archives = {
-        "amd64": archive(tmp_path, "amd64", attest=False, platform=False),
-        "arm64": archive(tmp_path, "arm64", attest=False),
+        "amd64": archive(tmp_path, "amd64", platform=False),
+        "arm64": archive(tmp_path, "arm64"),
     }
     merge_oci_images.merge(archives, out)
-    assert len(merged_index(out)["manifests"]) == 2
+    assert len(merged_index(out)["manifests"]) == 4  # two images, two SBOMs
+
+
+def test_an_image_without_its_sbom_is_refused(tmp_path: Path) -> None:
+    archives = {"amd64": archive(tmp_path, "amd64", attest=False)}
+    with pytest.raises(merge_oci_images.MergeError, match="0 attestations"):
+        merge_oci_images.merge(archives, tmp_path / "out")
 
 
 def test_an_archive_for_another_architecture_is_refused(tmp_path: Path) -> None:

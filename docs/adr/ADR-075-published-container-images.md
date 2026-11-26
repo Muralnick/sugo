@@ -72,7 +72,7 @@ The `container` CI job of ADR-065 runs on `ubuntu-24.04` and `ubuntu-24.04-arm`,
 
 ### 8. One-time manual steps for the maintainer
 
-- After the first push, in the package settings on GitHub: make the package public and link it to the repository (GHCR creates new packages private).
+- After the first push, in the package settings on GitHub: make the package public (GHCR creates new packages private). The Dockerfile's `org.opencontainers.image.source` label links it to the repository by itself.
 - Enable Dependabot version updates in the repository settings, if not already on.
 
 ### 9. Not done here

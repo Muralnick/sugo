@@ -10,8 +10,8 @@ the registry will serve, and the one the provenance attestation signs.
 
 Every blob's SHA-256 is checked against its name while it is moved into the
 output. An archive must hold exactly one Linux image, for the architecture
-given with it, and its image configuration must say the same. Standard
-library only.
+given with it, and its image configuration must say the same, plus exactly
+one attestation (its SBOM) for that image. Standard library only.
 
 Usage (inside the release workflow):
     python3 scripts/release/merge_oci_images.py <out-dir> <arch>=<archive>...
@@ -129,13 +129,13 @@ def merge(archives: dict[str, Path], out_dir: Path) -> str:
             platform = _platform(layout, images[0])
             if platform != ("linux", arch):
                 raise MergeError(f"{archive.name} is for {'/'.join(platform)}, not linux/{arch}")
+            # The image's SBOM (ADR-075, decision D): exactly one attestation, for it.
             image = images[0]["digest"]
-            for descriptor in descriptors:
-                if (
-                    _is_attestation(descriptor)
-                    and descriptor["annotations"].get(REFERENCE_DIGEST) != image
-                ):
-                    raise MergeError(f"{archive.name} has an attestation for another image")
+            attestations = [d for d in descriptors if _is_attestation(d)]
+            if any(d["annotations"].get(REFERENCE_DIGEST) != image for d in attestations):
+                raise MergeError(f"{archive.name} has an attestation for another image")
+            if len(attestations) != 1:
+                raise MergeError(f"{archive.name} has {len(attestations)} attestations, not one")
             _move_blobs(layout, out_dir)
             manifests.extend(descriptors)
     index = json.dumps(

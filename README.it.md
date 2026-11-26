@@ -256,7 +256,7 @@ Il server gira sullo stesso computer dell'agente, che lo avvia e ci parla dirett
 
 ```bash
 claude mcp add sugo -- docker run -i --rm --network none \
-  --user "$(id -u):$(id -g)" -v ~/Documents:/data:ro ghcr.io/muralnick/sugo:0.3.2
+  --user "$(id -u):$(id -g)" -v ~/Documenti:/data:ro ghcr.io/muralnick/sugo:0.3.2
 ```
 
 Per una configurazione che non può cambiare a tua insaputa, usa il digest dell'immagine (`ghcr.io/muralnick/sugo@sha256:…`) al posto della versione. Per controllare che un'immagine sia stata costruita dalla pipeline di release di Sugo a partire da questo repository:

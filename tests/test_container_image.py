@@ -130,7 +130,11 @@ def test_images_are_built_and_checked_on_both_architectures() -> None:
     for text, name in ((workflow("release.yml"), "image-build"), (workflow("ci.yml"), "container")):
         rows = re.findall(r"- arch: (\S+)\n\s+runner: (\S+)", job(text, name))
         assert set(rows) == {("amd64", "ubuntu-24.04"), ("arm64", "ubuntu-24.04-arm")}
-        assert "runs-on: ${{ matrix.runner }}" in job(text, name)
+        block = job(text, name)
+        assert "runs-on: ${{ matrix.runner }}" in block
+        # Each leg builds its image and runs the MCP probe on it, without network.
+        assert "docker build" in block or "docker buildx build --platform" in block
+        assert "scripts/container/mcp_probe.py docker run -i --rm --network none" in block
 
 
 def test_only_the_approved_publish_job_can_write_packages() -> None:
