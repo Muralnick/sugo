@@ -110,7 +110,7 @@ Limiti da tenere presenti: il corpus è piccolo e per lo più sintetico, ed è s
 ## Stato
 
 > [!NOTE]
-> **La v0.3.2 è uscita**, su [PyPI](https://pypi.org/project/sugo-cli/) con il nome `sugo-cli` e nel [registro MCP](https://registry.modelcontextprotocol.io/) ufficiale come `io.github.Muralnick/sugo`. Le novità sono nel [changelog](CHANGELOG.md) (in inglese). È ancora 0.x: i contratti possono cambiare, con preavviso, prima della 1.0. Le release sono costruite in modo riproducibile, con SBOM, attestazioni Sigstore e PyPI Trusted Publishing.
+> **La v0.3.3 è uscita**, su [PyPI](https://pypi.org/project/sugo-cli/) con il nome `sugo-cli` e nel [registro MCP](https://registry.modelcontextprotocol.io/) ufficiale come `io.github.Muralnick/sugo`. Le novità sono nel [changelog](CHANGELOG.md) (in inglese). È ancora 0.x: i contratti possono cambiare, con preavviso, prima della 1.0. Le release sono costruite in modo riproducibile, con SBOM, attestazioni Sigstore e PyPI Trusted Publishing.
 
 | Funziona oggi | In arrivo |
 |---|---|
@@ -253,20 +253,20 @@ claude mcp add sugo -- sugo mcp --root ~/Documenti
 
 L'agente riceve due strumenti: `convert_document` ed `estimate_savings`. Sugo è anche nel registro MCP ufficiale come `io.github.Muralnick/sugo`, così i client che leggono il registro possono installarlo da lì.
 
-Il server gira sullo stesso computer dell'agente, che lo avvia e ci parla direttamente: i tuoi documenti non lasciano mai quel computer. Per tenerlo in un container, usa l'immagine firmata su GitHub Container Registry, per Linux su Intel/AMD e su ARM, Apple Silicon compreso (da Sugo 0.3.2, ADR-075). Monta solo la cartella che l'agente può leggere, in sola lettura, e lascia il container senza rete, perché la conversione non ne ha mai bisogno:
+Il server gira sullo stesso computer dell'agente, che lo avvia e ci parla direttamente: i tuoi documenti non lasciano mai quel computer. Per tenerlo in un container, usa l'immagine firmata su GitHub Container Registry, per Linux su Intel/AMD e su ARM, Apple Silicon compreso (da Sugo 0.3.3, ADR-075). Monta solo la cartella che l'agente può leggere, in sola lettura, e lascia il container senza rete, perché la conversione non ne ha mai bisogno:
 
 ```bash
 claude mcp add sugo -- docker run -i --rm --network none \
-  --user "$(id -u):$(id -g)" -v ~/Documenti:/data:ro ghcr.io/muralnick/sugo:0.3.2
+  --user "$(id -u):$(id -g)" -v ~/Documenti:/data:ro ghcr.io/muralnick/sugo:0.3.3
 ```
 
 Per una configurazione che non può cambiare a tua insaputa, usa il digest dell'immagine (`ghcr.io/muralnick/sugo@sha256:…`) al posto della versione. Per controllare che un'immagine sia stata costruita dalla pipeline di release di Sugo a partire da questo repository:
 
 ```bash
-gh attestation verify oci://ghcr.io/muralnick/sugo:0.3.2 --repo Muralnick/sugo
+gh attestation verify oci://ghcr.io/muralnick/sugo:0.3.3 --repo Muralnick/sugo
 ```
 
-L'inventario dei componenti è in due parti. Lo SBOM CycloneDX firmato elenca i pacchetti Python e i modelli inclusi: aggiungi `--predicate-type https://cyclonedx.org/bom --format json` al comando qui sopra. L'elenco di tutti i pacchetti Debian e Python dentro l'immagine, per architettura, viaggia con l'immagine: `docker buildx imagetools inspect ghcr.io/muralnick/sugo:0.3.2 --format '{{ json .SBOM }}'`.
+L'inventario dei componenti è in due parti. Lo SBOM CycloneDX firmato elenca i pacchetti Python e i modelli inclusi: aggiungi `--predicate-type https://cyclonedx.org/bom --format json` al comando qui sopra. L'elenco di tutti i pacchetti Debian e Python dentro l'immagine, per architettura, viaggia con l'immagine: `docker buildx imagetools inspect ghcr.io/muralnick/sugo:0.3.3 --format '{{ json .SBOM }}'`.
 
 ### Disinstallare
 

@@ -7,6 +7,11 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-11-26
+
+The first release with the container image: 0.3.2 reached PyPI, but its
+image job stopped before publishing anything.
+
 ### Fixed
 
 - Release pipeline: the container image of 0.3.2 was not published. GitHub's
@@ -20,7 +25,8 @@ still change, with notice, before 1.0).
 
 ### Added
 
-- A signed container image of the MCP server on GitHub Container Registry,
+- (Not published with 0.3.2: the image job failed at the SBOM
+  attestation, before any push. The first image is 0.3.3.) A signed container image of the MCP server on GitHub Container Registry,
   `ghcr.io/muralnick/sugo`, for `linux/amd64` and `linux/arm64`, `lite`
   level (ADR-075). Each release builds it on both architectures from the
   repository's `Dockerfile`, runs the MCP probe on the exact image before
