@@ -259,11 +259,13 @@ claude mcp add sugo -- docker run -i --rm --network none \
   --user "$(id -u):$(id -g)" -v ~/Documents:/data:ro ghcr.io/muralnick/sugo:0.3.2
 ```
 
-Per una configurazione che non può cambiare a tua insaputa, usa il digest dell'immagine (`ghcr.io/muralnick/sugo@sha256:…`) al posto della versione. Per controllare che un'immagine sia stata costruita dalla pipeline di release di Sugo a partire da questo repository, e vederne l'inventario dei componenti:
+Per una configurazione che non può cambiare a tua insaputa, usa il digest dell'immagine (`ghcr.io/muralnick/sugo@sha256:…`) al posto della versione. Per controllare che un'immagine sia stata costruita dalla pipeline di release di Sugo a partire da questo repository:
 
 ```bash
 gh attestation verify oci://ghcr.io/muralnick/sugo:0.3.2 --repo Muralnick/sugo
 ```
+
+L'inventario dei componenti è in due parti. Lo SBOM CycloneDX firmato elenca i pacchetti Python e i modelli inclusi: aggiungi `--predicate-type https://cyclonedx.org/bom --format json` al comando qui sopra. L'elenco di tutti i pacchetti Debian e Python dentro l'immagine, per architettura, viaggia con l'immagine: `docker buildx imagetools inspect ghcr.io/muralnick/sugo:0.3.2 --format '{{ json .SBOM }}'`.
 
 ### Disinstallare
 

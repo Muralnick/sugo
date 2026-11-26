@@ -141,6 +141,12 @@ def test_only_the_approved_publish_job_can_write_packages() -> None:
     assert "environment: release\n" in publish
     assert "if: github.event_name == 'push'\n" in publish
     assert "\npermissions:\n  contents: read\n" in release
+    # Never public before PyPI has the release, and never tagged unsigned.
+    assert "needs: [image-merge, image-sbom, publish]\n" in publish
+    push = publish.index("skopeo copy")
+    assert publish.index("attest-build-provenance@") < push
+    assert publish.index("attest-sbom@") < push
+    assert "push-to-registry" not in publish
 
 
 def test_dependabot_keeps_the_base_image_rules() -> None:

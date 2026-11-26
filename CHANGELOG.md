@@ -13,11 +13,11 @@ still change, with notice, before 1.0).
   `ghcr.io/muralnick/sugo`, for `linux/amd64` and `linux/arm64`, `lite`
   level (ADR-075). Each release builds it on both architectures from the
   repository's `Dockerfile`, runs the MCP probe on the exact image before
-  pushing it, and publishes it after the same approval as PyPI, with the
-  tags `X.Y.Z`, `X.Y` and `latest`. It carries a Sigstore provenance
-  attestation and two SBOMs: the release's CycloneDX SBOM (Python packages
-  and models) and BuildKit's list of the Debian and Python packages in the
-  image. Check it with `gh attestation verify oci://ghcr.io/muralnick/sugo:X.Y.Z
+  pushing it, and publishes it after the PyPI upload and a second approval,
+  as `X.Y.Z`; `X.Y` and `latest` move only with the highest release. It is
+  signed before it is pushed, with a Sigstore provenance attestation and two
+  SBOMs: a CycloneDX SBOM from `uv.lock` (Python packages and models) and
+  BuildKit's list of the Debian and Python packages in the image. Check it with `gh attestation verify oci://ghcr.io/muralnick/sugo:X.Y.Z
   --repo Muralnick/sugo`.
 - Dependabot proposes base image updates for the `Dockerfile` once a week,
   only for releases at least 14 days old (ADR-035) and only Python 3.12

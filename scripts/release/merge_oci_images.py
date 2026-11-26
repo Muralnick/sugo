@@ -8,20 +8,21 @@ image index, as an OCI layout folder that ``skopeo copy --all
 --preserve-digests`` then pushes unchanged: the digest it prints is the one
 the registry will serve, and the one the provenance attestation signs.
 
-Every blob's SHA-256 is checked against its name while it is copied. An
-archive must hold exactly one image, for Linux, and no two archives may be
-for the same architecture. Standard library only.
+Every blob's SHA-256 is checked against its name while it is moved into the
+output. An archive must hold exactly one Linux image, for the architecture
+given with it, and its image configuration must say the same. Standard
+library only.
 
 Usage (inside the release workflow):
-    python3 scripts/release/merge_oci_images.py <out-dir> <archive>...
+    python3 scripts/release/merge_oci_images.py <out-dir> <arch>=<archive>...
 
 Prints ``digest=sha256:...`` for ``$GITHUB_OUTPUT``.
 """
 
 import hashlib
 import json
+import os
 import re
-import shutil
 import sys
 import tarfile
 import tempfile
@@ -75,15 +76,22 @@ def _is_attestation(descriptor: Descriptor) -> bool:
 
 
 def _platform(layout: Path, descriptor: Descriptor) -> tuple[str, str]:
-    platform = descriptor.get("platform")
-    if platform is None:
-        manifest = _read_json(layout, descriptor["digest"])
-        platform = _read_json(layout, manifest["config"]["digest"])
-    return str(platform["os"]), str(platform["architecture"])
+    """The image's (os, architecture), from its configuration.
+
+    A descriptor's ``platform`` field, when present, must agree with it: a
+    mislabeled image would be served to machines it cannot run on.
+    """
+    manifest = _read_json(layout, descriptor["digest"])
+    config = _read_json(layout, manifest["config"]["digest"])
+    platform = (str(config["os"]), str(config["architecture"]))
+    label = descriptor.get("platform")
+    if label is not None and (label["os"], label["architecture"]) != platform:
+        raise MergeError(f"image labelled {label['os']}/{label['architecture']} is {platform}")
+    return platform
 
 
-def _copy_blobs(source: Path, target: Path) -> None:
-    """Copy every blob, refusing one whose content does not match its name."""
+def _move_blobs(source: Path, target: Path) -> None:
+    """Move every blob, refusing one whose content does not match its name."""
     for path in sorted((source / "blobs" / "sha256").iterdir()):
         digest = hashlib.sha256()
         with path.open("rb") as file:
@@ -93,7 +101,7 @@ def _copy_blobs(source: Path, target: Path) -> None:
             raise MergeError(f"blob sha256:{path.name} does not match its content")
         destination = target / "blobs" / "sha256" / path.name
         if not destination.exists():
-            shutil.copyfile(path, destination)
+            os.replace(path, destination)
 
 
 def _extract(archive: Path, into: Path) -> Path:
@@ -104,26 +112,23 @@ def _extract(archive: Path, into: Path) -> Path:
     return into
 
 
-def merge(archives: list[Path], out_dir: Path) -> str:
-    """Write the merged layout to ``out_dir`` and return its index digest."""
+def merge(archives: dict[str, Path], out_dir: Path) -> str:
+    """Merge ``{architecture: archive}`` into ``out_dir``; return the index digest."""
     if not archives:
         raise MergeError("no archives given")
     (out_dir / "blobs" / "sha256").mkdir(parents=True)
     manifests: list[Descriptor] = []
-    platforms: set[tuple[str, str]] = set()
-    with tempfile.TemporaryDirectory() as work:
-        for number, archive in enumerate(archives):
+    # Extracted next to the output, so blobs move into it without a copy.
+    with tempfile.TemporaryDirectory(dir=out_dir.parent) as work:
+        for number, (arch, archive) in enumerate(archives.items()):
             layout = _extract(archive, Path(work) / str(number))
             descriptors = _descriptors(layout)
             images = [d for d in descriptors if not _is_attestation(d)]
             if len(images) != 1:
                 raise MergeError(f"{archive.name} holds {len(images)} images, not one")
             platform = _platform(layout, images[0])
-            if platform[0] != "linux":
-                raise MergeError(f"{archive.name} is for {platform[0]}, not linux")
-            if platform in platforms:
-                raise MergeError(f"two archives are for {'/'.join(platform)}")
-            platforms.add(platform)
+            if platform != ("linux", arch):
+                raise MergeError(f"{archive.name} is for {'/'.join(platform)}, not linux/{arch}")
             image = images[0]["digest"]
             for descriptor in descriptors:
                 if (
@@ -131,7 +136,7 @@ def merge(archives: list[Path], out_dir: Path) -> str:
                     and descriptor["annotations"].get(REFERENCE_DIGEST) != image
                 ):
                     raise MergeError(f"{archive.name} has an attestation for another image")
-            _copy_blobs(layout, out_dir)
+            _move_blobs(layout, out_dir)
             manifests.extend(descriptors)
     index = json.dumps(
         {"schemaVersion": 2, "mediaType": OCI_INDEX, "manifests": manifests},
@@ -159,8 +164,14 @@ def merge(archives: list[Path], out_dir: Path) -> str:
 def main() -> None:
     if len(sys.argv) < 3:  # noqa: PLR2004  (script name, folder, one archive at least)
         sys.exit(__doc__)
+    archives: dict[str, Path] = {}
+    for arg in sys.argv[2:]:
+        arch, sep, path = arg.partition("=")
+        if not sep or not arch or arch in archives:
+            sys.exit(f"merge_oci_images: expected one <arch>=<archive> per architecture: {arg!r}")
+        archives[arch] = Path(path)
     try:
-        digest = merge([Path(arg) for arg in sys.argv[2:]], Path(sys.argv[1]))
+        digest = merge(archives, Path(sys.argv[1]))
     except (MergeError, OSError, KeyError, json.JSONDecodeError, tarfile.TarError) as error:
         sys.exit(f"merge_oci_images: {error}")
     sys.stdout.write(f"digest={digest}\n")

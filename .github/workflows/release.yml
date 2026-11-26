@@ -1,6 +1,7 @@
-# Signed, verifiable release pipeline (ADR-033, roadmap step 9), scoped to
-# PyPI only for v0.1 — see ADR-033's 2026-11-04 amendment for what is
-# deferred (Docker/GHCR, other channels, the mirror) and why.
+# Signed, verifiable release pipeline (ADR-033, roadmap step 9): PyPI for
+# every project, and for sugo-cli also the container image on GHCR
+# (ADR-075). Other channels and the mirror are still deferred (ADR-033's
+# 2026-11-04 amendment).
 #
 # Triggered by pushing a stable version tag: vX.Y.Z for sugo-cli,
 # langchain-sugo-vX.Y.Z and llama-index-readers-sugo-vX.Y.Z for the loaders
@@ -303,7 +304,7 @@ jobs:
         name: Merge into one multi-platform index
         run: >-
           python3 scripts/release/merge_oci_images.py oci-sugo
-          images/sugo-amd64.tar images/sugo-arm64.tar >> "$GITHUB_OUTPUT"
+          amd64=images/sugo-amd64.tar arm64=images/sugo-arm64.tar >> "$GITHUB_OUTPUT"
 
       - name: Check the index with skopeo
         env:
@@ -312,14 +313,53 @@ jobs:
           skopeo inspect --raw oci:oci-sugo:sugo | sha256sum | grep -qx "${DIGEST#sha256:}  -"
           skopeo inspect --raw oci:oci-sugo:sugo | python3 -m json.tool
 
+  # The CycloneDX SBOM attested to the image: the same generator as the
+  # release SBOM (Python packages and bundled models, ADR-033), run on an
+  # environment installed from uv.lock exactly as the Dockerfile installs it,
+  # not on a fresh resolution of the wheel's dependencies.
+  image-sbom:
+    name: image SBOM
+    needs: target
+    if: needs.target.outputs.name == 'sugo-cli'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.13.0"
+          enable-cache: true
+
+      - name: Install the image's environment from the lock
+        env:
+          UV_PROJECT_ENVIRONMENT: .venv-image
+        run: uv sync --locked --no-dev --no-editable
+
+      - name: Generate the CycloneDX SBOM
+        run: |
+          mkdir -p dist
+          uv run python scripts/release/generate_sbom.py \
+            "$(pwd)/.venv-image/bin/python" \
+            "$(pwd)/dist/sbom-image.cdx.json"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-image
+          path: dist/sbom-image.cdx.json
+
   image-publish:
     name: publish image to GHCR
     if: github.event_name == 'push'
-    needs: [attest, image-merge]
+    # After the PyPI upload: an image is never public for a release PyPI
+    # does not have.
+    needs: [image-merge, image-sbom, publish]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    # The same environment, and so the same approval, as sugo-cli's PyPI
-    # upload. Only this job can write packages, with its own GITHUB_TOKEN.
+    # The release environment, approved a second time once PyPI is done.
+    # Only this job can write packages, with its own GITHUB_TOKEN.
     environment: release
     permissions:
       contents: read
@@ -342,48 +382,56 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: sbom
+          name: sbom-image
           path: dist
 
       - name: Merge again and check it is the index checked above
         run: |
           python3 scripts/release/merge_oci_images.py oci-sugo \
-            images/sugo-amd64.tar images/sugo-arm64.tar > merged.txt
+            amd64=images/sugo-amd64.tar arm64=images/sugo-arm64.tar > merged.txt
           test "$(cat merged.txt)" = "digest=${DIGEST}"
 
-      # skopeo reads the login docker writes; the attestation steps need it too.
-      - name: Log in to GHCR
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-
-      # Tags X.Y.Z, X.Y and latest; --preserve-digests pushes the index
-      # byte for byte, so the registry serves the digest signed below.
-      - name: Push the index and its tags
-        env:
-          TAG: ${{ github.ref_name }}
-        run: |
-          version="${TAG#v}"
-          for tag in "${version}" "${version%.*}" latest; do
-            skopeo copy --all --preserve-digests oci:oci-sugo:sugo "docker://${IMAGE}:${tag}"
-          done
-          skopeo inspect --raw "docker://${IMAGE}:${version}" | sha256sum | grep -qx "${DIGEST#sha256:}  -"
-
+      # Signed before anything is pushed: the attestations need only the
+      # digest, and are stored in the repository's attestations, where
+      # gh attestation verify looks. No tag ever points at an unsigned image.
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ env.DIGEST }}
-          push-to-registry: true
 
-      # The release's CycloneDX SBOM (Python packages and models, ADR-033);
+      # The CycloneDX SBOM from the lock (Python packages and models);
       # BuildKit's SBOM of the image's Debian and Python packages is already
       # inside the index, one per architecture.
       - uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
         with:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ env.DIGEST }}
-          sbom-path: dist/sbom.cdx.json
-          push-to-registry: true
+          sbom-path: dist/sbom-image.cdx.json
+
+      # X.Y.Z always; X.Y and latest only when this release is the highest
+      # of its line and of all releases, so a backport never moves them back.
+      - name: Pick the tags
+        env:
+          TAG: ${{ github.ref_name }}
+        run: git ls-remote --tags origin | python3 scripts/release/image_tags.py "${TAG#v}" > tags.txt
+
+      # skopeo reads the login docker writes.
+      - name: Log in to GHCR
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      # --preserve-digests pushes the index byte for byte, so the registry
+      # serves the digest signed above. Pushed once; the other tags are then
+      # copied inside the registry, where every blob already is.
+      - name: Push the index and its tags
+        run: |
+          version="$(head -n 1 tags.txt)"
+          skopeo copy --all --preserve-digests oci:oci-sugo:sugo "docker://${IMAGE}:${version}"
+          skopeo inspect --raw "docker://${IMAGE}:${version}" | sha256sum | grep -qx "${DIGEST#sha256:}  -"
+          tail -n +2 tags.txt | while read -r tag; do
+            skopeo copy --all --preserve-digests "docker://${IMAGE}@${DIGEST}" "docker://${IMAGE}:${tag}"
+          done
 
       - name: Log out
         if: always()
