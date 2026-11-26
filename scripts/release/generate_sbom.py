@@ -16,10 +16,12 @@ at install or run time (ADR-036). The day a level does, its downloader's
 own manifest joins the ``_bundled_components`` list below.
 """
 
+import hashlib
 import json
 import shutil
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -69,6 +71,19 @@ def _bundled_components() -> list[dict]:
     ]
 
 
+def serial_number(sbom: dict) -> str:
+    """A serial number derived from the SBOM's content, as ``urn:uuid:...``.
+
+    ``--output-reproducible`` leaves the serial number out, since by default
+    it is random, but GitHub's SBOM attestation refuses a CycloneDX document
+    without one (the v0.3.2 image release failed there). A UUID computed
+    from the content keeps two builds of the same release identical.
+    """
+    body = {key: value for key, value in sbom.items() if key != "serialNumber"}
+    digest = hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
+    return f"urn:uuid:{uuid.uuid5(uuid.NAMESPACE_URL, 'sugo-sbom:' + digest)}"
+
+
 def main() -> None:
     if len(sys.argv) != _EXPECTED_ARGC:
         sys.stderr.write("usage: generate_sbom.py <python-in-release-venv> <output.json>\n")
@@ -100,6 +115,7 @@ def main() -> None:
 
     sbom = json.loads(output_path.read_text(encoding="utf-8"))
     sbom.setdefault("components", []).extend(_bundled_components())
+    sbom["serialNumber"] = serial_number(sbom)
     output_path.write_text(json.dumps(sbom, indent=2, sort_keys=True), encoding="utf-8")
 
     sys.stdout.write(f"wrote {output_path} ({len(sbom['components'])} components)\n")

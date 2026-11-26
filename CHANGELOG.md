@@ -7,6 +7,15 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+### Fixed
+
+- Release pipeline: the container image of 0.3.2 was not published. GitHub's
+  SBOM attestation refused the CycloneDX SBOM, which had no serial number,
+  and the job stopped before pushing anything (PyPI has 0.3.2). The SBOM
+  now carries a serial number derived from its content, so builds stay
+  reproducible, and the deprecated `actions/attest-sbom` is replaced by
+  `actions/attest` (ADR-075).
+
 ## [0.3.2] - 2026-11-26
 
 ### Added
