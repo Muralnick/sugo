@@ -149,7 +149,7 @@ def test_only_the_approved_publish_job_can_write_packages() -> None:
     assert "needs: [image-merge, image-sbom, publish]\n" in publish
     push = publish.index("skopeo copy")
     assert publish.index("attest-build-provenance@") < push
-    assert publish.index("attest-sbom@") < push
+    assert publish.index("actions/attest@") < push
     assert "push-to-registry" not in publish
 
 
