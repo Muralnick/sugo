@@ -7,6 +7,8 @@ still change, with notice, before 1.0).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-26
+
 ### Added
 
 - A signed container image of the MCP server on GitHub Container Registry,
