@@ -22,7 +22,7 @@ Facts checked on 2026-11-26:
 ### Maintainer decisions (2026-11-26)
 
 - **A. Architectures:** `linux/amd64` and `linux/arm64`, one multi-platform image.
-- **B. Levels:** `lite` only. `normal` (Docling, ADR-071) is not finished and would make the image several times larger; it gets its own image, tagged with a `-normal` suffix, in a later ADR.
+- **B. Levels:** `lite` only. `normal` (Docling, ADR-071) shipped in v0.3.0 for PDF pages but is not complete yet (Office files through Docling are still on the v0.3.x roadmap), and it would make the image several times larger; it gets its own image, tagged with a `-normal` suffix, in a later ADR.
 - **C. Base image updates:** automatic pull requests, respecting the 14-day rule.
 - **D. Inventory:** two SBOMs attached to the image (point 5, option 1).
 
